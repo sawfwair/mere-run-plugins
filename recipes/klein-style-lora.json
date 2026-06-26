@@ -1,0 +1,53 @@
+{
+  "contractVersion": "mere.run/recipe.v1",
+  "id": "klein-style-lora",
+  "title": "FLUX.2 Klein Style LoRA",
+  "family": "style-lora",
+  "description": "Remote-friendly Klein style LoRA recipe aligned with mere.run's built-in klein-fast-style preset.",
+  "models": {
+    "train": "image-klein-base-9b",
+    "apply": "image-klein-9b"
+  },
+  "dataset": {
+    "layout": "paired-image-caption-directory",
+    "minImages": 16,
+    "preferredImages": "24-200 varied images",
+    "notes": [
+      "Preserve the source aspect ratio.",
+      "Prefer content diversity over repeated near-duplicates.",
+      "Avoid square-cropping vertical source formats unless the desired output is square."
+    ]
+  },
+  "captioning": {
+    "triggerToken": "STYLE_TRIGGER",
+    "technique": "Use a distinct trigger token in every caption, then describe only visible content. Do not describe the style you want the LoRA to learn.",
+    "rules": [
+      "Start every caption with the trigger token.",
+      "Describe subject, setting, composition, lighting, and medium if visible.",
+      "Do not use evaluative style labels such as beautiful, iconic, cinematic, or X-like unless the image literally contains that text.",
+      "Do not mention that this image is part of a set.",
+      "Keep captions independently meaningful."
+    ],
+    "examples": [
+      "stylemark. A red motorcycle is parked under an elevated expressway on a rainy night, bright streetlights reflecting on wet pavement.",
+      "stylemark. A worried young man in a red jacket looks sideways from deep shadow near a city street."
+    ]
+  },
+  "training": {
+    "command": "mere.run image train-lora",
+    "arguments": {
+      "--recipe": "klein-fast-style",
+      "--sample-interval": 250,
+      "--sample-model": "image-klein-9b",
+      "--sample-lora-scale": 2.0
+    }
+  },
+  "evaluation": {
+    "command": "mere.run image generate",
+    "prompts": [
+      "STYLE_TRIGGER a young biker in a red jacket beside a futuristic motorcycle under an elevated expressway at night, rain-soaked city, glowing traffic signals, tense urban science fiction film still",
+      "STYLE_TRIGGER a quiet diner interior at midnight with a single person sitting near a window, wet streets outside, dramatic overhead lighting"
+    ],
+    "loraScales": [1.0, 1.5, 2.0]
+  }
+}

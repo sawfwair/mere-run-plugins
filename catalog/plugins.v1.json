@@ -1,0 +1,31 @@
+{
+  "contractVersion": "mere.run/plugin-catalog.v1",
+  "updatedAt": "2026-06-26T11:45:00Z",
+  "defaultChannel": "main",
+  "plugins": [
+    {
+      "id": "mere-runpod",
+      "name": "RunPod Runner",
+      "description": "Run canonical mere.run recipes on user-owned ephemeral RunPod pods, fetch artifacts, and terminate by default.",
+      "repo": "https://github.com/sawfwair/mere-plugins",
+      "package": "mere-runpod",
+      "subdirectory": "packages/mere-runpod",
+      "entrypoint": "mere-runpod",
+      "capabilities": [
+        "remote-runner",
+        "runpod",
+        "train-lora",
+        "artifact-fetch",
+        "cleanup"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-plugins.git@main#subdirectory=packages/mere-runpod"
+        }
+      }
+    }
+  ]
+}
+

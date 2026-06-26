@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/catalog.v1.schema.json",
+  "title": "mere.run Plugin Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "updatedAt",
+    "defaultChannel",
+    "plugins"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/plugin-catalog.v1"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "defaultChannel": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "plugins": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "description",
+          "repo",
+          "package",
+          "subdirectory",
+          "entrypoint",
+          "capabilities",
+          "channels"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^mere-[a-z0-9-]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repo": {
+            "type": "string",
+            "format": "uri"
+          },
+          "package": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "subdirectory": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$"
+          },
+          "entrypoint": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            }
+          },
+          "channels": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["manager", "spec"],
+              "properties": {
+                "manager": {
+                  "enum": ["pipx"]
+                },
+                "spec": {
+                  "type": "string",
+                  "pattern": "^git\\+https://github\\.com/.+\\.git@[A-Za-z0-9_.-]+#subdirectory=[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$"
+                },
+                "ref": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.-]+$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

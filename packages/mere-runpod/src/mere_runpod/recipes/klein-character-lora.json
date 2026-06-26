@@ -1,0 +1,59 @@
+{
+  "contractVersion": "mere.run/recipe.v1",
+  "id": "klein-character-lora",
+  "title": "FLUX.2 Klein Character LoRA",
+  "family": "character-lora",
+  "description": "Identity-focused LoRA recipe for learning a portable character without overbinding pose, clothing, background, or rendering style.",
+  "models": {
+    "train": "image-klein-base-9b",
+    "apply": "image-klein-9b"
+  },
+  "dataset": {
+    "layout": "paired-image-caption-directory",
+    "minImages": 12,
+    "preferredImages": "20-80 images with varied pose, distance, expression, clothing, and background",
+    "notes": [
+      "Keep identity anchors consistent.",
+      "Vary pose, crop, scene, and medium if portability matters.",
+      "Avoid many same-background images unless the background is part of the character concept."
+    ]
+  },
+  "captioning": {
+    "triggerToken": "CHAR_TRIGGER",
+    "technique": "Use a unique trigger token plus a concrete class noun, then repeat the stable identity anchors in every caption and describe the variables in that image.",
+    "rules": [
+      "Start every caption with the trigger token.",
+      "Include a class noun such as man, woman, robot, creature, dog, or character.",
+      "Repeat stable identity traits in every caption.",
+      "Describe pose, clothing, expression, camera distance, background, and medium as variables.",
+      "Never write same person, same character, previous image, or another view; captions are independent examples.",
+      "Do not over-describe temporary props unless they should become identity traits."
+    ],
+    "examples": [
+      "fieldperson, gray-bearded fisherman man wearing a yellow rain hat and blue rubber overalls, holding a fishing rod on a wooden dock",
+      "fieldperson, gray-bearded fisherman man wearing a yellow rain hat and blue rubber overalls, close-up portrait with weathered face against a plain gray background"
+    ]
+  },
+  "training": {
+    "command": "mere.run image train-lora",
+    "arguments": {
+      "--recipe": "klein-fast-style",
+      "--training-steps": 1200,
+      "--rank": 32,
+      "--alpha": 32,
+      "--caption-dropout": 0.03,
+      "--sample-interval": 250,
+      "--sample-model": "image-klein-9b",
+      "--sample-lora-scale": 0.8
+    }
+  },
+  "evaluation": {
+    "command": "mere.run image generate",
+    "prompts": [
+      "CHAR_TRIGGER, gray-bearded fisherman man wearing a black wool coat in a snowy city street, documentary photograph",
+      "CHAR_TRIGGER, gray-bearded fisherman man as a small bronze statue on a museum pedestal, studio lighting",
+      "CHAR_TRIGGER, gray-bearded fisherman man wearing a yellow rain hat piloting a tiny spaceship, colorful comic panel"
+    ],
+    "loraScales": [0.6, 0.8, 1.0, 1.2]
+  }
+}

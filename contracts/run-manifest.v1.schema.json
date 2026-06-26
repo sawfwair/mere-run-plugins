@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/run-manifest.v1.schema.json",
+  "title": "mere.run Plugin Run Manifest v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "contractVersion",
+    "runId",
+    "plugin",
+    "recipe",
+    "status",
+    "createdAt",
+    "dataset",
+    "command",
+    "artifacts",
+    "cleanup"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/plugin-run.v1"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "plugin": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "required": ["id", "family"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "enum": ["planned", "running", "succeeded", "failed", "cleanup-only"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dataset": {
+      "type": "object",
+      "required": ["path", "pairCount"],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "pairCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "remote": {
+      "type": "object"
+    },
+    "artifacts": {
+      "type": "object"
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "status"],
+      "properties": {
+        "default": {
+          "enum": ["terminate", "stop", "none"]
+        },
+        "status": {
+          "enum": ["not-started", "skipped", "attempted", "succeeded", "failed"]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

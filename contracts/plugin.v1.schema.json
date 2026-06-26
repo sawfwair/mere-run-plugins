@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/plugin.v1.schema.json",
+  "title": "mere.run Plugin Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "name",
+    "version",
+    "executable",
+    "description",
+    "commands",
+    "capabilities",
+    "stdout",
+    "security"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/plugin.v1"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^mere-[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?$"
+    },
+    "executable": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description", "stdout"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "stdout": {
+            "enum": ["json", "paths", "text"]
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      }
+    },
+    "stdout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["machineReadableByDefault", "diagnostics"],
+      "properties": {
+        "machineReadableByDefault": {
+          "type": "boolean"
+        },
+        "diagnostics": {
+          "const": "stderr"
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usesUserCredentials",
+        "storesSecrets",
+        "createsPaidResources",
+        "cleanupDefault"
+      ],
+      "properties": {
+        "usesUserCredentials": {
+          "type": "boolean"
+        },
+        "storesSecrets": {
+          "type": "boolean"
+        },
+        "createsPaidResources": {
+          "type": "boolean"
+        },
+        "cleanupDefault": {
+          "enum": ["terminate", "stop", "none"]
+        }
+      }
+    }
+  }
+}

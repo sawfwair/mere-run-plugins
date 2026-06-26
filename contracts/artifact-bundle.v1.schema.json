@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/artifact-bundle.v1.schema.json",
+  "title": "mere.run Artifact Bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "createdAt",
+    "runManifest",
+    "files"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/artifact-bundle.v1"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "runManifest": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+
