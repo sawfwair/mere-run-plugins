@@ -106,7 +106,7 @@ def find_repo_root() -> pathlib.Path:
     for root in repo_root_candidates():
         if (root / "contracts").is_dir() and (root / "recipes").is_dir():
             return root
-    raise PluginError("could not locate mere-plugins repo root", 1)
+    raise PluginError("could not locate mere-run-plugins repo root", 1)
 
 
 def load_recipe(recipe: str) -> dict[str, Any]:
@@ -133,7 +133,7 @@ def plugin_manifest() -> dict[str, Any]:
         "version": __version__,
         "executable": "mere-runpod",
         "description": "Run canonical mere.run recipes on user-owned ephemeral RunPod pods.",
-        "homepage": "https://github.com/sawfwair/mere-plugins/tree/main/packages/mere-runpod",
+        "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-runpod",
         "commands": [
             {
                 "name": "manifest",

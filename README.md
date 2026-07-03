@@ -1,4 +1,4 @@
-# mere-plugins
+# mere-run-plugins
 
 Official companion plugins for `mere.run`.
 
@@ -12,10 +12,11 @@ use the user's account, credentials, spending limits, and cleanup policy.
 - Contract schemas used by official plugins.
 - A live plugin catalog that `mere.run` can fetch for one-shot installs.
 - Canonical recipe files for repeatable workflows.
-- Provider-specific companion CLIs.
+- Reference-evaluation recipes for LoRA comparisons.
+- Provider-specific and local-production companion CLIs.
 - Test utilities that verify plugin manifests, plans, and run manifests.
 
-## First Plugin
+## RunPod Plugin
 
 `mere-runpod` runs a normal `mere.run image train-lora` command on an ephemeral
 RunPod pod owned by the user.
@@ -23,7 +24,7 @@ RunPod pod owned by the user.
 Install the plugin with `pipx`:
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-plugins.git@main#subdirectory=packages/mere-runpod"
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
 ```
 
 ```bash
@@ -70,19 +71,49 @@ warm across terminated pods. The plugin also caches build packs under
 The bundled Klein recipes call the current core `klein-fast-style` training
 preset and sample against `image-klein-9b`.
 
+## Image Tools Plugin
+
+`mere-image-tools` contains local image-production helpers that rely on the
+installed `mere.run` CLI instead of adding a second model runtime.
+
+Install the plugin with `pipx`:
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+```
+
+The first command is `knockout`, which plans and runs a subject cutout through
+`mere.run vision segment` with SAM 3.1:
+
+```bash
+mere-image-tools manifest --json
+mere-image-tools doctor
+mere-image-tools knockout \
+  --input ./frame.png \
+  --output ./subject.png \
+  --mask-output ./subject-mask.png \
+  --prompt "subject" \
+  --prompt "prop"
+```
+
+By default, `knockout` calls `mere.run vision segment --model
+vision-segment-sam31`. Set `MERE_IMAGE_TOOLS_MERE_RUN` or pass
+`--mere-run-command` when you need to target a source checkout or non-standard
+binary path.
+
 ## Catalog
 
 The live catalog is published from this repo:
 
 ```text
-https://raw.githubusercontent.com/sawfwair/mere-plugins/main/catalog/plugins.v1.json
+https://raw.githubusercontent.com/sawfwair/mere-run-plugins/main/catalog/plugins.v1.json
 ```
 
 `mere.run plugin install mere-runpod` can read that catalog and run the exact
 `pipx install` command from the selected `main` channel:
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-plugins.git@main#subdirectory=packages/mere-runpod"
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
 ```
 
 ## Contract Philosophy
@@ -120,7 +151,9 @@ catalog/                   live install catalog for official plugins
 docs/plugins/              plugin contract, discovery, and security notes
 docs/recipes/              captioning and LoRA recipe guidance
 recipes/                   canonical machine-readable recipe files
+eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
+packages/mere-image-tools/ local image-production plugin
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
 SECURITY.md                private vulnerability reporting policy

@@ -1,13 +1,13 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-06-26T11:45:00Z",
+  "updatedAt": "2026-07-03T09:51:34Z",
   "defaultChannel": "main",
   "plugins": [
     {
       "id": "mere-runpod",
       "name": "RunPod Runner",
       "description": "Run canonical mere.run recipes on user-owned ephemeral RunPod pods, fetch artifacts, and terminate by default.",
-      "repo": "https://github.com/sawfwair/mere-plugins",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-runpod",
       "subdirectory": "packages/mere-runpod",
       "entrypoint": "mere-runpod",
@@ -22,10 +22,32 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-plugins.git@main#subdirectory=packages/mere-runpod"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
+        }
+      }
+    },
+    {
+      "id": "mere-image-tools",
+      "name": "Image Tools",
+      "description": "Run local image-production tools such as subject knockout, mask export, and future dataset prep helpers.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-image-tools",
+      "subdirectory": "packages/mere-image-tools",
+      "entrypoint": "mere-image-tools",
+      "capabilities": [
+        "image-tools",
+        "knockout",
+        "segmentation",
+        "alpha-mask",
+        "sam31"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
         }
       }
     }
   ]
 }
-

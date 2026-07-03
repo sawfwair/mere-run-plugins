@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repo.
 
 ## Repo Scope
 
-`mere-plugins` contains official companion plugin contracts and plugins for
+`mere-run-plugins` contains official companion plugin contracts and plugins for
 `mere.run`. Plugins may coordinate user-controlled external resources such as
 RunPod pods or SSH-accessed GPU hosts, but they must not turn the core
 `mere.run` CLI into a hosted service.

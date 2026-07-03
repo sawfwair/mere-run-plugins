@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/eval-recipe.v1.schema.json",
+  "title": "mere.run Evaluation Recipe v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "id",
+    "title",
+    "family",
+    "description",
+    "command",
+    "models",
+    "inputs",
+    "parameters",
+    "prompt",
+    "artifacts",
+    "notes"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/eval-recipe.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "family": {
+      "enum": ["reference-image-lora-eval"]
+    },
+    "description": {
+      "type": "string"
+    },
+    "command": {
+      "const": "mere.run image generate"
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apply"],
+      "properties": {
+        "apply": {
+          "type": "string"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["referenceImage", "lora", "triggerToken"],
+      "properties": {
+        "referenceImage": {
+          "type": "string"
+        },
+        "lora": {
+          "type": "string"
+        },
+        "triggerToken": {
+          "type": "string"
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height",
+        "steps",
+        "seed",
+        "strength",
+        "loraScale"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 64
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 64
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "loraScale": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template", "anatomyRepairPhrases"],
+      "properties": {
+        "template": {
+          "type": "string"
+        },
+        "anatomyRepairPhrases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "seed", "prompt"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "prompt": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outputPattern", "storeExamplesUnder"],
+      "properties": {
+        "outputPattern": {
+          "type": "string"
+        },
+        "storeExamplesUnder": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

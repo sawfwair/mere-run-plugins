@@ -8,7 +8,7 @@ ephemeral RunPod pod, retrieve artifacts, and terminate the pod automatically.
 ## Commands
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-plugins.git@main#subdirectory=packages/mere-runpod"
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
 mere-runpod manifest --json
 mere-runpod doctor
 mere-runpod volume ensure --name mere-klein-cache --data-center-id US-KS-2 --size-gb 512 --dry-run
