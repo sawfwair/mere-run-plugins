@@ -1,0 +1,57 @@
+{
+  "contractVersion": "mere.run/eval-recipe.v1",
+  "id": "klein-times-square-kiss",
+  "title": "Klein Reference Kiss LoRA Evaluation",
+  "family": "reference-image-lora-eval",
+  "description": "A fixed reference-image protocol for checking whether a Klein style LoRA can pull a neutral source photograph into the learned visual language without relying on a style-specific prompt.",
+  "command": "mere.run image generate",
+  "models": {
+    "apply": "image-klein-9b"
+  },
+  "inputs": {
+    "referenceImage": "street-kiss.png",
+    "lora": "style.safetensors",
+    "triggerToken": "STYLE_TRIGGER"
+  },
+  "parameters": {
+    "width": 1024,
+    "height": 768,
+    "steps": 16,
+    "seed": 424243,
+    "strength": 0.55,
+    "loraScale": 1.5
+  },
+  "prompt": {
+    "template": "STYLE_TRIGGER a sailor in uniform kissing a nurse in a crowded city street, full body embrace, her right arm around his shoulder, her left arm hidden behind his back, his arms around her waist, natural human anatomy, no extra limbs, no extra hands, crisp faces, detailed fabric texture, clear depth separation, high detail, clean sharp cinematic film still, STYLE_DIRECTION",
+    "anatomyRepairPhrases": [
+      "her right arm around his shoulder",
+      "her left arm hidden behind his back",
+      "his arms around her waist",
+      "natural human anatomy",
+      "no extra limbs",
+      "no extra hands"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "seed": 424243,
+        "prompt": "STYLE_TRIGGER a sailor in uniform kissing a nurse in a crowded city street, full body embrace, her right arm around his shoulder, her left arm hidden behind his back, his arms around her waist, natural human anatomy, no extra limbs, no extra hands, crisp faces, detailed fabric texture, clear depth separation, high detail, clean sharp cinematic film still, STYLE_DIRECTION"
+      },
+      {
+        "name": "side-view-repair",
+        "seed": 424245,
+        "prompt": "STYLE_TRIGGER a sailor in dark uniform gently kissing a nurse in a white dress in a busy downtown street, clean side-view couple pose, her right arm over his shoulder, her left hand hidden behind his back, both of his hands placed around her waist, natural human anatomy, no duplicate arms, no extra hands, clean sharp cinematic film still, STYLE_DIRECTION"
+      }
+    ]
+  },
+  "artifacts": {
+    "outputPattern": "{style-slug}-times-square-kiss-ref-scale1.5-strength0.55-seed{seed}.png",
+    "storeExamplesUnder": "data/lora-evals/times-square-kiss/"
+  },
+  "notes": [
+    "Use this as an eval protocol, not as a training recipe.",
+    "The reference image should stay neutral and not name the target style.",
+    "The prompt may include the LoRA trigger token and concrete subject/anatomy constraints, but the style direction should stay broad enough that the LoRA has to do the visual work.",
+    "Keep source images, private LoRA files, and generated eval outputs outside the public mere.run core repo."
+  ]
+}

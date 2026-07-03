@@ -7,6 +7,10 @@ The canonical Klein flow has two phases:
 
 The recipes are machine-readable JSON files in `recipes/`.
 
+Reference-image eval protocols live separately in `eval-recipes/`. Use
+`klein-times-square-kiss` when you need a fixed composition test for comparing
+style pull across multiple Klein LoRAs.
+
 ## Style LoRA
 
 Use `klein-style-lora` for broad visual style.

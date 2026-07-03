@@ -89,6 +89,22 @@ def validate_recipes() -> None:
             fail(f"{package_path}: bundled recipe does not match {path}")
 
 
+def validate_eval_recipes() -> None:
+    schema = contract_schema("eval-recipe.v1.schema.json")
+    seen: set[str] = set()
+    for path in sorted((ROOT / "eval-recipes").glob("*.json")):
+        recipe = load_json(path)
+        validate_schema(path, schema, recipe)
+        if recipe["id"] in seen:
+            fail(f"{path}: duplicate eval recipe id {recipe['id']}")
+        seen.add(recipe["id"])
+        if recipe["models"]["apply"] != "image-klein-9b":
+            fail(f"{path}: Klein eval recipes must apply on image-klein-9b")
+        serialized = json.dumps(recipe)
+        if "/Users/" in serialized:
+            fail(f"{path}: public eval recipe must not contain workstation paths")
+
+
 def validate_catalog() -> None:
     path = ROOT / "catalog" / "plugins.v1.json"
     catalog = load_json(path)
@@ -109,11 +125,20 @@ def validate_catalog() -> None:
             fail(f"{path}: only pipx installs are currently supported")
         if "#subdirectory=" not in install["spec"]:
             fail(f"{path}: install spec should pin a package subdirectory")
+        package_dir = ROOT / plugin["subdirectory"]
+        if not package_dir.is_dir():
+            fail(f"{path}: plugin subdirectory does not exist: {plugin['subdirectory']}")
+        if not (package_dir / "pyproject.toml").is_file():
+            fail(f"{path}: plugin subdirectory missing pyproject.toml: {plugin['subdirectory']}")
 
 
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
-    env["PYTHONPATH"] = str(ROOT / "packages" / "mere-runpod" / "src")
+    package_paths = [
+        ROOT / "packages" / "mere-runpod" / "src",
+        ROOT / "packages" / "mere-image-tools" / "src",
+    ]
+    env["PYTHONPATH"] = os.pathsep.join(str(path) for path in package_paths)
     return env
 
 
@@ -125,9 +150,9 @@ def write_dataset(path: pathlib.Path, count: int) -> None:
         (path / f"{stem}.txt").write_text("testtrigger, a test image\n")
 
 
-def validate_plugin_manifest() -> None:
+def validate_plugin_manifest(module: str, executable: str, required_commands: set[str]) -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "mere_runpod", "manifest", "--json"],
+        [sys.executable, "-m", module, "manifest", "--json"],
         cwd=ROOT,
         env=plugin_env(),
         text=True,
@@ -136,19 +161,34 @@ def validate_plugin_manifest() -> None:
         check=True,
     )
     manifest = json.loads(result.stdout)
-    validate_schema(pathlib.Path("mere-runpod manifest"), contract_schema("plugin.v1.schema.json"), manifest)
+    validate_schema(pathlib.Path(f"{executable} manifest"), contract_schema("plugin.v1.schema.json"), manifest)
     require_keys(
-        pathlib.Path("mere-runpod manifest"),
+        pathlib.Path(f"{executable} manifest"),
         manifest,
         ["contractVersion", "name", "version", "commands", "security"],
     )
+    if manifest["executable"] != executable:
+        fail(f"{executable} manifest reported executable {manifest['executable']}")
     command_names = {command["name"] for command in manifest["commands"]}
-    for required in {"manifest", "doctor", "volume", "plan", "run", "resume", "cleanup"}:
+    for required in required_commands:
         if required not in command_names:
-            fail(f"mere-runpod manifest missing command {required}")
+            fail(f"{executable} manifest missing command {required}")
 
 
-def validate_plugin_plan() -> None:
+def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_runpod",
+        "mere-runpod",
+        {"manifest", "doctor", "volume", "plan", "run", "resume", "cleanup"},
+    )
+    validate_plugin_manifest(
+        "mere_image_tools",
+        "mere-image-tools",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "knockout"},
+    )
+
+
+def validate_runpod_plan() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
         dataset = root / "dataset"
@@ -190,6 +230,48 @@ def validate_plugin_plan() -> None:
             fail("style recipe command should sample against image-klein-9b")
 
 
+def validate_image_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        source = root / "frame.png"
+        output = root / "subject.png"
+        source.write_bytes(b"not-a-real-image-but-plan-only")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_image_tools",
+                "plan",
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--run-id",
+                "validate-knockout",
+                "--mere-run-command",
+                "fake-mere-run",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-image-tools plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["status"] != "planned":
+            fail("image-tools plan manifest should have status planned")
+        if manifest["tool"]["name"] != "knockout":
+            fail("image-tools plan should record knockout tool")
+        if manifest["tool"]["backend"] != "mere.run/vision-segment":
+            fail("image-tools plan should call mere.run vision segment")
+        if manifest["cleanup"]["default"] != "none":
+            fail("image-tools cleanup default should be none")
+        if not (root / "subject.run.json").is_file():
+            fail("image-tools plan should write default run manifest")
+
+
 def validate_volume_dry_run() -> None:
     result = subprocess.run(
         [
@@ -228,8 +310,10 @@ def main() -> int:
     validate_contracts()
     validate_catalog()
     validate_recipes()
-    validate_plugin_manifest()
-    validate_plugin_plan()
+    validate_eval_recipes()
+    validate_plugin_manifests()
+    validate_runpod_plan()
+    validate_image_tools_plan()
     validate_volume_dry_run()
     print("validate_repo: ok")
     return 0
