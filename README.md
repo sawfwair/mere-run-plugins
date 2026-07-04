@@ -101,6 +101,25 @@ vision-segment-sam31`. Set `MERE_IMAGE_TOOLS_MERE_RUN` or pass
 `--mere-run-command` when you need to target a source checkout or non-standard
 binary path.
 
+## Workflow Tools
+
+`mere-workflow-tools` installs six focused companion commands that turn common
+local inference workflows into repeatable manifests:
+
+```bash
+mere-doc-tools process --input ./scan.png --output-dir ./doc-out
+mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
+mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
+mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
+mere-image-compose generate --prompt "a product render" --output-dir ./image-out
+mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
+```
+
+These tools call existing `mere.run` surfaces such as `vision ocr`,
+`text anonymize`, `vision caption`, `speech transcribe`, and `image generate`.
+The plugin layer owns planning, artifact hashes, resumability, and local cleanup
+state.
+
 ## Catalog
 
 The live catalog is published from this repo:
@@ -154,6 +173,7 @@ recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
 packages/mere-image-tools/ local image-production plugin
+packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
 SECURITY.md                private vulnerability reporting policy
