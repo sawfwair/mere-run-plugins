@@ -50,6 +50,35 @@
       }
     },
     {
+      "id": "mere-animatic-tools",
+      "name": "Animatic Tools",
+      "description": "Run local Animatic production tools for character knockouts, reference packs, continuity checks, shot kits, voice kits, style locks, and delivery prep.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-animatic-tools",
+      "subdirectory": "packages/mere-animatic-tools",
+      "entrypoint": "mere-animatic-tools",
+      "capabilities": [
+        "animatic",
+        "character-knockout",
+        "reference-pack",
+        "continuity-check",
+        "shot-kit",
+        "storyboard-repair",
+        "edit-doctor",
+        "actor-voice-kit",
+        "location-plates",
+        "style-lock",
+        "delivery-prep"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-animatic-tools"
+        }
+      }
+    },
+    {
       "id": "mere-doc-tools",
       "name": "Document Tools",
       "description": "OCR local documents and remove PII with native mere.run models.",
