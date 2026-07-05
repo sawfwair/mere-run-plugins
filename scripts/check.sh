@@ -13,16 +13,20 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-animatic-tools/src"
 
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-workflow-tools/src packages/mere-animatic-tools/src scripts
 "$PYTHON" -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m unittest discover -s packages/mere-image-tools/tests
+"$PYTHON" -m unittest discover -s packages/mere-workflow-tools/tests
+"$PYTHON" -m unittest discover -s packages/mere-animatic-tools/tests
 "$PYTHON" scripts/validate_repo.py
 
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-workflow-tools
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-animatic-tools
 "$PYTHON" - <<'PY'
 import pathlib
 import subprocess
@@ -85,4 +89,49 @@ result = subprocess.run(
 )
 if '"runId": "installed-image-smoke"' not in result.stdout:
     raise SystemExit("installed image-tools smoke did not produce expected run manifest")
+
+animatic_cli = pathlib.Path(sys.executable).with_name("mere-animatic-tools")
+request = root / "animatic-request.json"
+request.write_text('{"inputs":{"prompt":"installed smoke"}}')
+result = subprocess.run(
+    [
+        str(animatic_cli),
+        "plan",
+        "--tool",
+        "shot-kit",
+        "--request-json",
+        str(request),
+        "--output-dir",
+        str(root / "animatic"),
+        "--run-id",
+        "installed-animatic-smoke",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"runId": "installed-animatic-smoke"' not in result.stdout:
+    raise SystemExit("installed animatic-tools smoke did not produce expected run manifest")
+
+for executable in [
+    "mere-doc-tools",
+    "mere-media-scrub",
+    "mere-dataset-tools",
+    "mere-transcript-tools",
+    "mere-image-compose",
+    "mere-batch-runner",
+]:
+    cli = pathlib.Path(sys.executable).with_name(executable)
+    result = subprocess.run(
+        [str(cli), "manifest", "--json"],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    if f'"executable": "{executable}"' not in result.stdout:
+        raise SystemExit(f"installed workflow smoke did not report {executable}")
 PY

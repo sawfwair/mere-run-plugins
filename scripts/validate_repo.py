@@ -137,6 +137,8 @@ def plugin_env() -> dict[str, str]:
     package_paths = [
         ROOT / "packages" / "mere-runpod" / "src",
         ROOT / "packages" / "mere-image-tools" / "src",
+        ROOT / "packages" / "mere-workflow-tools" / "src",
+        ROOT / "packages" / "mere-animatic-tools" / "src",
     ]
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in package_paths)
     return env
@@ -186,6 +188,42 @@ def validate_plugin_manifests() -> None:
         "mere-image-tools",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup", "knockout"},
     )
+    validate_plugin_manifest(
+        "mere_animatic_tools",
+        "mere-animatic-tools",
+        {
+            "manifest",
+            "doctor",
+            "plan",
+            "run",
+            "resume",
+            "cleanup",
+            "character-knockout",
+            "reference-pack",
+            "continuity-check",
+            "shot-kit",
+            "storyboard-repair",
+            "edit-doctor",
+            "actor-voice-kit",
+            "location-plates",
+            "style-lock",
+            "delivery-prep",
+        },
+    )
+    workflow_tools = [
+        ("mere_workflow_tools.doc_cli", "mere-doc-tools", "process"),
+        ("mere_workflow_tools.media_cli", "mere-media-scrub", "scrub"),
+        ("mere_workflow_tools.dataset_cli", "mere-dataset-tools", "caption"),
+        ("mere_workflow_tools.transcript_cli", "mere-transcript-tools", "transcribe"),
+        ("mere_workflow_tools.image_compose_cli", "mere-image-compose", "generate"),
+        ("mere_workflow_tools.batch_cli", "mere-batch-runner", "run-jobs"),
+    ]
+    for module, executable, one_shot in workflow_tools:
+        validate_plugin_manifest(
+            module,
+            executable,
+            {"manifest", "doctor", "plan", "run", "resume", "cleanup", one_shot},
+        )
 
 
 def validate_runpod_plan() -> None:
@@ -272,6 +310,123 @@ def validate_image_tools_plan() -> None:
             fail("image-tools plan should write default run manifest")
 
 
+def validate_workflow_tools_plans() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        image = root / "scan.png"
+        image.write_bytes(b"fake")
+        frames = root / "frames"
+        frames.mkdir()
+        (frames / "001.png").write_bytes(b"fake")
+        audio = root / "meeting.wav"
+        audio.write_bytes(b"fake wav")
+        jobs = root / "jobs.jsonl"
+        jobs.write_text(json.dumps({
+            "argv": ["text", "anonymize", "--output", str(root / "batch.txt")],
+            "outputs": {"text": str(root / "batch.txt")},
+        }) + "\n")
+        cases = [
+            (
+                "mere_workflow_tools.doc_cli",
+                "mere-doc-tools",
+                ["plan", "--input", str(image), "--output-dir", str(root / "doc")],
+            ),
+            (
+                "mere_workflow_tools.media_cli",
+                "mere-media-scrub",
+                ["plan", "--input", str(frames), "--output-dir", str(root / "media")],
+            ),
+            (
+                "mere_workflow_tools.dataset_cli",
+                "mere-dataset-tools",
+                ["plan", "--input", str(frames), "--output-dir", str(root / "dataset"), "--trigger-token", "STYLE"],
+            ),
+            (
+                "mere_workflow_tools.transcript_cli",
+                "mere-transcript-tools",
+                ["plan", "--input", str(audio), "--output-dir", str(root / "transcript")],
+            ),
+            (
+                "mere_workflow_tools.image_compose_cli",
+                "mere-image-compose",
+                ["plan", "--prompt", "a local image", "--output-dir", str(root / "image")],
+            ),
+            (
+                "mere_workflow_tools.batch_cli",
+                "mere-batch-runner",
+                ["plan", "--jobs", str(jobs), "--output-dir", str(root / "batch")],
+            ),
+        ]
+        for module, executable, args in cases:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    module,
+                    *args,
+                    "--run-id",
+                    f"validate-{executable}",
+                    "--mere-run-command",
+                    "fake-mere-run",
+                ],
+                cwd=ROOT,
+                env=plugin_env(),
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            manifest = json.loads(result.stdout)
+            validate_schema(pathlib.Path(f"{executable} plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+            if manifest["plugin"]["name"] != executable:
+                fail(f"{executable} plan reported plugin {manifest['plugin']['name']}")
+            if manifest["status"] != "planned":
+                fail(f"{executable} plan manifest should have status planned")
+            if manifest["tool"]["backend"] != "mere.run":
+                fail(f"{executable} plan should call mere.run")
+            if not pathlib.Path(manifest["local"]["runManifest"]).is_file():
+                fail(f"{executable} plan should write run manifest")
+
+
+def validate_animatic_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        request = root / "request.json"
+        request.write_text(json.dumps({"inputs": {"prompt": "validate a short animatic beat"}}))
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_animatic_tools",
+                "plan",
+                "--tool",
+                "shot-kit",
+                "--request-json",
+                str(request),
+                "--output-dir",
+                str(root / "animatic"),
+                "--run-id",
+                "validate-animatic-tools",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-animatic-tools plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["plugin"]["name"] != "mere-animatic-tools":
+            fail("animatic tools plan reported wrong plugin name")
+        if manifest["status"] != "planned":
+            fail("animatic tools plan manifest should have status planned")
+        if manifest["tool"]["name"] != "shot-kit":
+            fail("animatic tools plan should record requested tool")
+        if not (root / "animatic" / "run.json").is_file():
+            fail("animatic tools plan should write run manifest")
+
+
 def validate_volume_dry_run() -> None:
     result = subprocess.run(
         [
@@ -314,6 +469,8 @@ def main() -> int:
     validate_plugin_manifests()
     validate_runpod_plan()
     validate_image_tools_plan()
+    validate_workflow_tools_plans()
+    validate_animatic_tools_plan()
     validate_volume_dry_run()
     print("validate_repo: ok")
     return 0
