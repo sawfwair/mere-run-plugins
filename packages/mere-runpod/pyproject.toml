@@ -21,4 +21,4 @@ mere-runpod = "mere_runpod.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_runpod = ["recipes/*.json"]
+mere_runpod = ["py.typed", "recipes/*.json"]

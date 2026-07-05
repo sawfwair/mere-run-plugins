@@ -29,6 +29,20 @@ def write_tar(path: pathlib.Path, members: dict[str, bytes]) -> None:
             archive.add(source, arcname=name)
 
 
+class FakeHTTPResponse:
+    def __init__(self, body: str) -> None:
+        self.body = body.encode("utf-8")
+
+    def __enter__(self) -> FakeHTTPResponse:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.body
+
+
 class MereRunPodCLITests(unittest.TestCase):
     def test_manifest_has_required_commands(self) -> None:
         manifest = cli.plugin_manifest()
@@ -168,6 +182,104 @@ class MereRunPodCLITests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         eprint.assert_any_call("child-output")
 
+    def test_graphql_returns_data_and_wraps_provider_errors(self) -> None:
+        with mock.patch(
+            "mere_runpod.cli.urllib.request.urlopen",
+            return_value=FakeHTTPResponse('{"data":{"pod":{"id":"pod123"}}}'),
+        ):
+            self.assertEqual(cli.graphql("api", "query")["pod"]["id"], "pod123")
+
+        with mock.patch(
+            "mere_runpod.cli.urllib.request.urlopen",
+            return_value=FakeHTTPResponse('{"errors":[{"message":"denied"}]}'),
+        ):
+            with self.assertRaises(cli.RunPodAPIError) as error:
+                cli.graphql("api", "query")
+        self.assertIn("denied", str(error.exception))
+
+    def test_runpod_rest_handles_empty_json_and_unexpected_shapes(self) -> None:
+        with mock.patch("mere_runpod.cli.urllib.request.urlopen", return_value=FakeHTTPResponse("")):
+            self.assertIsNone(cli.runpod_rest("api", "DELETE", "/networkvolumes/vol123"))
+
+        with mock.patch("mere_runpod.cli.urllib.request.urlopen", return_value=FakeHTTPResponse('{"id":"vol123"}')):
+            self.assertEqual(cli.create_network_volume("api", name="cache", data_center_id="US-KS-2", size_gb=512)["id"], "vol123")
+
+        with mock.patch("mere_runpod.cli.runpod_rest", return_value={"not": "a-list"}):
+            with self.assertRaises(cli.RunPodAPIError):
+                cli.list_network_volumes("api")
+
+        with mock.patch("mere_runpod.cli.runpod_rest", return_value=["not-a-dict"]):
+            with self.assertRaises(cli.RunPodAPIError):
+                cli.list_network_volumes("api")
+
+    def test_json_boundary_helpers_reject_invalid_shapes(self) -> None:
+        with self.assertRaises(cli.PluginError):
+            cli.as_map([], "payload")
+        with self.assertRaises(cli.PluginError):
+            cli.as_list({}, "items")
+        with self.assertRaises(cli.PluginError):
+            cli.string_list(["ok", 1], "command")
+        with self.assertRaises(cli.PluginError):
+            cli.string_field({"name": 3}, "name", "payload")
+        with self.assertRaises(cli.PluginError):
+            cli.int_value(True, "count")
+        with self.assertRaises(cli.PluginError):
+            cli.int_value(object(), "count")
+        self.assertEqual(cli.int_value("22", "count"), 22)
+
+    def test_query_pod_and_ssh_target_parse_runtime_ports(self) -> None:
+        pod = {
+            "id": "pod123",
+            "runtime": {
+                "ports": [
+                    {"privatePort": 8888, "ip": "1.1.1.1", "publicPort": 8888},
+                    {"privatePort": 22, "ip": "2.2.2.2", "publicPort": 32022},
+                ]
+            },
+        }
+        with mock.patch("mere_runpod.cli.graphql", return_value={"pod": pod}):
+            self.assertEqual(cli.query_pod("api", "pod123"), pod)
+        self.assertEqual(cli.ssh_target(pod), ("2.2.2.2", 32022))
+        with self.assertRaises(cli.PluginError):
+            cli.query_pod("api", "../../bad")
+
+    def test_doctor_manifest_and_env_file_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            env_file = root / ".env"
+            ssh_key = root / "id"
+            ssh_pub = root / "id.pub"
+            build_pack = root / "pack.tar.gz"
+            env_file.write_text("RUNPOD_API_KEY=from-file\n# ignored\nEMPTY\n")
+            ssh_key.write_text("fake")
+            ssh_pub.write_text("fake.pub")
+            build_pack.write_bytes(b"not a real tar for doctor")
+
+            stdout = StringIO()
+            with mock.patch.dict(cli.os.environ, {}, clear=True):
+                with mock.patch("mere_runpod.cli.shutil.which", return_value="/usr/bin/tool"):
+                    with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                        exit_code = cli.main([
+                            "doctor",
+                            "--env-file",
+                            str(env_file),
+                            "--ssh-key",
+                            str(ssh_key),
+                            "--public-key-file",
+                            str(ssh_pub),
+                            "--build-pack",
+                            str(build_pack),
+                        ])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertTrue(payload["ok"])
+
+            stderr = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(stderr):
+                exit_code = cli.main(["manifest"])
+            self.assertEqual(exit_code, 0)
+            self.assertIn("manifest output is JSON", stderr.getvalue())
+
     def test_cleanup_provider_failure_returns_json_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             manifest = pathlib.Path(tmp) / "run.json"
@@ -219,6 +331,72 @@ class MereRunPodCLITests(unittest.TestCase):
             payload = json.loads(stdout.getvalue())
             self.assertEqual(payload["cleanup"]["status"], "succeeded")
             self.assertEqual(payload["status"], "cleanup-only")
+
+    def test_cleanup_is_idempotent_and_skips_missing_pod(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            succeeded = root / "succeeded.json"
+            succeeded.write_text(json.dumps({
+                "runId": "already-clean",
+                "status": "running",
+                "remote": {"podId": "pod123"},
+                "cleanup": {"default": "terminate", "status": "succeeded"},
+            }))
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main(["cleanup", str(succeeded)])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout.getvalue())["cleanup"]["reason"], "already cleaned up")
+
+            missing = root / "missing.json"
+            missing.write_text(json.dumps({
+                "runId": "no-pod",
+                "status": "failed",
+                "remote": {},
+                "cleanup": {"default": "terminate", "status": "not-started"},
+            }))
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main(["cleanup", str(missing)])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout.getvalue())["cleanup"]["reason"], "no pod id in run manifest")
+
+    def test_cleanup_treats_missing_remote_resource_as_success(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = pathlib.Path(tmp) / "run.json"
+            manifest.write_text(json.dumps({
+                "runId": "already-gone",
+                "status": "running",
+                "remote": {"podId": "pod123"},
+                "cleanup": {"default": "terminate", "status": "not-started"},
+            }))
+            stdout = StringIO()
+            with mock.patch.dict(cli.os.environ, {"RUNPOD_API_KEY": "fake"}, clear=True):
+                with mock.patch("mere_runpod.cli.terminate_pod", side_effect=cli.RunPodAPIError("pod not found", 4)):
+                    with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                        exit_code = cli.main(["cleanup", str(manifest)])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["cleanup"]["status"], "succeeded")
+            self.assertEqual(payload["cleanup"]["reason"], "remote resource already absent")
+
+    def test_resume_queries_live_pod_when_api_key_is_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = pathlib.Path(tmp) / "run.json"
+            manifest.write_text(json.dumps({
+                "runId": "resume-test",
+                "status": "running",
+                "remote": {"podId": "pod123"},
+                "cleanup": {"default": "terminate", "status": "not-started"},
+            }))
+            stdout = StringIO()
+            with mock.patch.dict(cli.os.environ, {"RUNPOD_API_KEY": "fake"}, clear=True):
+                with mock.patch("mere_runpod.cli.query_pod", return_value={"id": "pod123", "desiredStatus": "RUNNING"}):
+                    with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                        exit_code = cli.main(["resume", str(manifest)])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["pod"]["desiredStatus"], "RUNNING")
 
     def test_command_from_style_recipe_preserves_base_and_apply_policy(self) -> None:
         recipe = cli.load_recipe("klein-style-lora")
@@ -380,6 +558,62 @@ class MereRunPodCLITests(unittest.TestCase):
         self.assertEqual(pod_input["dataCenterId"], "US-KS-2")
         self.assertNotIn("volumeInGb", pod_input)
 
+    def test_run_command_records_remote_success_and_default_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            dataset = root / "dataset"
+            output = root / "run"
+            build_pack = root / "mere-run-linux-cuda.tar.gz"
+            ssh_key = root / "id"
+            ssh_pub = root / "id.pub"
+            write_dataset(dataset, 12)
+            write_tar(build_pack, {"mere-run-linux/mere.run": b"#!/usr/bin/env bash\n"})
+            ssh_key.write_text("fake")
+            ssh_pub.write_text("fake.pub")
+
+            with (
+                mock.patch.dict(
+                    cli.os.environ,
+                    {"RUNPOD_API_KEY": "api", "HF_TOKEN": "hf"},
+                    clear=True,
+                ),
+                mock.patch("mere_runpod.cli.shutil.which", return_value="/usr/bin/tool"),
+                mock.patch("mere_runpod.cli.create_pod", return_value={"id": "pod123", "costPerHr": 1.5}),
+                mock.patch("mere_runpod.cli.wait_for_ssh", return_value=("2.2.2.2", 32022)),
+                mock.patch("mere_runpod.cli.ssh_script"),
+                mock.patch("mere_runpod.cli.rsync_to_remote"),
+                mock.patch("mere_runpod.cli.ensure_remote_build_pack"),
+                mock.patch("mere_runpod.cli.fetch_remote_artifacts"),
+                mock.patch("mere_runpod.cli.terminate_pod") as terminate,
+                redirect_stdout(StringIO()),
+                redirect_stderr(StringIO()),
+            ):
+                exit_code = cli.main([
+                    "run",
+                    "--recipe",
+                    "klein-character-lora",
+                    "--data",
+                    str(dataset),
+                    "--output",
+                    str(output),
+                    "--run-id",
+                    "remote-success",
+                    "--build-pack",
+                    str(build_pack),
+                    "--ssh-key",
+                    str(ssh_key),
+                    "--public-key-file",
+                    str(ssh_pub),
+                    "--data-center-id",
+                    "US-KS-2",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads((output / "run.json").read_text())
+            self.assertEqual(manifest["status"], "succeeded")
+            self.assertEqual(manifest["cleanup"]["status"], "succeeded")
+            terminate.assert_called_once_with("api", "pod123")
+
     def test_run_requires_data_center_with_network_volume(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -439,6 +673,53 @@ class MereRunPodCLITests(unittest.TestCase):
             self.assertFalse(payload["created"])
             self.assertEqual(payload["volume"]["id"], "volabc123")
 
+    def test_volume_list_create_and_validation_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = pathlib.Path(tmp) / "missing.env"
+
+            stdout = StringIO()
+            with mock.patch.dict(cli.os.environ, {"RUNPOD_API_KEY": "fake"}, clear=True):
+                with mock.patch("mere_runpod.cli.list_network_volumes", return_value=[{"id": "vol123"}]):
+                    with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                        exit_code = cli.main(["volume", "list", "--env-file", str(env_file)])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout.getvalue())["volumes"][0]["id"], "vol123")
+
+            stdout = StringIO()
+            with mock.patch.dict(cli.os.environ, {"RUNPOD_API_KEY": "fake"}, clear=True):
+                with mock.patch("mere_runpod.cli.create_network_volume", return_value={"id": "new-vol"}) as create:
+                    with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                        exit_code = cli.main([
+                            "volume",
+                            "create",
+                            "--name",
+                            "cache",
+                            "--data-center-id",
+                            "US-KS-2",
+                            "--size-gb",
+                            "512",
+                            "--env-file",
+                            str(env_file),
+                        ])
+            self.assertEqual(exit_code, 0)
+            create.assert_called_once()
+            self.assertTrue(json.loads(stdout.getvalue())["created"])
+
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                exit_code = cli.main([
+                    "volume",
+                    "create",
+                    "--name",
+                    "cache",
+                    "--data-center-id",
+                    "US-KS-2",
+                    "--size-gb",
+                    "1",
+                    "--env-file",
+                    str(env_file),
+                ])
+            self.assertEqual(exit_code, 2)
+
     def test_volume_ensure_dry_run_does_not_require_api_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             stdout = StringIO()
@@ -463,6 +744,29 @@ class MereRunPodCLITests(unittest.TestCase):
             self.assertTrue(payload["createsPaidResource"])
             self.assertEqual(payload["request"]["name"], "mere-klein-cache")
             self.assertEqual(payload["request"]["dataCenterId"], "US-KS-2")
+
+    def test_run_dry_run_writes_manifest_without_remote_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            dataset = root / "dataset"
+            output = root / "run"
+            write_dataset(dataset, 12)
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                exit_code = cli.main([
+                    "run",
+                    "--recipe",
+                    "klein-character-lora",
+                    "--data",
+                    str(dataset),
+                    "--output",
+                    str(output),
+                    "--run-id",
+                    "dry-run",
+                    "--dry-run",
+                ])
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads((output / "run.json").read_text())
+            self.assertEqual(manifest["status"], "planned")
 
     def test_run_inputs_reject_bootstrap_build_pack_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

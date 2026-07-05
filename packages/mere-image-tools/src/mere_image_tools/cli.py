@@ -11,21 +11,21 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Any
+from typing import cast
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from . import __version__
 
-
 PLUGIN_NAME = "mere-image-tools"
 DEFAULT_MERE_RUN = "mere.run"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+JsonMap = dict[str, object]
 
 
 class PluginError(RuntimeError):
-    def __init__(self, message: str, exit_code: int = 1):
+    def __init__(self, message: str, exit_code: int = 1) -> None:
         super().__init__(message)
         self.exit_code = exit_code
 
@@ -35,16 +35,38 @@ def now_iso() -> str:
 
 
 def eprint(message: str) -> None:
-    print(message, file=sys.stderr, flush=True)
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
 
 
-def print_json(payload: Any) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+def print_json(payload: object) -> None:
+    sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def write_json(path: pathlib.Path, payload: Any) -> None:
+def write_json(path: pathlib.Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def as_map(value: object, label: str) -> JsonMap:
+    if isinstance(value, dict):
+        return cast(JsonMap, value)
+    raise PluginError(f"manifest field is not an object: {label}", 1)
+
+
+def string_items(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def number_value(value: object, default: float = 0) -> float:
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
 
 
 def file_sha256(path: pathlib.Path) -> str:
@@ -103,7 +125,7 @@ def ensure_input_image(path: pathlib.Path) -> None:
         raise PluginError(f"unsupported image extension: {path.suffix}", 2)
 
 
-def plugin_manifest() -> dict[str, Any]:
+def plugin_manifest() -> JsonMap:
     return {
         "contractVersion": "mere.run/plugin.v1",
         "name": PLUGIN_NAME,
@@ -134,7 +156,7 @@ def plugin_manifest() -> dict[str, Any]:
     }
 
 
-def make_knockout_manifest(args: argparse.Namespace) -> dict[str, Any]:
+def make_knockout_manifest(args: argparse.Namespace) -> JsonMap:
     ensure_input_image(args.input)
     mere_run_command = split_command(args.mere_run_command)
     created = now_iso()
@@ -222,48 +244,52 @@ def make_knockout_manifest(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def update_manifest(path: pathlib.Path, manifest: dict[str, Any], **updates: Any) -> None:
+def update_manifest(path: pathlib.Path, manifest: JsonMap, **updates: object) -> None:
     manifest.update(updates)
     manifest["updatedAt"] = now_iso()
     write_json(path, manifest)
 
 
-def segment_argv(manifest: dict[str, Any]) -> list[str]:
-    tool = manifest["tool"]
-    local = manifest["local"]
-    artifacts = manifest["artifacts"]
-    argv = list(tool["mereRunCommand"])
+def segment_argv(manifest: JsonMap) -> list[str]:
+    tool = as_map(manifest["tool"], "tool")
+    local = as_map(manifest["local"], "local")
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    mere_run_command = tool["mereRunCommand"]
+    if not isinstance(mere_run_command, list) or not all(isinstance(item, str) for item in mere_run_command):
+        raise PluginError("manifest tool.mereRunCommand must be a string list", 1)
+    argv = list(mere_run_command)
     argv.extend([
         "vision",
         "segment",
-        local["input"],
+        str(local["input"]),
         "--model",
-        tool["model"],
+        str(tool["model"]),
         "--output",
-        artifacts["segmentedImage"],
+        str(artifacts["segmentedImage"]),
         "--json-output",
-        artifacts["segmentationJson"],
+        str(artifacts["segmentationJson"]),
         "--mask-output-dir",
-        artifacts["maskDirectory"],
+        str(artifacts["maskDirectory"]),
         "--threshold",
         str(tool["threshold"]),
         "--resolution",
         str(tool["resolution"]),
     ])
-    for prompt in tool.get("prompts") or []:
+    for prompt in string_items(tool.get("prompts")):
         argv.extend(["--prompt", prompt])
-    for box in tool.get("boxes") or []:
+    for box in string_items(tool.get("boxes")):
         argv.extend(["--box", box])
-    for point in tool.get("points") or []:
+    for point in string_items(tool.get("points")):
         argv.extend(["--point", point])
     return argv
 
 
-def run_segment(manifest: dict[str, Any]) -> None:
+def run_segment(manifest: JsonMap) -> None:
     argv = segment_argv(manifest)
     if not command_available(argv):
         raise PluginError(f"mere.run command not found: {argv[0]}. Install mere.run or pass --mere-run-command.", 3)
-    pathlib.Path(manifest["artifacts"]["maskDirectory"]).mkdir(parents=True, exist_ok=True)
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    pathlib.Path(str(artifacts["maskDirectory"])).mkdir(parents=True, exist_ok=True)
     eprint("$ " + shlex.join(argv))
     process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     assert process.stdout is not None
@@ -274,16 +300,21 @@ def run_segment(manifest: dict[str, Any]) -> None:
         raise PluginError(f"mere.run vision segment failed with exit {returncode}", 1)
 
 
-def selected_detections(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    path = pathlib.Path(manifest["artifacts"]["segmentationJson"])
+def selected_detections(manifest: JsonMap) -> list[JsonMap]:
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    path = pathlib.Path(str(artifacts["segmentationJson"]))
     try:
         payload = json.loads(path.read_text())
     except OSError as exc:
         raise PluginError(f"could not read segmentation JSON: {path}: {exc}", 1) from None
-    detections = [item for item in payload.get("detections", []) if item.get("maskPath")]
+    payload_map = as_map(payload, "segmentation payload")
+    detections_raw = payload_map.get("detections")
+    detections: list[JsonMap] = []
+    if isinstance(detections_raw, list):
+        detections = [cast(JsonMap, item) for item in detections_raw if isinstance(item, dict) and item.get("maskPath")]
     if not detections:
         raise PluginError("mere.run segmentation produced no mask artifacts", 1)
-    by_label: dict[str, dict[str, Any]] = {}
+    by_label: dict[str, JsonMap] = {}
     for item in detections:
         label = str(item.get("label") or "default")
         current = by_label.get(label)
@@ -292,8 +323,8 @@ def selected_detections(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(by_label.values(), key=detection_rank, reverse=True)
 
 
-def detection_rank(item: dict[str, Any]) -> tuple[float, int]:
-    return (float(item.get("score") or 0), int(item.get("maskAreaPixels") or 0))
+def detection_rank(item: JsonMap) -> tuple[float, int]:
+    return (number_value(item.get("score")), int(number_value(item.get("maskAreaPixels"))))
 
 
 def normalize_mask(mask_path: pathlib.Path) -> Image.Image:
@@ -305,7 +336,8 @@ def normalize_mask(mask_path: pathlib.Path) -> Image.Image:
         mask_source = ImageOps.grayscale(raw.convert("RGB"))
     mask = mask_source.point(lambda p: 255 if p > 16 else 0)
     width, height = mask.size
-    foreground = sum(1 for value in mask.getdata() if value)
+    histogram = mask.histogram()
+    foreground = sum(histogram[1:])
     if foreground > int(width * height * 0.65):
         mask = mask.point(lambda p: 0 if p else 255)
     return keep_significant_components(mask)
@@ -315,6 +347,8 @@ def keep_significant_components(mask: Image.Image) -> Image.Image:
     mask = mask.convert("L").point(lambda p: 255 if p > 0 else 0)
     width, height = mask.size
     pixels = mask.load()
+    if pixels is None:
+        raise PluginError("could not read mask pixels", 1)
     visited = bytearray(width * height)
     components: list[list[tuple[int, int]]] = []
     for y in range(height):
@@ -343,6 +377,8 @@ def keep_significant_components(mask: Image.Image) -> Image.Image:
     minimum = max(32, int(largest * 0.02))
     clean = Image.new("L", (width, height), 0)
     clean_pixels = clean.load()
+    if clean_pixels is None:
+        raise PluginError("could not write mask pixels", 1)
     for component in components:
         if len(component) < minimum:
             continue
@@ -351,34 +387,39 @@ def keep_significant_components(mask: Image.Image) -> Image.Image:
     return clean
 
 
-def composite_knockout(manifest: dict[str, Any]) -> None:
+def composite_knockout(manifest: JsonMap) -> None:
     detections = selected_detections(manifest)
-    mask_paths = [pathlib.Path(detection["maskPath"]) for detection in detections]
+    mask_paths = [pathlib.Path(str(detection["maskPath"])) for detection in detections]
     mask = normalize_mask(mask_paths[0])
     for mask_path in mask_paths[1:]:
         next_mask = normalize_mask(mask_path)
         if next_mask.size != mask.size:
             next_mask = next_mask.resize(mask.size)
         mask = ImageChops.lighter(mask, next_mask)
-    radius = float(manifest["tool"].get("featherRadius") or 0)
+    tool = as_map(manifest["tool"], "tool")
+    local = as_map(manifest["local"], "local")
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    radius = number_value(tool.get("featherRadius"))
     alpha = mask.filter(ImageFilter.GaussianBlur(radius=radius)) if radius > 0 else mask
-    image = Image.open(manifest["local"]["input"]).convert("RGBA")
+    image = Image.open(str(local["input"])).convert("RGBA")
     if alpha.size != image.size:
         alpha = alpha.resize(image.size)
         mask = mask.resize(image.size)
-    output = pathlib.Path(manifest["local"]["output"])
-    mask_output = pathlib.Path(manifest["local"]["maskOutput"])
+    output = pathlib.Path(str(local["output"]))
+    mask_output = pathlib.Path(str(local["maskOutput"]))
     result = image.copy()
     result.putalpha(alpha)
     result.save(output)
     mask.save(mask_output)
-    manifest["artifacts"]["selectedSourceMask"] = str(mask_paths[0])
-    manifest["artifacts"]["selectedSourceMasks"] = [str(mask_path) for mask_path in mask_paths]
+    artifacts["selectedSourceMask"] = str(mask_paths[0])
+    artifacts["selectedSourceMasks"] = [str(mask_path) for mask_path in mask_paths]
 
 
-def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    output = pathlib.Path(manifest["local"]["output"])
-    mask = pathlib.Path(manifest["local"]["maskOutput"])
+def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
+    local = as_map(manifest["local"], "local")
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    output = pathlib.Path(str(local["output"]))
+    mask = pathlib.Path(str(local["maskOutput"]))
     output.parent.mkdir(parents=True, exist_ok=True)
     mask.parent.mkdir(parents=True, exist_ok=True)
     update_manifest(manifest_path, manifest, status="running")
@@ -389,8 +430,8 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any]) -> d
             raise PluginError(f"knockout did not write output: {output}", 1)
         if not mask.is_file():
             raise PluginError(f"knockout did not write mask output: {mask}", 1)
-        manifest["artifacts"]["sha256"] = file_sha256(output)
-        manifest["artifacts"]["maskSha256"] = file_sha256(mask)
+        artifacts["sha256"] = file_sha256(output)
+        artifacts["maskSha256"] = file_sha256(mask)
         update_manifest(manifest_path, manifest, status="succeeded")
     except Exception as exc:
         manifest["error"] = str(exc)

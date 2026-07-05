@@ -1,0 +1,86 @@
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+src = [
+  "packages/mere-animatic-tools/src",
+  "packages/mere-image-tools/src",
+  "packages/mere-runpod/src",
+  "packages/mere-shotgrid-tools/src",
+  "packages/mere-workflow-tools/src",
+  "scripts",
+]
+
+[tool.ruff.lint]
+select = [
+  "ANN",
+  "ARG",
+  "B",
+  "E",
+  "F",
+  "I",
+  "RET",
+  "SIM",
+  "T201",
+  "UP",
+]
+ignore = [
+  "ANN401",
+  "E501",
+  "UP022",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"packages/*/tests/test_*.py" = ["SIM117", "T201"]
+"scripts/check_*.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+show_error_codes = true
+pretty = true
+warn_unreachable = true
+explicit_package_bases = true
+mypy_path = [
+  "packages/mere-animatic-tools/src",
+  "packages/mere-image-tools/src",
+  "packages/mere-runpod/src",
+  "packages/mere-shotgrid-tools/src",
+  "packages/mere-workflow-tools/src",
+]
+files = [
+  "packages/mere-animatic-tools/src",
+  "packages/mere-image-tools/src",
+  "packages/mere-runpod/src",
+  "packages/mere-shotgrid-tools/src",
+  "packages/mere-workflow-tools/src",
+  "scripts/check_structure.py",
+  "scripts/validate_repo.py",
+]
+
+[[tool.mypy.overrides]]
+module = "shotgun_api3"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = [
+  "packages/mere-animatic-tools/src/mere_animatic_tools",
+  "packages/mere-image-tools/src/mere_image_tools",
+  "packages/mere-runpod/src/mere_runpod",
+  "packages/mere-shotgrid-tools/src/mere_shotgrid_tools",
+  "packages/mere-workflow-tools/src/mere_workflow_tools",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+omit = [
+  "*/__main__.py",
+  "*/__init__.py",
+  "*/batch_cli.py",
+  "*/dataset_cli.py",
+  "*/doc_cli.py",
+  "*/image_compose_cli.py",
+  "*/media_cli.py",
+  "*/transcript_cli.py",
+]

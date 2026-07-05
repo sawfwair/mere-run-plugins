@@ -17,10 +17,12 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
 from . import __version__
 
+JsonMap = dict[str, object]
+JsonList = list[object]
 
 PLUGIN_NAME = "mere-runpod"
 DEFAULT_IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
@@ -34,7 +36,7 @@ RUNPOD_REST_URL = "https://rest.runpod.io/v1"
 
 
 class PluginError(RuntimeError):
-    def __init__(self, message: str, exit_code: int = 1):
+    def __init__(self, message: str, exit_code: int = 1) -> None:
         super().__init__(message)
         self.exit_code = exit_code
 
@@ -56,7 +58,8 @@ def now_iso() -> str:
 
 
 def eprint(message: str) -> None:
-    print(message, file=sys.stderr, flush=True)
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
 
 
 def log(message: str) -> None:
@@ -64,13 +67,49 @@ def log(message: str) -> None:
     eprint(f"[{stamp}] {message}")
 
 
-def write_json(path: pathlib.Path, payload: Any) -> None:
+def write_json(path: pathlib.Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def print_json(payload: Any) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+def print_json(payload: object) -> None:
+    sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def as_map(value: object, context: str) -> JsonMap:
+    if not isinstance(value, dict):
+        raise PluginError(f"{context} must be a JSON object", 2)
+    return cast(JsonMap, value)
+
+
+def as_list(value: object, context: str) -> JsonList:
+    if not isinstance(value, list):
+        raise PluginError(f"{context} must be a JSON array", 2)
+    return cast(JsonList, value)
+
+
+def string_list(value: object, context: str) -> list[str]:
+    raw_items = as_list(value, context)
+    if not all(isinstance(item, str) for item in raw_items):
+        raise PluginError(f"{context} must contain only strings", 2)
+    return cast(list[str], raw_items)
+
+
+def string_field(mapping: JsonMap, key: str, context: str) -> str:
+    value = mapping.get(key)
+    if not isinstance(value, str):
+        raise PluginError(f"{context}.{key} must be a string", 2)
+    return value
+
+
+def int_value(value: object, context: str) -> int:
+    if isinstance(value, bool):
+        raise PluginError(f"{context} must be an integer", 2)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value)
+    raise PluginError(f"{context} must be an integer", 2)
 
 
 def load_env_file(path: pathlib.Path | None) -> None:
@@ -109,24 +148,24 @@ def find_repo_root() -> pathlib.Path:
     raise PluginError("could not locate mere-run-plugins repo root", 1)
 
 
-def load_recipe(recipe: str) -> dict[str, Any]:
+def load_recipe(recipe: str) -> JsonMap:
     path = pathlib.Path(recipe).expanduser()
     if path.is_file():
-        return json.loads(path.read_text())
+        return as_map(json.loads(path.read_text()), f"recipe file {path}")
     for root in repo_root_candidates():
         candidate = root / "recipes" / f"{recipe}.json"
         if candidate.is_file():
-            return json.loads(candidate.read_text())
+            return as_map(json.loads(candidate.read_text()), f"recipe file {candidate}")
     try:
         resource = importlib.resources.files("mere_runpod.recipes").joinpath(f"{recipe}.json")
         if resource.is_file():
-            return json.loads(resource.read_text())
+            return as_map(json.loads(resource.read_text()), f"recipe resource {recipe}")
     except (FileNotFoundError, ModuleNotFoundError):
         pass
     raise PluginError(f"recipe not found: {recipe}", 2)
 
 
-def plugin_manifest() -> dict[str, Any]:
+def plugin_manifest() -> JsonMap:
     return {
         "contractVersion": "mere.run/plugin.v1",
         "name": PLUGIN_NAME,
@@ -224,8 +263,9 @@ def dataset_info(path: pathlib.Path) -> DatasetInfo:
     )
 
 
-def validate_dataset_for_recipe(recipe: dict[str, Any], dataset: DatasetInfo) -> None:
-    minimum = int(recipe.get("dataset", {}).get("minImages") or 1)
+def validate_dataset_for_recipe(recipe: JsonMap, dataset: DatasetInfo) -> None:
+    dataset_config = as_map(recipe.get("dataset", {}), "recipe.dataset")
+    minimum = int_value(dataset_config.get("minImages", 1), "recipe.dataset.minImages")
     if dataset.pair_count < minimum:
         raise PluginError(
             f"recipe {recipe['id']} requires at least {minimum} paired images; found {dataset.pair_count}",
@@ -254,20 +294,22 @@ def is_bootstrap_build_pack(path: pathlib.Path) -> bool:
     return "source.tar.gz" in members and "bin/mere.run" in members
 
 
-def recipe_requires_hf_token(recipe: dict[str, Any]) -> bool:
-    model_values = recipe.get("models", {}).values()
+def recipe_requires_hf_token(recipe: JsonMap) -> bool:
+    models = as_map(recipe.get("models", {}), "recipe.models")
+    model_values = models.values()
     gated_aliases = {"image-klein-base-9b", "image-klein-9b"}
     return any(str(model) in gated_aliases for model in model_values)
 
 
 def command_from_recipe(
-    recipe: dict[str, Any],
+    recipe: JsonMap,
     *,
     data_path: str,
     output_path: str,
     models_root: str | None = None,
 ) -> list[str]:
-    args = recipe["training"]["arguments"]
+    training = as_map(recipe.get("training"), "recipe.training")
+    args = as_map(training.get("arguments"), "recipe.training.arguments")
     command: list[str] = ["mere.run"]
     if models_root:
         command.extend(["--models-root", models_root])
@@ -285,19 +327,20 @@ def command_from_recipe(
     return command
 
 
-def remote_model_pull_ids(manifest: dict[str, Any]) -> list[str]:
+def remote_model_pull_ids(manifest: JsonMap) -> list[str]:
     pull_ids: list[str] = []
 
-    def add_model(value: Any) -> None:
+    def add_model(value: object) -> None:
         model = str(value or "")
         if not model or "/" in model or model.startswith("."):
             return
         if model not in pull_ids:
             pull_ids.append(model)
 
-    add_model(manifest.get("recipe", {}).get("trainModel"))
+    recipe = as_map(manifest.get("recipe", {}), "manifest.recipe")
+    add_model(recipe.get("trainModel"))
 
-    command = manifest.get("command", [])
+    command = string_list(manifest.get("command", []), "manifest.command")
     for index, part in enumerate(command):
         if part == "--sample-model" and index + 1 < len(command):
             add_model(command[index + 1])
@@ -335,7 +378,7 @@ def validate_run_id(run_id: str) -> None:
         )
 
 
-def make_run_manifest(args: argparse.Namespace, recipe: dict[str, Any], dataset: DatasetInfo) -> dict[str, Any]:
+def make_run_manifest(args: argparse.Namespace, recipe: JsonMap, dataset: DatasetInfo) -> JsonMap:
     run_id = args.run_id
     output_dir = args.output.expanduser().resolve()
     paths = remote_paths(run_id)
@@ -353,6 +396,7 @@ def make_run_manifest(args: argparse.Namespace, recipe: dict[str, Any], dataset:
         if build_pack
         else None
     )
+    models = as_map(recipe.get("models"), "recipe.models")
     return {
         "contractVersion": "mere.run/plugin-run.v1",
         "runId": run_id,
@@ -364,8 +408,8 @@ def make_run_manifest(args: argparse.Namespace, recipe: dict[str, Any], dataset:
             "id": recipe["id"],
             "family": recipe["family"],
             "title": recipe["title"],
-            "trainModel": recipe["models"]["train"],
-            "applyModel": recipe["models"]["apply"],
+            "trainModel": models["train"],
+            "applyModel": models["apply"],
         },
         "status": "planned",
         "createdAt": now_iso(),
@@ -438,7 +482,7 @@ def run_process(argv: list[str], *, input_text: str | None = None, check: bool =
     return completed
 
 
-def summarize_runpod_errors(errors: Any) -> str:
+def summarize_runpod_errors(errors: object) -> str:
     if not errors:
         return "unknown RunPod API error"
     if isinstance(errors, list):
@@ -452,7 +496,7 @@ def summarize_runpod_errors(errors: Any) -> str:
     return str(errors)
 
 
-def graphql(api_key: str, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+def graphql(api_key: str, query: str, variables: JsonMap | None = None) -> JsonMap:
     body = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
     request = urllib.request.Request(
         RUNPOD_GRAPHQL_URL,
@@ -465,7 +509,7 @@ def graphql(api_key: str, query: str, variables: dict[str, Any] | None = None) -
     )
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            payload = as_map(json.loads(response.read().decode("utf-8")), "RunPod GraphQL response")
     except urllib.error.HTTPError as exc:
         raise RunPodAPIError(f"RunPod API HTTP {exc.code}: {exc.reason}", 4) from None
     except urllib.error.URLError as exc:
@@ -476,10 +520,10 @@ def graphql(api_key: str, query: str, variables: dict[str, Any] | None = None) -
         raise RunPodAPIError(f"RunPod API returned invalid JSON: {exc}", 4) from None
     if payload.get("errors"):
         raise RunPodAPIError(summarize_runpod_errors(payload["errors"]), 4)
-    return payload["data"]
+    return as_map(payload.get("data"), "RunPod GraphQL response.data")
 
 
-def runpod_rest(api_key: str, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+def runpod_rest(api_key: str, method: str, path: str, body: JsonMap | None = None) -> object:
     data = json.dumps(body).encode("utf-8") if body is not None else None
     request = urllib.request.Request(
         f"{RUNPOD_REST_URL}{path}",
@@ -513,33 +557,36 @@ def runpod_rest(api_key: str, method: str, path: str, body: dict[str, Any] | Non
         raise RunPodAPIError(f"RunPod REST returned invalid JSON: {exc}", 4) from None
 
 
-def list_network_volumes(api_key: str) -> list[dict[str, Any]]:
+def list_network_volumes(api_key: str) -> list[JsonMap]:
     payload = runpod_rest(api_key, "GET", "/networkvolumes")
     if not isinstance(payload, list):
         raise RunPodAPIError("RunPod REST /networkvolumes returned unexpected payload", 4)
-    return payload
+    volumes: list[JsonMap] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise RunPodAPIError("RunPod REST /networkvolumes returned unexpected volume item", 4)
+        volumes.append(cast(JsonMap, item))
+    return volumes
 
 
-def create_network_volume(api_key: str, *, name: str, data_center_id: str, size_gb: int) -> dict[str, Any]:
+def create_network_volume(api_key: str, *, name: str, data_center_id: str, size_gb: int) -> JsonMap:
     payload = runpod_rest(
         api_key,
         "POST",
         "/networkvolumes",
         {"name": name, "dataCenterId": data_center_id, "size": size_gb},
     )
-    if not isinstance(payload, dict):
-        raise RunPodAPIError("RunPod REST /networkvolumes create returned unexpected payload", 4)
-    return payload
+    return as_map(payload, "RunPod REST /networkvolumes create response")
 
 
-def find_network_volume(volumes: list[dict[str, Any]], *, name: str, data_center_id: str) -> dict[str, Any] | None:
+def find_network_volume(volumes: list[JsonMap], *, name: str, data_center_id: str) -> JsonMap | None:
     for volume in volumes:
         if volume.get("name") == name and volume.get("dataCenterId") == data_center_id:
             return volume
     return None
 
 
-def create_pod(args: argparse.Namespace, api_key: str, public_key: str) -> dict[str, Any]:
+def create_pod(args: argparse.Namespace, api_key: str, public_key: str) -> JsonMap:
     env = [{"key": "PUBLIC_KEY", "value": public_key}]
     for name in HF_TOKEN_NAMES:
         if token := os.environ.get(name):
@@ -547,7 +594,7 @@ def create_pod(args: argparse.Namespace, api_key: str, public_key: str) -> dict[
     if endpoint := os.environ.get("HF_ENDPOINT"):
         env.append({"key": "HF_ENDPOINT", "value": endpoint})
 
-    pod_input: dict[str, Any] = {
+    pod_input: dict[str, object] = {
         "cloudType": args.cloud_type,
         "gpuCount": args.gpu_count,
         "containerDiskInGb": args.container_disk_gb,
@@ -582,7 +629,10 @@ def create_pod(args: argparse.Namespace, api_key: str, public_key: str) -> dict[
       }
     }
     """
-    return graphql(api_key, query, {"input": pod_input})["podFindAndDeployOnDemand"]
+    return as_map(
+        graphql(api_key, query, {"input": pod_input}).get("podFindAndDeployOnDemand"),
+        "RunPod podFindAndDeployOnDemand response",
+    )
 
 
 def terminate_pod(api_key: str, pod_id: str) -> None:
@@ -608,7 +658,7 @@ def runpod_resource_missing(error: Exception) -> bool:
     )
 
 
-def query_pod(api_key: str, pod_id: str) -> dict[str, Any] | None:
+def query_pod(api_key: str, pod_id: str) -> JsonMap | None:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", pod_id):
         raise PluginError(f"unsafe pod id: {pod_id}", 2)
     query = f"""
@@ -627,17 +677,20 @@ def query_pod(api_key: str, pod_id: str) -> dict[str, Any] | None:
       }}
     }}
     """
-    return graphql(api_key, query)["pod"]
+    pod = graphql(api_key, query).get("pod")
+    return None if pod is None else as_map(pod, "RunPod pod response")
 
 
-def ssh_target(pod: dict[str, Any]) -> tuple[str, int] | None:
-    for port in (pod.get("runtime") or {}).get("ports") or []:
+def ssh_target(pod: JsonMap) -> tuple[str, int] | None:
+    runtime = as_map(pod.get("runtime", {}), "pod.runtime")
+    for item in as_list(runtime.get("ports", []), "pod.runtime.ports"):
+        port = as_map(item, "pod.runtime.ports[]")
         if str(port.get("privatePort")) == "22" and port.get("ip") and port.get("publicPort"):
-            return str(port["ip"]), int(port["publicPort"])
+            return str(port["ip"]), int_value(port["publicPort"], "pod.runtime.ports[].publicPort")
     return None
 
 
-def ssh_base(args: argparse.Namespace, target: tuple[str, int]) -> list[str]:
+def ssh_base(args: argparse.Namespace, target: tuple[str, int]) -> list[str]:  # pragma: no cover
     host, port = target
     return [
         "ssh",
@@ -657,18 +710,18 @@ def ssh_base(args: argparse.Namespace, target: tuple[str, int]) -> list[str]:
     ]
 
 
-def ssh_probe(args: argparse.Namespace, target: tuple[str, int]) -> bool:
+def ssh_probe(args: argparse.Namespace, target: tuple[str, int]) -> bool:  # pragma: no cover
     return run_process(ssh_base(args, target) + ["true"], check=False).returncode == 0
 
 
-def wait_for_ssh(args: argparse.Namespace, api_key: str, pod_id: str) -> tuple[str, int]:
+def wait_for_ssh(args: argparse.Namespace, api_key: str, pod_id: str) -> tuple[str, int]:  # pragma: no cover
     deadline = time.monotonic() + args.ssh_timeout_seconds
     last_status = "unknown"
     while time.monotonic() < deadline:
         pod = query_pod(api_key, pod_id)
         if pod is None:
             raise PluginError(f"pod disappeared before SSH became ready: {pod_id}", 4)
-        last_status = pod.get("desiredStatus") or last_status
+        last_status = str(pod.get("desiredStatus") or last_status)
         target = ssh_target(pod)
         if target and ssh_probe(args, target):
             return target
@@ -677,7 +730,12 @@ def wait_for_ssh(args: argparse.Namespace, api_key: str, pod_id: str) -> tuple[s
     raise PluginError(f"timed out waiting for SSH on pod {pod_id}; last status={last_status}", 4)
 
 
-def rsync_to_remote(args: argparse.Namespace, target: tuple[str, int], source: pathlib.Path, dest: str) -> None:
+def rsync_to_remote(
+    args: argparse.Namespace,
+    target: tuple[str, int],
+    source: pathlib.Path,
+    dest: str,
+) -> None:  # pragma: no cover
     host, port = target
     source_arg = str(source)
     if source.is_dir() and not source_arg.endswith("/"):
@@ -706,7 +764,12 @@ def rsync_to_remote(args: argparse.Namespace, target: tuple[str, int], source: p
     ])
 
 
-def rsync_from_remote(args: argparse.Namespace, target: tuple[str, int], source: str, dest: pathlib.Path) -> None:
+def rsync_from_remote(
+    args: argparse.Namespace,
+    target: tuple[str, int],
+    source: str,
+    dest: pathlib.Path,
+) -> None:  # pragma: no cover
     host, port = target
     dest.mkdir(parents=True, exist_ok=True)
     ssh = shlex.join([
@@ -723,7 +786,7 @@ def rsync_from_remote(args: argparse.Namespace, target: tuple[str, int], source:
     run_process(["rsync", "-az", "--no-owner", "--no-group", "-e", ssh, f"root@{host}:{source}/", str(dest)])
 
 
-def remote_file_exists(args: argparse.Namespace, target: tuple[str, int], source: str) -> bool:
+def remote_file_exists(args: argparse.Namespace, target: tuple[str, int], source: str) -> bool:  # pragma: no cover
     probe = run_process(
         ssh_base(args, target) + ["test", "-f", source],
         check=False,
@@ -736,7 +799,7 @@ def rsync_remote_file_if_exists(
     target: tuple[str, int],
     source: str,
     dest: pathlib.Path,
-) -> bool:
+) -> bool:  # pragma: no cover
     host, port = target
     if not remote_file_exists(args, target, source):
         return False
@@ -759,11 +822,13 @@ def rsync_remote_file_if_exists(
 def ensure_remote_build_pack(
     args: argparse.Namespace,
     target: tuple[str, int],
-    manifest: dict[str, Any],
+    manifest: JsonMap,
 ) -> str:
-    remote_path = manifest["buildPack"].get("remotePath")
+    build_pack = as_map(manifest.get("buildPack"), "manifest.buildPack")
+    remote_path = build_pack.get("remotePath")
     if not remote_path:
         raise PluginError("run manifest is missing buildPack.remotePath", 2)
+    remote_path = str(remote_path)
     if remote_file_exists(args, target, remote_path):
         log(f"reusing cached build pack at {remote_path}")
         return remote_path
@@ -777,12 +842,14 @@ def ensure_remote_build_pack(
 def fetch_remote_artifacts(
     args: argparse.Namespace,
     target: tuple[str, int],
-    manifest: dict[str, Any],
+    manifest: JsonMap,
     output: pathlib.Path,
 ) -> None:
-    remote_artifacts = manifest["remote"]["paths"]["artifacts"]
+    remote = as_map(manifest.get("remote"), "manifest.remote")
+    paths = as_map(remote.get("paths"), "manifest.remote.paths")
+    remote_artifacts = string_field(paths, "artifacts", "manifest.remote.paths")
     local_artifacts = output / "artifacts"
-    run_id = manifest["runId"]
+    run_id = string_field(manifest, "runId", "manifest")
     final_name = f"{run_id}.safetensors"
 
     rsync_remote_file_if_exists(
@@ -814,7 +881,7 @@ def fetch_remote_artifacts(
         rsync_from_remote(args, target, remote_artifacts, local_artifacts)
 
 
-def ssh_script(args: argparse.Namespace, target: tuple[str, int], script: str) -> None:
+def ssh_script(args: argparse.Namespace, target: tuple[str, int], script: str) -> None:  # pragma: no cover
     run_process(ssh_base(args, target) + ["bash", "-s"], input_text=script)
 
 
@@ -841,18 +908,23 @@ nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 """
 
 
-def remote_train_script(manifest: dict[str, Any]) -> str:
-    remote = manifest["remote"]
-    paths = remote["paths"]
-    run_id = manifest["runId"]
-    command = manifest["command"]
-    build_pack_file = manifest["buildPack"].get("remotePath")
+def remote_train_script(manifest: JsonMap) -> str:
+    remote = as_map(manifest.get("remote"), "manifest.remote")
+    paths = as_map(remote.get("paths"), "manifest.remote.paths")
+    run_id = string_field(manifest, "runId", "manifest")
+    command = string_list(manifest.get("command"), "manifest.command")
+    build_pack = as_map(manifest.get("buildPack"), "manifest.buildPack")
+    build_pack_file = build_pack.get("remotePath")
     if not build_pack_file:
-        build_pack_file = f"{paths['build_pack']}/{pathlib.Path(manifest['buildPack']['path']).name}"
+        build_pack_file = f"{string_field(paths, 'build_pack', 'manifest.remote.paths')}/{pathlib.Path(str(build_pack.get('path'))).name}"
     command_args = command[1:]
     array_lines = "\n".join(f"  {shlex.quote(part)}" for part in command_args)
+    path_artifacts = string_field(paths, "artifacts", "manifest.remote.paths")
+    path_hub = string_field(paths, "hub", "manifest.remote.paths")
+    path_models = string_field(paths, "models", "manifest.remote.paths")
+    path_package = string_field(paths, "package", "manifest.remote.paths")
     model_pull_lines = "\n".join(
-        f'"$cli" --models-root {shlex.quote(paths["models"])} model pull {shlex.quote(model_id)} || true'
+        f'"$cli" --models-root {shlex.quote(path_models)} model pull {shlex.quote(model_id)} || true'
         for model_id in remote_model_pull_ids(manifest)
     )
     env_lines: list[str] = []
@@ -866,9 +938,9 @@ def remote_train_script(manifest: dict[str, Any]) -> str:
 set -euo pipefail
 export MERERUN_LINUX_ACCEL=cuda
 export MERERUN_MLX_SWIFT_LINKAGE=cuda-prebuilt
-export MERERUN_HUB_CACHE={shlex.quote(paths["hub"])}
+export MERERUN_HUB_CACHE={shlex.quote(path_hub)}
 export MERERUN_MODEL_CACHE_HOME=/workspace/mere-runpod
-export MERERUN_MODELS_DIR={shlex.quote(paths["models"])}
+export MERERUN_MODELS_DIR={shlex.quote(path_models)}
 export MLX_CUDA_USE_CUDNN_SDPA="${{MLX_CUDA_USE_CUDNN_SDPA:-0}}"
 export MLX_CUDA_GRAPH_CACHE_SIZE="${{MLX_CUDA_GRAPH_CACHE_SIZE:-4096}}"
 export CUDA_HOME="${{CUDA_HOME:-/usr/local/cuda}}"
@@ -898,9 +970,9 @@ fi
 if [[ -z "${{HUGGING_FACE_HUB_TOKEN:-}}" && -n "${{HF_TOKEN:-}}" ]]; then
   export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
 fi
-mkdir -p {shlex.quote(paths["package"])} {shlex.quote(paths["models"])} {shlex.quote(paths["hub"])} {shlex.quote(paths["artifacts"])}
-tar --no-same-owner -xzf {shlex.quote(build_pack_file)} -C {shlex.quote(paths["package"])}
-cli="$(find {shlex.quote(paths["package"])} -type f -name mere.run -perm -111 | head -n 1)"
+mkdir -p {shlex.quote(path_package)} {shlex.quote(path_models)} {shlex.quote(path_hub)} {shlex.quote(path_artifacts)}
+tar --no-same-owner -xzf {shlex.quote(str(build_pack_file))} -C {shlex.quote(path_package)}
+cli="$(find {shlex.quote(path_package)} -type f -name mere.run -perm -111 | head -n 1)"
 if [[ -z "$cli" ]]; then
   echo "could not find extracted mere.run CLI" >&2
   exit 1
@@ -909,15 +981,15 @@ fi
 train_args=(
 {array_lines}
 )
-printf '%q ' "$cli" "${{train_args[@]}}" > {shlex.quote(paths["artifacts"])}/{shlex.quote(run_id)}.command.txt
-printf '\\n' >> {shlex.quote(paths["artifacts"])}/{shlex.quote(run_id)}.command.txt
-"$cli" "${{train_args[@]}}" 2>&1 | tee {shlex.quote(paths["artifacts"])}/{shlex.quote(run_id)}.log
+printf '%q ' "$cli" "${{train_args[@]}}" > {shlex.quote(path_artifacts)}/{shlex.quote(run_id)}.command.txt
+printf '\\n' >> {shlex.quote(path_artifacts)}/{shlex.quote(run_id)}.command.txt
+"$cli" "${{train_args[@]}}" 2>&1 | tee {shlex.quote(path_artifacts)}/{shlex.quote(run_id)}.log
 """
 
 
 def command_doctor(args: argparse.Namespace) -> int:
     load_env_file(args.env_file)
-    checks: list[dict[str, Any]] = []
+    checks: list[dict[str, object]] = []
 
     def add(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "ok": ok, "detail": detail})
@@ -1014,7 +1086,7 @@ def command_plan(args: argparse.Namespace) -> int:
     return 0
 
 
-def validate_run_inputs(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
+def validate_run_inputs(args: argparse.Namespace, recipe: JsonMap) -> None:
     if getattr(args, "network_volume_id", None) and args.cloud_type != "SECURE":
         raise PluginError("RunPod network volumes for pods require --cloud-type SECURE", 2)
     if not args.build_pack or not args.build_pack.is_file():
@@ -1038,13 +1110,13 @@ def validate_run_inputs(args: argparse.Namespace, recipe: dict[str, Any]) -> Non
         raise PluginError("recipe requires a Hugging Face token; set HF_TOKEN or HUGGING_FACE_HUB_TOKEN", 3)
 
 
-def update_manifest(path: pathlib.Path, manifest: dict[str, Any], **updates: Any) -> None:
+def update_manifest(path: pathlib.Path, manifest: JsonMap, **updates: object) -> None:
     manifest.update(updates)
     manifest["updatedAt"] = now_iso()
     write_json(path, manifest)
 
 
-def mark_cleanup_only_if_active(manifest: dict[str, Any]) -> None:
+def mark_cleanup_only_if_active(manifest: JsonMap) -> None:
     if manifest.get("status") in {"planned", "running"}:
         manifest["status"] = "cleanup-only"
 
@@ -1070,52 +1142,58 @@ def command_run(args: argparse.Namespace) -> int:
     try:
         update_manifest(manifest_path, manifest, status="running")
         pod = create_pod(args, api_key, public_key)
-        pod_id = pod["id"]
-        manifest["remote"]["podId"] = pod_id
-        manifest["remote"]["costPerHr"] = pod.get("costPerHr")
-        manifest["remote"]["machine"] = pod.get("machine")
+        pod_id = string_field(pod, "id", "RunPod pod")
+        remote = as_map(manifest.get("remote"), "manifest.remote")
+        remote["podId"] = pod_id
+        remote["costPerHr"] = pod.get("costPerHr")
+        remote["machine"] = pod.get("machine")
         update_manifest(manifest_path, manifest)
         target = wait_for_ssh(args, api_key, pod_id)
-        manifest["remote"]["ssh"] = {"host": target[0], "port": target[1]}
+        remote["ssh"] = {"host": target[0], "port": target[1]}
         update_manifest(manifest_path, manifest)
 
         ssh_script(args, target, bootstrap_script())
-        paths = manifest["remote"]["paths"]
+        paths = as_map(remote.get("paths"), "manifest.remote.paths")
+        path_dataset = string_field(paths, "dataset", "manifest.remote.paths")
+        path_build_pack = string_field(paths, "build_pack", "manifest.remote.paths")
+        path_build_packs = string_field(paths, "build_packs", "manifest.remote.paths")
         ssh_script(
             args,
             target,
             "mkdir -p "
-            f"{shlex.quote(paths['dataset'])} "
-            f"{shlex.quote(paths['build_pack'])} "
-            f"{shlex.quote(paths['build_packs'])}",
+            f"{shlex.quote(path_dataset)} "
+            f"{shlex.quote(path_build_pack)} "
+            f"{shlex.quote(path_build_packs)}",
         )
-        rsync_to_remote(args, target, data.path, paths["dataset"])
+        rsync_to_remote(args, target, data.path, path_dataset)
         ensure_remote_build_pack(args, target, manifest)
         ssh_script(args, target, remote_train_script(manifest))
         fetch_remote_artifacts(args, target, manifest, output)
 
-        lora = output / "artifacts" / f"{manifest['runId']}.safetensors"
-        manifest["artifacts"]["lora"] = str(lora) if lora.is_file() else None
-        manifest["artifacts"]["sha256"] = file_sha256(lora) if lora.is_file() else None
+        lora = output / "artifacts" / f"{string_field(manifest, 'runId', 'manifest')}.safetensors"
+        artifacts = as_map(manifest.get("artifacts"), "manifest.artifacts")
+        artifacts["lora"] = str(lora) if lora.is_file() else None
+        artifacts["sha256"] = file_sha256(lora) if lora.is_file() else None
         update_manifest(manifest_path, manifest, status="succeeded")
     except Exception as exc:
         manifest["error"] = str(exc)
         update_manifest(manifest_path, manifest, status="failed")
         raise
     finally:
+        cleanup = as_map(manifest.get("cleanup"), "manifest.cleanup")
         if pod_id and not args.keep_pod:
-            manifest["cleanup"]["status"] = "attempted"
+            cleanup["status"] = "attempted"
             write_json(manifest_path, manifest)
             try:
                 terminate_pod(api_key, pod_id)
-                manifest["cleanup"]["status"] = "succeeded"
+                cleanup["status"] = "succeeded"
             except Exception as cleanup_error:
-                manifest["cleanup"]["status"] = "failed"
-                manifest["cleanup"]["error"] = str(cleanup_error)
+                cleanup["status"] = "failed"
+                cleanup["error"] = str(cleanup_error)
             write_json(manifest_path, manifest)
         elif pod_id:
-            manifest["cleanup"]["status"] = "skipped"
-            manifest["cleanup"]["reason"] = "--keep-pod"
+            cleanup["status"] = "skipped"
+            cleanup["reason"] = "--keep-pod"
             write_json(manifest_path, manifest)
     print_json(manifest)
     return 0
@@ -1123,15 +1201,16 @@ def command_run(args: argparse.Namespace) -> int:
 
 def command_resume(args: argparse.Namespace) -> int:
     load_env_file(args.env_file)
-    manifest = json.loads(args.run_manifest.expanduser().read_text())
-    pod_id = (manifest.get("remote") or {}).get("podId")
-    payload: dict[str, Any] = {
+    manifest = as_map(json.loads(args.run_manifest.expanduser().read_text()), "run manifest")
+    remote = as_map(manifest.get("remote", {}), "manifest.remote")
+    pod_id = remote.get("podId")
+    payload: JsonMap = {
         "runId": manifest.get("runId"),
         "status": manifest.get("status"),
         "podId": pod_id,
         "cleanup": manifest.get("cleanup"),
     }
-    if pod_id and os.environ.get("RUNPOD_API_KEY"):
+    if isinstance(pod_id, str) and os.environ.get("RUNPOD_API_KEY"):
         payload["pod"] = query_pod(os.environ["RUNPOD_API_KEY"], pod_id)
     print_json(payload)
     return 0
@@ -1140,16 +1219,18 @@ def command_resume(args: argparse.Namespace) -> int:
 def command_cleanup(args: argparse.Namespace) -> int:
     load_env_file(args.env_file)
     manifest_path = args.run_manifest.expanduser().resolve()
-    manifest = json.loads(manifest_path.read_text())
-    cleanup = manifest.setdefault("cleanup", {"default": "terminate", "status": "not-started"})
+    manifest = as_map(json.loads(manifest_path.read_text()), "run manifest")
+    cleanup_value = manifest.setdefault("cleanup", {"default": "terminate", "status": "not-started"})
+    cleanup = as_map(cleanup_value, "manifest.cleanup")
     if cleanup.get("status") == "succeeded":
         cleanup["reason"] = "already cleaned up"
         mark_cleanup_only_if_active(manifest)
         update_manifest(manifest_path, manifest)
         print_json(manifest)
         return 0
-    pod_id = (manifest.get("remote") or {}).get("podId")
-    if not pod_id:
+    remote = as_map(manifest.get("remote", {}), "manifest.remote")
+    pod_id = remote.get("podId")
+    if not isinstance(pod_id, str) or not pod_id:
         cleanup["status"] = "skipped"
         cleanup["reason"] = "no pod id in run manifest"
         write_json(manifest_path, manifest)
