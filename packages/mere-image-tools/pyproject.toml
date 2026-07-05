@@ -21,3 +21,6 @@ mere-image-tools = "mere_image_tools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mere_image_tools = ["py.typed"]

@@ -72,7 +72,7 @@ def write_fake_mere_run(path: pathlib.Path) -> None:
 
 class MereWorkflowToolsTests(unittest.TestCase):
     def test_manifests_have_common_commands(self) -> None:
-        for kind, spec in cli.TOOLS.items():
+        for _kind, spec in cli.TOOLS.items():
             manifest = cli.plugin_manifest(spec)
             self.assertEqual(manifest["contractVersion"], "mere.run/plugin.v1")
             self.assertEqual(manifest["name"], spec.plugin_name)

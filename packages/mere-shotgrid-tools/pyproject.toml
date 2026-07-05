@@ -21,3 +21,6 @@ mere-shotgrid-tools = "mere_shotgrid_tools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mere_shotgrid_tools = ["py.typed"]

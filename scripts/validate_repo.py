@@ -7,25 +7,39 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+from typing import NoReturn, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+JsonMap = dict[str, object]
+JsonList = list[object]
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise SystemExit(message)
 
 
-def load_json(path: pathlib.Path) -> dict:
+def as_map(value: object, label: str) -> JsonMap:
+    if isinstance(value, dict):
+        return cast(JsonMap, value)
+    fail(f"{label}: expected object")
+
+
+def as_list(value: object, label: str) -> JsonList:
+    if isinstance(value, list):
+        return value
+    fail(f"{label}: expected list")
+
+
+def load_json(path: pathlib.Path) -> JsonMap:
     try:
-        return json.loads(path.read_text())
+        return as_map(json.loads(path.read_text()), str(path))
     except json.JSONDecodeError as exc:
         fail(f"{path}: invalid JSON: {exc}")
 
 
-def validate_schema(path: pathlib.Path, schema: dict, payload: dict) -> None:
+def validate_schema(path: pathlib.Path, schema: JsonMap, payload: JsonMap) -> None:
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(payload), key=lambda item: list(item.path))
     if errors:
@@ -34,11 +48,11 @@ def validate_schema(path: pathlib.Path, schema: dict, payload: dict) -> None:
         fail(f"{path}: schema validation failed at {location}: {error.message}")
 
 
-def contract_schema(name: str) -> dict:
+def contract_schema(name: str) -> JsonMap:
     return load_json(ROOT / "contracts" / name)
 
 
-def require_keys(path: pathlib.Path, payload: dict, keys: list[str]) -> None:
+def require_keys(path: pathlib.Path, payload: JsonMap, keys: list[str]) -> None:
     missing = [key for key in keys if key not in payload]
     if missing:
         fail(f"{path}: missing keys: {', '.join(missing)}")
@@ -73,14 +87,17 @@ def validate_recipes() -> None:
         require_keys(path, recipe, required)
         if recipe["contractVersion"] != "mere.run/recipe.v1":
             fail(f"{path}: wrong contractVersion")
-        if recipe["id"] in seen:
-            fail(f"{path}: duplicate recipe id {recipe['id']}")
-        seen.add(recipe["id"])
-        if recipe["models"]["train"] != "image-klein-base-9b":
+        recipe_id = str(recipe["id"])
+        models = as_map(recipe["models"], f"{path}: models")
+        captioning = as_map(recipe["captioning"], f"{path}: captioning")
+        if recipe_id in seen:
+            fail(f"{path}: duplicate recipe id {recipe_id}")
+        seen.add(recipe_id)
+        if models["train"] != "image-klein-base-9b":
             fail(f"{path}: Klein LoRA recipes must train on image-klein-base-9b")
-        if recipe["models"]["apply"] != "image-klein-9b":
+        if models["apply"] != "image-klein-9b":
             fail(f"{path}: Klein LoRA recipes must apply on image-klein-9b")
-        if "same " in " ".join(recipe["captioning"].get("examples", [])).lower():
+        if "same " in " ".join(str(item) for item in as_list(captioning.get("examples", []), f"{path}: examples")).lower():
             fail(f"{path}: caption examples should not use same/previous phrasing")
         package_path = ROOT / "packages" / "mere-runpod" / "src" / "mere_runpod" / "recipes" / path.name
         if not package_path.is_file():
@@ -95,10 +112,12 @@ def validate_eval_recipes() -> None:
     for path in sorted((ROOT / "eval-recipes").glob("*.json")):
         recipe = load_json(path)
         validate_schema(path, schema, recipe)
-        if recipe["id"] in seen:
-            fail(f"{path}: duplicate eval recipe id {recipe['id']}")
-        seen.add(recipe["id"])
-        if recipe["models"]["apply"] != "image-klein-9b":
+        recipe_id = str(recipe["id"])
+        models = as_map(recipe["models"], f"{path}: models")
+        if recipe_id in seen:
+            fail(f"{path}: duplicate eval recipe id {recipe_id}")
+        seen.add(recipe_id)
+        if models["apply"] != "image-klein-9b":
             fail(f"{path}: Klein eval recipes must apply on image-klein-9b")
         serialized = json.dumps(recipe)
         if "/Users/" in serialized:
@@ -113,19 +132,23 @@ def validate_catalog() -> None:
     if catalog["contractVersion"] != "mere.run/plugin-catalog.v1":
         fail(f"{path}: wrong contractVersion")
     seen: set[str] = set()
-    for plugin in catalog["plugins"]:
+    default_channel = str(catalog["defaultChannel"])
+    for raw_plugin in as_list(catalog["plugins"], f"{path}: plugins"):
+        plugin = as_map(raw_plugin, f"{path}: plugin")
         require_keys(path, plugin, ["id", "entrypoint", "channels"])
-        if plugin["id"] in seen:
-            fail(f"{path}: duplicate plugin id {plugin['id']}")
-        seen.add(plugin["id"])
-        if catalog["defaultChannel"] not in plugin["channels"]:
-            fail(f"{path}: {plugin['id']} missing default channel {catalog['defaultChannel']}")
-        install = plugin["channels"][catalog["defaultChannel"]]
+        plugin_id = str(plugin["id"])
+        channels = as_map(plugin["channels"], f"{path}: {plugin_id}.channels")
+        if plugin_id in seen:
+            fail(f"{path}: duplicate plugin id {plugin_id}")
+        seen.add(plugin_id)
+        if default_channel not in channels:
+            fail(f"{path}: {plugin_id} missing default channel {default_channel}")
+        install = as_map(channels[default_channel], f"{path}: {plugin_id}.{default_channel}")
         if install["manager"] != "pipx":
             fail(f"{path}: only pipx installs are currently supported")
-        if "#subdirectory=" not in install["spec"]:
+        if "#subdirectory=" not in str(install["spec"]):
             fail(f"{path}: install spec should pin a package subdirectory")
-        package_dir = ROOT / plugin["subdirectory"]
+        package_dir = ROOT / str(plugin["subdirectory"])
         if not package_dir.is_dir():
             fail(f"{path}: plugin subdirectory does not exist: {plugin['subdirectory']}")
         if not (package_dir / "pyproject.toml").is_file():
@@ -525,7 +548,7 @@ def main() -> int:
     validate_animatic_tools_plan()
     validate_shotgrid_tools_plan()
     validate_volume_dry_run()
-    print("validate_repo: ok")
+    sys.stdout.write("validate_repo: ok\n")
     return 0
 
 

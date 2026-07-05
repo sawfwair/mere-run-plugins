@@ -15,12 +15,21 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 
 export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src"
 
+"$PYTHON" -m ruff check .
+"$PYTHON" -m mypy
+if rg -n "\bAny\b" packages/*/src scripts; then
+  echo "Production code must not use the dynamic top type; define typed JSON/provider boundaries instead." >&2
+  exit 1
+fi
 "$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-workflow-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src scripts
-"$PYTHON" -m unittest discover -s packages/mere-runpod/tests
-"$PYTHON" -m unittest discover -s packages/mere-image-tools/tests
-"$PYTHON" -m unittest discover -s packages/mere-workflow-tools/tests
-"$PYTHON" -m unittest discover -s packages/mere-animatic-tools/tests
-"$PYTHON" -m unittest discover -s packages/mere-shotgrid-tools/tests
+"$PYTHON" -m coverage erase
+"$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-workflow-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-animatic-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-shotgrid-tools/tests
+"$PYTHON" -m coverage report
+"$PYTHON" scripts/check_structure.py
 "$PYTHON" scripts/validate_repo.py
 
 unset PYTHONPATH

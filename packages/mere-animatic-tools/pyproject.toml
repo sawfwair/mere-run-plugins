@@ -21,3 +21,6 @@ mere-animatic-tools = "mere_animatic_tools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mere_animatic_tools = ["py.typed"]

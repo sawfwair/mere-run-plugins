@@ -26,3 +26,6 @@ mere-batch-runner = "mere_workflow_tools.batch_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mere_workflow_tools = ["py.typed"]

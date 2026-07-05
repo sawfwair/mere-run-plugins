@@ -12,21 +12,22 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
 
 from . import __version__
 
-
 DEFAULT_MERE_RUN = "mere.run"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+JsonMap = dict[str, object]
+JsonList = list[object]
 
 
 class PluginError(RuntimeError):
-    def __init__(self, message: str, exit_code: int = 1):
+    def __init__(self, message: str, exit_code: int = 1) -> None:
         super().__init__(message)
         self.exit_code = exit_code
 
@@ -112,21 +113,56 @@ def now_iso() -> str:
 
 
 def eprint(message: str) -> None:
-    print(message, file=sys.stderr, flush=True)
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
 
 
-def print_json(payload: Any) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+def print_json(payload: object) -> None:
+    sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def write_json(path: pathlib.Path, payload: Any) -> None:
+def write_json(path: pathlib.Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def load_json(path: pathlib.Path) -> Any:
+def as_map(value: object, label: str) -> JsonMap:
+    if isinstance(value, dict):
+        return cast(JsonMap, value)
+    raise PluginError(f"manifest field is not an object: {label}", 1)
+
+
+def as_list(value: object, label: str) -> JsonList:
+    if isinstance(value, list):
+        return value
+    raise PluginError(f"manifest field is not a list: {label}", 1)
+
+
+def manifest_local(manifest: JsonMap) -> JsonMap:
+    return as_map(manifest["local"], "local")
+
+
+def manifest_tool(manifest: JsonMap) -> JsonMap:
+    return as_map(manifest["tool"], "tool")
+
+
+def manifest_artifacts(manifest: JsonMap) -> JsonMap:
+    return as_map(manifest["artifacts"], "artifacts")
+
+
+def manifest_steps(manifest: JsonMap) -> JsonList:
+    return as_list(manifest["steps"], "steps")
+
+
+def string_list(value: object, label: str) -> list[str]:
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise PluginError(f"manifest field is not a string list: {label}", 1)
+
+
+def load_json(path: pathlib.Path) -> JsonMap:
     try:
-        return json.loads(path.read_text())
+        return as_map(json.loads(path.read_text()), str(path))
     except json.JSONDecodeError as exc:
         raise PluginError(f"invalid JSON in {path}: {exc}", 2) from None
 
@@ -206,14 +242,14 @@ def image_inputs(path: pathlib.Path) -> list[pathlib.Path]:
     return images
 
 
-def plugin_manifest(spec: ToolSpec) -> dict[str, Any]:
+def plugin_manifest(spec: ToolSpec) -> JsonMap:
     return {
         "contractVersion": "mere.run/plugin.v1",
         "name": spec.plugin_name,
         "version": __version__,
         "executable": spec.executable,
         "description": spec.description,
-        "homepage": f"https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-workflow-tools",
+        "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-workflow-tools",
         "commands": [
             {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
             {"name": "doctor", "description": "Check local readiness and mere.run availability.", "stdout": "json"},
@@ -237,7 +273,7 @@ def plugin_manifest(spec: ToolSpec) -> dict[str, Any]:
     }
 
 
-def base_manifest(spec: ToolSpec, args: argparse.Namespace, inputs: list[pathlib.Path]) -> dict[str, Any]:
+def base_manifest(spec: ToolSpec, args: argparse.Namespace, inputs: list[pathlib.Path]) -> JsonMap:
     created = now_iso()
     output_dir = args.output_dir
     manifest_path = args.manifest or default_manifest_path(output_dir)
@@ -274,8 +310,8 @@ def base_manifest(spec: ToolSpec, args: argparse.Namespace, inputs: list[pathlib
     }
 
 
-def make_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
-    builders: dict[str, Callable[[ToolSpec, argparse.Namespace], dict[str, Any]]] = {
+def make_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
+    builders: dict[str, Callable[[ToolSpec, argparse.Namespace], JsonMap]] = {
         "doc": make_doc_manifest,
         "media": make_media_manifest,
         "dataset": make_dataset_manifest,
@@ -286,14 +322,14 @@ def make_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
     return builders[spec.kind](spec, args)
 
 
-def add_step(manifest: dict[str, Any], name: str, argv: list[str], outputs: dict[str, str], stdin_path: str | None = None) -> None:
+def add_step(manifest: JsonMap, name: str, argv: list[str], outputs: dict[str, str], stdin_path: str | None = None) -> None:
     step = {"name": name, "argv": argv, "outputs": outputs}
     if stdin_path is not None:
         step["stdinPath"] = stdin_path
-    manifest["steps"].append(step)
+    manifest_steps(manifest).append(step)
 
 
-def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     input_path = args.input
     ensure_file(input_path, "input document image")
     manifest = base_manifest(spec, args, [input_path])
@@ -302,8 +338,8 @@ def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any
     redacted_text = args.output_dir / f"{input_path.stem}.redacted.txt"
     spans_json = args.output_dir / f"{input_path.stem}.pii.json"
     manifest["command"] = one_shot_command(spec, args)
-    manifest["local"]["input"] = str(input_path)
-    manifest["tool"].update({"workflow": "ocr-redact", "ocrBackend": args.ocr_backend, "redact": args.redact})
+    manifest_local(manifest)["input"] = str(input_path)
+    manifest_tool(manifest).update({"workflow": "ocr-redact", "ocrBackend": args.ocr_backend, "redact": args.redact})
     add_step(
         manifest,
         "ocr",
@@ -328,14 +364,14 @@ def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any
     return manifest
 
 
-def make_media_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_media_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     inputs = image_inputs(args.input)
     manifest = base_manifest(spec, args, inputs)
     ocr_dir = args.output_dir / "ocr"
     redacted_dir = args.output_dir / "redacted"
     manifest["command"] = one_shot_command(spec, args)
-    manifest["local"]["input"] = str(args.input)
-    manifest["tool"].update({"workflow": "media-ocr-scrub", "ocrBackend": args.ocr_backend, "redact": args.redact})
+    manifest_local(manifest)["input"] = str(args.input)
+    manifest_tool(manifest).update({"workflow": "media-ocr-scrub", "ocrBackend": args.ocr_backend, "redact": args.redact})
     add_step(
         manifest,
         "ocr",
@@ -356,7 +392,7 @@ def make_media_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, A
     return manifest
 
 
-def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     ensure_dir(args.input, "dataset directory")
     inputs = image_inputs(args.input)
     manifest = base_manifest(spec, args, inputs)
@@ -364,8 +400,8 @@ def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str,
     ocr_dir = args.output_dir / "ocr"
     contact_sheet = args.output_dir / "contact-sheet.jpg"
     manifest["command"] = one_shot_command(spec, args)
-    manifest["local"]["input"] = str(args.input)
-    manifest["tool"].update({
+    manifest_local(manifest)["input"] = str(args.input)
+    manifest_tool(manifest).update({
         "workflow": "dataset-caption",
         "triggerToken": args.trigger_token,
         "focus": args.focus,
@@ -389,7 +425,7 @@ def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str,
             {"ocrDirectory": str(ocr_dir)},
         )
     if args.contact_sheet:
-        manifest["steps"].append({
+        manifest_steps(manifest).append({
             "name": "contact-sheet",
             "python": "contact-sheet",
             "inputs": [str(path) for path in inputs],
@@ -398,7 +434,7 @@ def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str,
     return manifest
 
 
-def make_transcript_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_transcript_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     ensure_file(args.input, "audio input")
     if args.input.suffix.lower() not in AUDIO_EXTENSIONS:
         raise PluginError(f"unsupported audio extension: {args.input.suffix}", 2)
@@ -406,8 +442,8 @@ def make_transcript_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[s
     transcript = args.output_dir / f"{args.input.stem}.txt"
     redacted = args.output_dir / f"{args.input.stem}.redacted.txt"
     manifest["command"] = one_shot_command(spec, args)
-    manifest["local"]["input"] = str(args.input)
-    manifest["tool"].update({"workflow": "transcribe-redact", "asrBackend": args.backend, "redact": args.redact})
+    manifest_local(manifest)["input"] = str(args.input)
+    manifest_tool(manifest).update({"workflow": "transcribe-redact", "asrBackend": args.backend, "redact": args.redact})
     transcribe_argv = ["speech", "transcribe", str(args.input), "--output", str(transcript), "--backend", args.backend]
     if args.language:
         transcribe_argv.extend(["--language", args.language])
@@ -423,14 +459,14 @@ def make_transcript_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[s
     return manifest
 
 
-def make_image_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_image_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     output_image = args.output_dir / "image.png"
     inputs = [args.ref_image] if args.ref_image else [args.output_dir]
     if args.ref_image:
         ensure_file(args.ref_image, "reference image")
     manifest = base_manifest(spec, args, inputs)
     manifest["command"] = one_shot_command(spec, args)
-    manifest["tool"].update({
+    manifest_tool(manifest).update({
         "workflow": "image-generate",
         "model": args.model,
         "prompt": args.prompt,
@@ -469,9 +505,9 @@ def make_image_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, A
     return manifest
 
 
-def make_batch_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, Any]:
+def make_batch_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     ensure_file(args.jobs, "jobs file")
-    jobs: list[dict[str, Any]] = []
+    jobs: list[tuple[list[str], dict[str, str]]] = []
     for index, line in enumerate(args.jobs.read_text().splitlines(), start=1):
         if not line.strip():
             continue
@@ -479,16 +515,17 @@ def make_batch_manifest(spec: ToolSpec, args: argparse.Namespace) -> dict[str, A
         argv = job.get("argv")
         if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
             raise PluginError(f"job {index} must contain string-array argv", 2)
-        jobs.append(job)
+        outputs_raw = job.get("outputs") if isinstance(job.get("outputs"), dict) else {}
+        outputs = {str(key): str(value) for key, value in outputs_raw.items()}
+        jobs.append((argv, outputs))
     if not jobs:
         raise PluginError(f"jobs file contains no runnable jobs: {args.jobs}", 2)
     manifest = base_manifest(spec, args, [args.jobs])
     manifest["command"] = one_shot_command(spec, args)
-    manifest["local"]["jobs"] = str(args.jobs)
-    manifest["tool"].update({"workflow": "batch", "jobCount": len(jobs), "continueOnError": args.continue_on_error})
-    for index, job in enumerate(jobs, start=1):
-        outputs = job.get("outputs") if isinstance(job.get("outputs"), dict) else {}
-        add_step(manifest, f"job-{index:03d}", job["argv"], outputs)
+    manifest_local(manifest)["jobs"] = str(args.jobs)
+    manifest_tool(manifest).update({"workflow": "batch", "jobCount": len(jobs), "continueOnError": args.continue_on_error})
+    for index, (argv, outputs) in enumerate(jobs, start=1):
+        add_step(manifest, f"job-{index:03d}", argv, outputs)
     return manifest
 
 
@@ -511,19 +548,25 @@ def one_shot_command(spec: ToolSpec, args: argparse.Namespace) -> list[str]:
     return command
 
 
-def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    output_dir = pathlib.Path(manifest["local"]["outputDirectory"])
+def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
+    output_dir = pathlib.Path(str(manifest_local(manifest)["outputDirectory"]))
     output_dir.mkdir(parents=True, exist_ok=True)
     update_manifest(manifest_path, manifest, status="running")
     try:
-        for step in manifest["steps"]:
+        for raw_step in manifest_steps(manifest):
+            step = as_map(raw_step, "step")
             if step.get("python") == "contact-sheet":
-                make_contact_sheet([pathlib.Path(item) for item in step["inputs"]], pathlib.Path(step["outputs"]["contactSheet"]))
+                outputs = as_map(step["outputs"], "step.outputs")
+                make_contact_sheet(
+                    [pathlib.Path(item) for item in string_list(step["inputs"], "step.inputs")],
+                    pathlib.Path(str(outputs["contactSheet"])),
+                )
             else:
                 run_mere_step(manifest, step)
         files = collect_artifacts(manifest)
-        manifest["artifacts"]["files"] = files
-        manifest["artifacts"]["sha256"] = {
+        artifacts = manifest_artifacts(manifest)
+        artifacts["files"] = files
+        artifacts["sha256"] = {
             str(path): file_sha256(pathlib.Path(path))
             for path in files
             if pathlib.Path(path).is_file()
@@ -536,18 +579,22 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any]) -> d
     return manifest
 
 
-def run_mere_step(manifest: dict[str, Any], step: dict[str, Any]) -> None:
-    command = list(manifest["tool"]["mereRunCommand"]) + list(step["argv"])
+def run_mere_step(manifest: JsonMap, step: JsonMap) -> None:
+    command = string_list(manifest_tool(manifest)["mereRunCommand"], "tool.mereRunCommand") + string_list(
+        step["argv"],
+        "step.argv",
+    )
     if not command_available(command):
         raise PluginError(f"mere.run command not found: {command[0]}. Install mere.run or pass --mere-run-command.", 3)
     stdin_data = None
     if "stdinPath" in step:
-        stdin_path = pathlib.Path(step["stdinPath"])
+        stdin_path = pathlib.Path(str(step["stdinPath"]))
         if not stdin_path.is_file():
             raise PluginError(f"step input missing for {step['name']}: {stdin_path}", 1)
         stdin_data = stdin_path.read_text()
-    for output in step.get("outputs", {}).values():
-        pathlib.Path(output).parent.mkdir(parents=True, exist_ok=True)
+    outputs = as_map(step.get("outputs", {}), "step.outputs")
+    for output in outputs.values():
+        pathlib.Path(str(output)).parent.mkdir(parents=True, exist_ok=True)
     eprint("$ " + shlex.join(command))
     process = subprocess.run(
         command,
@@ -564,11 +611,13 @@ def run_mere_step(manifest: dict[str, Any], step: dict[str, Any]) -> None:
         raise PluginError(f"mere.run step {step['name']} failed with exit {process.returncode}", 1)
 
 
-def collect_artifacts(manifest: dict[str, Any]) -> list[str]:
+def collect_artifacts(manifest: JsonMap) -> list[str]:
     files: list[str] = []
-    for step in manifest["steps"]:
-        for output in step.get("outputs", {}).values():
-            path = pathlib.Path(output)
+    for raw_step in manifest_steps(manifest):
+        step = as_map(raw_step, "step")
+        outputs = as_map(step.get("outputs", {}), "step.outputs")
+        for output in outputs.values():
+            path = pathlib.Path(str(output))
             if path.is_file():
                 files.append(str(path))
             elif path.is_dir():
@@ -596,7 +645,7 @@ def make_contact_sheet(images: list[pathlib.Path], output: pathlib.Path) -> None
     sheet.save(output)
 
 
-def update_manifest(path: pathlib.Path, manifest: dict[str, Any], **updates: Any) -> None:
+def update_manifest(path: pathlib.Path, manifest: JsonMap, **updates: object) -> None:
     manifest.update(updates)
     manifest["updatedAt"] = now_iso()
     write_json(path, manifest)
@@ -609,7 +658,7 @@ def command_manifest(spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
-def command_doctor(spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_doctor(_spec: ToolSpec, args: argparse.Namespace) -> int:
     mere_run_command = split_command(args.mere_run_command)
     checks = [
         {"name": "python", "ok": True, "detail": sys.version.split()[0]},
@@ -622,12 +671,12 @@ def command_doctor(spec: ToolSpec, args: argparse.Namespace) -> int:
 
 def command_plan(spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = make_manifest(spec, args)
-    write_json(pathlib.Path(manifest["local"]["runManifest"]), manifest)
+    write_json(pathlib.Path(str(manifest_local(manifest)["runManifest"])), manifest)
     print_json(manifest)
     return 0
 
 
-def command_run(spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_run(_spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest_path = args.run_manifest
     manifest = load_json(manifest_path)
     if args.dry_run:
@@ -640,7 +689,7 @@ def command_run(spec: ToolSpec, args: argparse.Namespace) -> int:
 
 def command_one_shot(spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = make_manifest(spec, args)
-    manifest_path = pathlib.Path(manifest["local"]["runManifest"])
+    manifest_path = pathlib.Path(str(manifest_local(manifest)["runManifest"]))
     write_json(manifest_path, manifest)
     if args.dry_run:
         print_json(manifest)
@@ -650,7 +699,7 @@ def command_one_shot(spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
-def command_resume(spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_resume(_spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = load_json(args.run_manifest)
     print_json({
         "runId": manifest.get("runId"),
@@ -662,9 +711,9 @@ def command_resume(spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
-def command_cleanup(spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_cleanup(_spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = load_json(args.run_manifest)
-    cleanup = manifest.setdefault("cleanup", {"default": "none", "status": "not-started"})
+    cleanup = as_map(manifest.setdefault("cleanup", {"default": "none", "status": "not-started"}), "cleanup")
     cleanup["status"] = "skipped"
     cleanup["reason"] = "local workflow tools do not create remote resources"
     update_manifest(args.run_manifest, manifest)

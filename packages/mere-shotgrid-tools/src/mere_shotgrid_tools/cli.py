@@ -10,10 +10,13 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol, cast
 
 from . import __version__
 
+JsonMap = dict[str, object]
+JsonList = list[object]
+ShotGridFilters = list[list[object]]
 
 PLUGIN_NAME = "mere-shotgrid-tools"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -27,9 +30,25 @@ PASSWORD_ENV = ("MERE_SHOTGRID_PASSWORD", "SHOTGRID_PASSWORD", "SG_PASSWORD")
 
 
 class PluginError(RuntimeError):
-    def __init__(self, message: str, exit_code: int = 1):
+    def __init__(self, message: str, exit_code: int = 1) -> None:
         super().__init__(message)
         self.exit_code = exit_code
+
+
+class ShotGridClient(Protocol):
+    def find_one(self, entity_type: str, filters: ShotGridFilters, fields: list[str]) -> JsonMap | None: ...
+
+    def find(self, entity_type: str, filters: ShotGridFilters, fields: list[str], *, limit: int) -> list[JsonMap]: ...
+
+    def create(self, entity_type: str, data: JsonMap) -> JsonMap: ...
+
+    def update(self, entity_type: str, entity_id: int, data: JsonMap, **kwargs: object) -> JsonMap: ...
+
+    def upload(self, entity_type: str, entity_id: int, path: str, **kwargs: object) -> object: ...
+
+    def upload_thumbnail(self, entity_type: str, entity_id: int, path: str) -> object: ...
+
+    def delete(self, entity_type: str, entity_id: int) -> object: ...
 
 
 @dataclass(frozen=True)
@@ -54,21 +73,57 @@ def now_iso() -> str:
 
 
 def eprint(message: str) -> None:
-    print(message, file=sys.stderr, flush=True)
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
 
 
-def print_json(payload: Any) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+def print_json(payload: object) -> None:
+    sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def write_json(path: pathlib.Path, payload: Any) -> None:
+def write_json(path: pathlib.Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def load_json(path: pathlib.Path) -> Any:
+def as_map(value: object, context: str) -> JsonMap:
+    if not isinstance(value, dict):
+        raise PluginError(f"{context} must be a JSON object", 2)
+    return cast(JsonMap, value)
+
+
+def as_list(value: object, context: str) -> JsonList:
+    if not isinstance(value, list):
+        raise PluginError(f"{context} must be a JSON array", 2)
+    return cast(JsonList, value)
+
+
+def optional_map(value: object, context: str) -> JsonMap | None:
+    if value is None:
+        return None
+    return as_map(value, context)
+
+
+def string_field(mapping: JsonMap, key: str, context: str) -> str:
+    value = mapping.get(key)
+    if not isinstance(value, str):
+        raise PluginError(f"{context}.{key} must be a string", 2)
+    return value
+
+
+def int_value(value: object, context: str) -> int:
+    if isinstance(value, bool):
+        raise PluginError(f"{context} must be an integer", 2)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value)
+    raise PluginError(f"{context} must be an integer", 2)
+
+
+def load_json(path: pathlib.Path) -> JsonMap:
     try:
-        return json.loads(path.read_text())
+        return as_map(json.loads(path.read_text()), f"JSON file {path}")
     except json.JSONDecodeError as exc:
         raise PluginError(f"invalid JSON in {path}: {exc}", 2) from None
 
@@ -116,7 +171,7 @@ def validate_config(config: ShotGridConfig) -> None:
         )
 
 
-def redacted_config(config: ShotGridConfig) -> dict[str, Any]:
+def redacted_config(config: ShotGridConfig) -> JsonMap:
     return {
         "siteUrl": config.site_url,
         "authMode": config.auth_mode,
@@ -127,7 +182,7 @@ def redacted_config(config: ShotGridConfig) -> dict[str, Any]:
     }
 
 
-def make_shotgrid_client(config: ShotGridConfig) -> Any:
+def make_shotgrid_client(config: ShotGridConfig) -> ShotGridClient:  # pragma: no cover
     validate_config(config)
     try:
         import shotgun_api3
@@ -137,8 +192,8 @@ def make_shotgrid_client(config: ShotGridConfig) -> Any:
             3,
         ) from exc
     if config.auth_mode == "script":
-        return shotgun_api3.Shotgun(config.site_url, script_name=config.script_name, api_key=config.api_key)
-    return shotgun_api3.Shotgun(config.site_url, login=config.login, password=config.password)
+        return cast(ShotGridClient, shotgun_api3.Shotgun(config.site_url, script_name=config.script_name, api_key=config.api_key))
+    return cast(ShotGridClient, shotgun_api3.Shotgun(config.site_url, login=config.login, password=config.password))
 
 
 def file_sha256(path: pathlib.Path) -> str:
@@ -174,20 +229,26 @@ def default_manifest_path(output_dir: pathlib.Path) -> pathlib.Path:
     return output_dir / "run.json"
 
 
-def int_or_none(value: Any) -> int | None:
+def int_or_none(value: object) -> int | None:
     if value is None or value == "":
         return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
-def entity_ref(entity_type: str, entity_id: int) -> dict[str, Any]:
+def entity_ref(entity_type: str, entity_id: int) -> JsonMap:
     return {"type": entity_type, "id": int(entity_id)}
 
 
-def ref_from_payload(value: Any) -> dict[str, Any] | None:
+def ref_from_payload(value: object) -> JsonMap | None:
     if not isinstance(value, dict):
         return None
     entity_type = value.get("type")
@@ -197,8 +258,8 @@ def ref_from_payload(value: Any) -> dict[str, Any] | None:
     return None
 
 
-def parse_key_value(values: list[str]) -> dict[str, Any]:
-    parsed: dict[str, Any] = {}
+def parse_key_value(values: list[str]) -> JsonMap:
+    parsed: JsonMap = {}
     for raw in values:
         if "=" not in raw:
             raise PluginError(f"field override must use key=value syntax: {raw}", 2)
@@ -213,7 +274,7 @@ def parse_key_value(values: list[str]) -> dict[str, Any]:
     return parsed
 
 
-def plugin_manifest() -> dict[str, Any]:
+def plugin_manifest() -> JsonMap:
     return {
         "contractVersion": "mere.run/plugin.v1",
         "name": PLUGIN_NAME,
@@ -265,7 +326,7 @@ def artifact_kind(path: pathlib.Path) -> str:
     return "file"
 
 
-def artifact_item(path: pathlib.Path, *, label: str | None = None, allow_missing: bool = False) -> dict[str, Any]:
+def artifact_item(path: pathlib.Path, *, label: str | None = None, allow_missing: bool = False) -> JsonMap:
     path = path.expanduser().resolve()
     if not path.is_file():
         if allow_missing:
@@ -294,12 +355,10 @@ def artifact_item(path: pathlib.Path, *, label: str | None = None, allow_missing
 
 def collect_paths_from_manifest(path: pathlib.Path) -> list[pathlib.Path]:
     payload = load_json(path)
-    artifacts = payload.get("artifacts") if isinstance(payload, dict) else {}
-    if not isinstance(artifacts, dict):
-        return []
+    artifacts = as_map(payload.get("artifacts", {}), "source manifest artifacts")
     candidates: list[pathlib.Path] = []
 
-    def add(value: Any) -> None:
+    def add(value: object) -> None:
         if isinstance(value, str) and value:
             candidates.append(pathlib.Path(value))
         elif isinstance(value, dict):
@@ -307,9 +366,9 @@ def collect_paths_from_manifest(path: pathlib.Path) -> list[pathlib.Path]:
             if isinstance(item_path, str) and item_path:
                 candidates.append(pathlib.Path(item_path))
 
-    for item in artifacts.get("items") or []:
+    for item in as_list(artifacts.get("items", []), "source manifest artifacts.items"):
         add(item)
-    for item in artifacts.get("files") or []:
+    for item in as_list(artifacts.get("files", []), "source manifest artifacts.files"):
         add(item)
     for key in ("image", "movie", "video", "lora", "mask", "thumbnail"):
         add(artifacts.get(key))
@@ -318,27 +377,23 @@ def collect_paths_from_manifest(path: pathlib.Path) -> list[pathlib.Path]:
 
 def collect_paths_from_bundle(path: pathlib.Path) -> list[pathlib.Path]:
     payload = load_json(path)
-    files = payload.get("files") if isinstance(payload, dict) else []
+    files = payload.get("files", [])
     candidates: list[pathlib.Path] = []
-    if isinstance(files, list):
-        for item in files:
-            if isinstance(item, dict) and isinstance(item.get("path"), str):
-                candidates.append(pathlib.Path(item["path"]))
-            elif isinstance(item, str):
-                candidates.append(pathlib.Path(item))
+    for item in as_list(files, "artifact bundle files"):
+        if isinstance(item, dict) and isinstance(item.get("path"), str):
+            candidates.append(pathlib.Path(item["path"]))
+        elif isinstance(item, str):
+            candidates.append(pathlib.Path(item))
     return candidates
 
 
-def load_request(args: argparse.Namespace) -> dict[str, Any]:
+def load_request(args: argparse.Namespace) -> JsonMap:
     if not getattr(args, "request_json", None):
         return {}
-    payload = load_json(args.request_json)
-    if not isinstance(payload, dict):
-        raise PluginError("--request-json must contain a JSON object", 2)
-    return payload
+    return load_json(args.request_json)
 
 
-def collect_artifacts(args: argparse.Namespace) -> list[dict[str, Any]]:
+def collect_artifacts(args: argparse.Namespace) -> list[JsonMap]:
     paths: list[pathlib.Path] = []
     paths.extend(getattr(args, "artifact", None) or [])
     if getattr(args, "source_run_manifest", None):
@@ -346,7 +401,7 @@ def collect_artifacts(args: argparse.Namespace) -> list[dict[str, Any]]:
     if getattr(args, "artifact_bundle", None):
         paths.extend(collect_paths_from_bundle(args.artifact_bundle))
     seen: set[pathlib.Path] = set()
-    items: list[dict[str, Any]] = []
+    items: list[JsonMap] = []
     for path in paths:
         resolved = path.expanduser().resolve()
         if resolved in seen:
@@ -361,14 +416,14 @@ def collect_artifacts(args: argparse.Namespace) -> list[dict[str, Any]]:
     return items
 
 
-def first_image_artifact(artifacts: list[dict[str, Any]]) -> pathlib.Path | None:
+def first_image_artifact(artifacts: list[JsonMap]) -> pathlib.Path | None:
     for item in artifacts:
         if item["kind"] == "image" and not item.get("missing"):
-            return pathlib.Path(item["path"])
+            return pathlib.Path(string_field(item, "path", "artifact"))
     return None
 
 
-def project_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any]:
+def project_target(args: argparse.Namespace, request: JsonMap) -> JsonMap:
     project = request.get("project") if isinstance(request.get("project"), dict) else {}
     project_ref = ref_from_payload(project)
     project_id = args.project_id or (project_ref or {}).get("id") or int_or_none(request.get("project_id") or request.get("projectId"))
@@ -380,8 +435,9 @@ def project_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[st
     }
 
 
-def entity_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any] | None:
-    payload = request.get("entity") if isinstance(request.get("entity"), dict) else {}
+def entity_target(args: argparse.Namespace, request: JsonMap) -> JsonMap | None:
+    raw_payload = request.get("entity")
+    payload = as_map(raw_payload, "request.entity") if isinstance(raw_payload, dict) else {}
     ref = ref_from_payload(payload)
     entity_type = args.entity_type or (ref or {}).get("type") or payload.get("type") or request.get("entity_type")
     entity_id = args.entity_id or (ref or {}).get("id") or int_or_none(payload.get("id") or request.get("entity_id"))
@@ -393,8 +449,9 @@ def entity_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str
     return {"type": entity_type, "id": entity_id, "code": entity_code}
 
 
-def task_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any] | None:
-    payload = request.get("task") if isinstance(request.get("task"), dict) else {}
+def task_target(args: argparse.Namespace, request: JsonMap) -> JsonMap | None:
+    raw_payload = request.get("task")
+    payload = as_map(raw_payload, "request.task") if isinstance(raw_payload, dict) else {}
     ref = ref_from_payload(payload)
     task_id = args.task_id or (ref or {}).get("id") or int_or_none(payload.get("id") or request.get("task_id"))
     task_name = args.task_name or payload.get("content") or payload.get("name") or request.get("task_name")
@@ -403,8 +460,9 @@ def task_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, 
     return {"type": "Task", "id": task_id, "name": task_name}
 
 
-def playlist_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any] | None:
-    payload = request.get("playlist") if isinstance(request.get("playlist"), dict) else {}
+def playlist_target(args: argparse.Namespace, request: JsonMap) -> JsonMap | None:
+    raw_payload = request.get("playlist")
+    payload = as_map(raw_payload, "request.playlist") if isinstance(raw_payload, dict) else {}
     ref = ref_from_payload(payload)
     playlist_id = args.playlist_id or (ref or {}).get("id") or int_or_none(payload.get("id") or request.get("playlist_id"))
     playlist_code = args.playlist_code or payload.get("code") or payload.get("name") or request.get("playlist_code")
@@ -413,14 +471,14 @@ def playlist_target(args: argparse.Namespace, request: dict[str, Any]) -> dict[s
     return {"type": "Playlist", "id": playlist_id, "code": playlist_code, "createIfMissing": args.create_playlist}
 
 
-def version_code(args: argparse.Namespace, target: dict[str, Any] | None) -> str:
+def version_code(args: argparse.Namespace, target: JsonMap | None) -> str:
     if args.version_code:
-        return args.version_code
+        return str(args.version_code)
     if target and target.get("code"):
         return f"{target['code']}_{args.run_id}"
     if target and target.get("id"):
         return f"{target['type']}_{target['id']}_{args.run_id}"
-    return args.run_id
+    return str(args.run_id)
 
 
 def make_publish_command(args: argparse.Namespace, command_name: str) -> list[str]:
@@ -470,26 +528,26 @@ def make_publish_command(args: argparse.Namespace, command_name: str) -> list[st
     return command
 
 
-def planned_operations(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    shotgrid = manifest["shotgrid"]
-    operations = [
+def planned_operations(manifest: JsonMap) -> list[JsonMap]:
+    shotgrid = as_map(manifest.get("shotgrid"), "manifest.shotgrid")
+    operations: list[JsonMap] = [
         {
             "action": "create",
             "entityType": "Version",
             "description": "Create review Version linked to the resolved Project, entity, and Task.",
         }
     ]
-    operations.extend(
-        {
+    for raw_item in as_list(shotgrid.get("uploads"), "manifest.shotgrid.uploads"):
+        item = as_map(raw_item, "manifest.shotgrid.uploads[]")
+        operations.append({
             "action": "upload",
             "entityType": "Version",
             "path": item["path"],
             "fieldName": item.get("fieldName"),
-        }
-        for item in shotgrid["uploads"]
-    )
-    if shotgrid.get("thumbnail"):
-        operations.append({"action": "upload-thumbnail", "entityType": "Version", "path": shotgrid["thumbnail"]["path"]})
+        })
+    thumbnail = optional_map(shotgrid.get("thumbnail"), "manifest.shotgrid.thumbnail")
+    if thumbnail:
+        operations.append({"action": "upload-thumbnail", "entityType": "Version", "path": thumbnail["path"]})
     if shotgrid.get("note"):
         operations.append({"action": "create", "entityType": "Note", "description": "Create review note linked to the Version."})
     if shotgrid.get("playlist"):
@@ -499,7 +557,7 @@ def planned_operations(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return operations
 
 
-def make_publish_manifest(args: argparse.Namespace, command_name: str = "plan") -> dict[str, Any]:
+def make_publish_manifest(args: argparse.Namespace, command_name: str = "plan") -> JsonMap:
     request = load_request(args)
     artifacts = collect_artifacts(args)
     project = project_target(args, request)
@@ -525,12 +583,12 @@ def make_publish_manifest(args: argparse.Namespace, command_name: str = "plan") 
     }
     if args.user_id:
         version["user"] = entity_ref("HumanUser", args.user_id)
-    sha_values = [item.get("sha256") or item["path"] for item in artifacts]
+    sha_values = [str(item.get("sha256") or item["path"]) for item in artifacts]
     if thumbnail:
-        sha_values.append(thumbnail.get("sha256") or thumbnail["path"])
+        sha_values.append(str(thumbnail.get("sha256") or thumbnail["path"]))
     if not sha_values:
         sha_values.append(json.dumps(request, sort_keys=True))
-    manifest: dict[str, Any] = {
+    manifest: JsonMap = {
         "contractVersion": "mere.run/plugin-run.v1",
         "runId": args.run_id,
         "plugin": {"name": PLUGIN_NAME, "version": __version__},
@@ -539,7 +597,7 @@ def make_publish_manifest(args: argparse.Namespace, command_name: str = "plan") 
         "createdAt": created,
         "updatedAt": created,
         "dataset": {
-            "path": str(pathlib.Path(artifacts[0]["path"]).parent if artifacts else output_dir),
+            "path": str(pathlib.Path(string_field(artifacts[0], "path", "artifact")).parent if artifacts else output_dir),
             "pairCount": max(1, len(artifacts)),
             "sha256": combined_sha256(sha_values),
         },
@@ -578,29 +636,32 @@ def make_publish_manifest(args: argparse.Namespace, command_name: str = "plan") 
         },
         "cleanup": {"default": "none", "status": "not-started"},
     }
-    manifest["shotgrid"]["plannedOperations"] = planned_operations(manifest)
+    shotgrid = as_map(manifest.get("shotgrid"), "manifest.shotgrid")
+    shotgrid["plannedOperations"] = planned_operations(manifest)
     return manifest
 
 
-def update_manifest(path: pathlib.Path, manifest: dict[str, Any], **updates: Any) -> None:
+def update_manifest(path: pathlib.Path, manifest: JsonMap, **updates: object) -> None:
     manifest.update(updates)
     manifest["updatedAt"] = now_iso()
     write_json(path, manifest)
 
 
-def require_existing_uploads(manifest: dict[str, Any]) -> None:
-    for item in manifest.get("shotgrid", {}).get("uploads") or []:
-        path = pathlib.Path(item["path"])
+def require_existing_uploads(manifest: JsonMap) -> None:
+    shotgrid = as_map(manifest.get("shotgrid", {}), "manifest.shotgrid")
+    for raw_item in as_list(shotgrid.get("uploads", []), "manifest.shotgrid.uploads"):
+        item = as_map(raw_item, "manifest.shotgrid.uploads[]")
+        path = pathlib.Path(string_field(item, "path", "upload"))
         if not path.is_file():
             raise PluginError(f"upload artifact does not exist: {path}", 2)
-    thumbnail = manifest.get("shotgrid", {}).get("thumbnail")
-    if thumbnail and not pathlib.Path(thumbnail["path"]).is_file():
+    thumbnail = optional_map(shotgrid.get("thumbnail"), "manifest.shotgrid.thumbnail")
+    if thumbnail and not pathlib.Path(string_field(thumbnail, "path", "thumbnail")).is_file():
         raise PluginError(f"thumbnail does not exist: {thumbnail['path']}", 2)
 
 
-def resolve_project(sg: Any, project: dict[str, Any]) -> dict[str, Any]:
+def resolve_project(sg: ShotGridClient, project: JsonMap) -> JsonMap:
     if project.get("id"):
-        return entity_ref("Project", int(project["id"]))
+        return entity_ref("Project", int_value(project["id"], "project.id"))
     result = None
     if project.get("code"):
         try:
@@ -615,52 +676,54 @@ def resolve_project(sg: Any, project: dict[str, Any]) -> dict[str, Any]:
         raise PluginError("project id, code, or name is required", 2)
     if not result:
         raise PluginError(f"ShotGrid project not found: {project}", 4)
-    return entity_ref("Project", result["id"])
+    return entity_ref("Project", int_value(result["id"], "ShotGrid Project.id"))
 
 
-def resolve_linked_entity(sg: Any, project_ref: dict[str, Any], target: dict[str, Any] | None) -> dict[str, Any] | None:
+def resolve_linked_entity(sg: ShotGridClient, project_ref: JsonMap, target: JsonMap | None) -> JsonMap | None:
     if not target:
         return None
     if target.get("id"):
-        return entity_ref(target["type"], int(target["id"]))
-    filters = [["project", "is", project_ref], ["code", "is", target["code"]]]
-    result = sg.find_one(target["type"], filters, ["id", "code"])
+        return entity_ref(string_field(target, "type", "target"), int_value(target["id"], "target.id"))
+    target_type = string_field(target, "type", "target")
+    filters: ShotGridFilters = [["project", "is", project_ref], ["code", "is", target["code"]]]
+    result = sg.find_one(target_type, filters, ["id", "code"])
     if not result:
-        raise PluginError(f"ShotGrid {target['type']} not found by code: {target['code']}", 4)
-    return entity_ref(target["type"], result["id"])
+        raise PluginError(f"ShotGrid {target_type} not found by code: {target['code']}", 4)
+    return entity_ref(target_type, int_value(result["id"], f"ShotGrid {target_type}.id"))
 
 
-def resolve_task(sg: Any, project_ref: dict[str, Any], entity: dict[str, Any] | None, task: dict[str, Any] | None) -> dict[str, Any] | None:
+def resolve_task(sg: ShotGridClient, project_ref: JsonMap, entity: JsonMap | None, task: JsonMap | None) -> JsonMap | None:
     if not task:
         return None
     if task.get("id"):
-        return entity_ref("Task", int(task["id"]))
-    filters: list[list[Any]] = [["project", "is", project_ref], ["content", "is", task["name"]]]
+        return entity_ref("Task", int_value(task["id"], "task.id"))
+    filters: ShotGridFilters = [["project", "is", project_ref], ["content", "is", task["name"]]]
     if entity:
         filters.append(["entity", "is", entity])
     result = sg.find_one("Task", filters, ["id", "content"])
     if not result:
         raise PluginError(f"ShotGrid Task not found: {task['name']}", 4)
-    return entity_ref("Task", result["id"])
+    return entity_ref("Task", int_value(result["id"], "ShotGrid Task.id"))
 
 
-def resolve_playlist(sg: Any, project_ref: dict[str, Any], playlist: dict[str, Any] | None) -> tuple[dict[str, Any] | None, bool]:
+def resolve_playlist(sg: ShotGridClient, project_ref: JsonMap, playlist: JsonMap | None) -> tuple[JsonMap | None, bool]:
     if not playlist:
         return None, False
     if playlist.get("id"):
-        return entity_ref("Playlist", int(playlist["id"])), False
+        return entity_ref("Playlist", int_value(playlist["id"], "playlist.id")), False
     result = sg.find_one("Playlist", [["project", "is", project_ref], ["code", "is", playlist["code"]]], ["id", "code"])
     if result:
-        return entity_ref("Playlist", result["id"]), False
+        return entity_ref("Playlist", int_value(result["id"], "ShotGrid Playlist.id")), False
     if not playlist.get("createIfMissing"):
         raise PluginError(f"ShotGrid Playlist not found: {playlist['code']}", 4)
     created = sg.create("Playlist", {"project": project_ref, "code": playlist["code"]})
-    return entity_ref("Playlist", created["id"]), True
+    return entity_ref("Playlist", int_value(created["id"], "created Playlist.id")), True
 
 
-def build_version_data(manifest: dict[str, Any], project: dict[str, Any], entity: dict[str, Any] | None, task: dict[str, Any] | None) -> dict[str, Any]:
-    source = manifest["shotgrid"]["version"]
-    data: dict[str, Any] = {
+def build_version_data(manifest: JsonMap, project: JsonMap, entity: JsonMap | None, task: JsonMap | None) -> JsonMap:
+    shotgrid = as_map(manifest.get("shotgrid"), "manifest.shotgrid")
+    source = as_map(shotgrid.get("version"), "manifest.shotgrid.version")
+    data: JsonMap = {
         "project": project,
         "code": source["code"],
         "description": source["description"],
@@ -672,18 +735,18 @@ def build_version_data(manifest: dict[str, Any], project: dict[str, Any], entity
         data["sg_task"] = task
     if source.get("user"):
         data["user"] = source["user"]
-    data.update(source.get("extraFields") or {})
+    data.update(as_map(source.get("extraFields", {}), "manifest.shotgrid.version.extraFields"))
     return data
 
 
-def upload_with_retry(sg: Any, *, entity_type: str, entity_id: int, item: dict[str, Any]) -> int:
-    path = item["path"]
-    kwargs: dict[str, Any] = {"display_name": item.get("name") or pathlib.Path(path).name}
+def upload_with_retry(sg: ShotGridClient, *, entity_type: str, entity_id: int, item: JsonMap) -> int:
+    path = string_field(item, "path", "upload")
+    kwargs: JsonMap = {"display_name": item.get("name") or pathlib.Path(path).name}
     if item.get("fieldName"):
         kwargs["field_name"] = item["fieldName"]
     for attempt in range(2):
         try:
-            return int(sg.upload(entity_type, entity_id, path, **kwargs))
+            return int_value(sg.upload(entity_type, entity_id, path, **kwargs), "ShotGrid upload id")
         except Exception:
             if attempt:
                 raise
@@ -691,21 +754,32 @@ def upload_with_retry(sg: Any, *, entity_type: str, entity_id: int, item: dict[s
     raise AssertionError("unreachable")
 
 
-def record_created(manifest: dict[str, Any], entity: dict[str, Any], label: str) -> None:
-    manifest["shotgrid"]["result"]["created"].append({"type": entity["type"], "id": entity["id"], "label": label})
+def record_created(manifest: JsonMap, entity: JsonMap, label: str) -> None:
+    shotgrid = as_map(manifest.get("shotgrid"), "manifest.shotgrid")
+    result = as_map(shotgrid.get("result"), "manifest.shotgrid.result")
+    created = as_list(result.get("created"), "manifest.shotgrid.result.created")
+    created.append({"type": entity["type"], "id": entity["id"], "label": label})
 
 
-def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any], *, sg: Any | None = None, config: ShotGridConfig | None = None) -> dict[str, Any]:
+def execute_manifest(
+    manifest_path: pathlib.Path,
+    manifest: JsonMap,
+    *,
+    sg: ShotGridClient | None = None,
+    config: ShotGridConfig | None = None,
+) -> JsonMap:
     require_existing_uploads(manifest)
     if sg is None:
         sg = make_shotgrid_client(config or ShotGridConfig(None, None, None, None, None))
     update_manifest(manifest_path, manifest, status="running")
     try:
-        project = resolve_project(sg, manifest["shotgrid"]["project"])
-        entity = resolve_linked_entity(sg, project, manifest["shotgrid"].get("entity"))
-        task = resolve_task(sg, project, entity, manifest["shotgrid"].get("task"))
-        playlist, playlist_created = resolve_playlist(sg, project, manifest["shotgrid"].get("playlist"))
-        manifest["shotgrid"]["resolved"] = {
+        shotgrid = as_map(manifest.get("shotgrid"), "manifest.shotgrid")
+        result = as_map(shotgrid.get("result"), "manifest.shotgrid.result")
+        project = resolve_project(sg, as_map(shotgrid.get("project"), "manifest.shotgrid.project"))
+        entity = resolve_linked_entity(sg, project, optional_map(shotgrid.get("entity"), "manifest.shotgrid.entity"))
+        task = resolve_task(sg, project, entity, optional_map(shotgrid.get("task"), "manifest.shotgrid.task"))
+        playlist, playlist_created = resolve_playlist(sg, project, optional_map(shotgrid.get("playlist"), "manifest.shotgrid.playlist"))
+        shotgrid["resolved"] = {
             "project": project,
             "entity": entity,
             "task": task,
@@ -716,14 +790,21 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any], *, s
         update_manifest(manifest_path, manifest)
 
         version = sg.create("Version", build_version_data(manifest, project, entity, task))
-        version_ref = entity_ref("Version", version["id"])
-        manifest["shotgrid"]["result"]["version"] = version_ref
+        version_ref = entity_ref("Version", int_value(version["id"], "created Version.id"))
+        result["version"] = version_ref
         record_created(manifest, version_ref, "version")
         update_manifest(manifest_path, manifest)
 
-        for item in manifest["shotgrid"].get("uploads") or []:
-            attachment_id = upload_with_retry(sg, entity_type="Version", entity_id=version_ref["id"], item=item)
-            manifest["shotgrid"]["result"]["uploads"].append({
+        uploads = as_list(result.get("uploads"), "manifest.shotgrid.result.uploads")
+        for raw_item in as_list(shotgrid.get("uploads", []), "manifest.shotgrid.uploads"):
+            item = as_map(raw_item, "manifest.shotgrid.uploads[]")
+            attachment_id = upload_with_retry(
+                sg,
+                entity_type="Version",
+                entity_id=int_value(version_ref["id"], "Version.id"),
+                item=item,
+            )
+            uploads.append({
                 "type": "Attachment",
                 "id": attachment_id,
                 "path": item["path"],
@@ -731,13 +812,20 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any], *, s
             })
             update_manifest(manifest_path, manifest)
 
-        thumbnail = manifest["shotgrid"].get("thumbnail")
+        thumbnail = optional_map(shotgrid.get("thumbnail"), "manifest.shotgrid.thumbnail")
         if thumbnail:
-            attachment_id = int(sg.upload_thumbnail("Version", version_ref["id"], thumbnail["path"]))
-            manifest["shotgrid"]["result"]["thumbnail"] = {"type": "Attachment", "id": attachment_id, "path": thumbnail["path"]}
+            attachment_id = int_value(
+                sg.upload_thumbnail(
+                    "Version",
+                    int_value(version_ref["id"], "Version.id"),
+                    string_field(thumbnail, "path", "thumbnail"),
+                ),
+                "ShotGrid thumbnail upload id",
+            )
+            result["thumbnail"] = {"type": "Attachment", "id": attachment_id, "path": thumbnail["path"]}
             update_manifest(manifest_path, manifest)
 
-        note = manifest["shotgrid"].get("note")
+        note = optional_map(shotgrid.get("note"), "manifest.shotgrid.note")
         if note:
             links = [version_ref]
             for ref in (entity, task):
@@ -750,20 +838,33 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any], *, s
                 "note_links": links,
             }
             created_note = sg.create("Note", note_data)
-            note_ref = entity_ref("Note", created_note["id"])
-            manifest["shotgrid"]["result"]["note"] = note_ref
+            note_ref = entity_ref("Note", int_value(created_note["id"], "created Note.id"))
+            result["note"] = note_ref
             record_created(manifest, note_ref, "note")
             update_manifest(manifest_path, manifest)
 
         if playlist:
-            sg.update("Playlist", playlist["id"], {"versions": [version_ref]}, multi_entity_update_modes={"versions": "add"})
-            manifest["shotgrid"]["result"]["updates"].append({"type": "Playlist", "id": playlist["id"], "field": "versions"})
+            sg.update(
+                "Playlist",
+                int_value(playlist["id"], "Playlist.id"),
+                {"versions": [version_ref]},
+                multi_entity_update_modes={"versions": "add"},
+            )
+            as_list(result.get("updates"), "manifest.shotgrid.result.updates").append({
+                "type": "Playlist",
+                "id": playlist["id"],
+                "field": "versions",
+            })
             update_manifest(manifest_path, manifest)
 
-        task_update = manifest["shotgrid"].get("taskUpdate")
+        task_update = optional_map(shotgrid.get("taskUpdate"), "manifest.shotgrid.taskUpdate")
         if task and task_update:
-            sg.update("Task", task["id"], task_update)
-            manifest["shotgrid"]["result"]["updates"].append({"type": "Task", "id": task["id"], "fields": sorted(task_update)})
+            sg.update("Task", int_value(task["id"], "Task.id"), task_update)
+            as_list(result.get("updates"), "manifest.shotgrid.result.updates").append({
+                "type": "Task",
+                "id": task["id"],
+                "fields": sorted(task_update),
+            })
             update_manifest(manifest_path, manifest)
 
         update_manifest(manifest_path, manifest, status="succeeded")
@@ -776,13 +877,22 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: dict[str, Any], *, s
         raise PluginError(f"ShotGrid publish failed: {exc}", 4) from None
 
 
-def cleanup_created_records(manifest_path: pathlib.Path, manifest: dict[str, Any], sg: Any) -> dict[str, Any]:
-    cleanup = manifest.setdefault("cleanup", {"default": "none", "status": "not-started"})
+def cleanup_created_records(manifest_path: pathlib.Path, manifest: JsonMap, sg: ShotGridClient) -> JsonMap:
+    cleanup = as_map(
+        manifest.setdefault("cleanup", {"default": "none", "status": "not-started"}),
+        "manifest.cleanup",
+    )
     cleanup["status"] = "attempted"
     update_manifest(manifest_path, manifest)
-    deleted: list[dict[str, Any]] = []
-    for item in reversed(manifest.get("shotgrid", {}).get("result", {}).get("created") or []):
-        sg.delete(item["type"], item["id"])
+    deleted: list[JsonMap] = []
+    shotgrid = as_map(manifest.get("shotgrid", {}), "manifest.shotgrid")
+    result = as_map(shotgrid.get("result", {}), "manifest.shotgrid.result")
+    created = as_list(result.get("created", []), "manifest.shotgrid.result.created")
+    for raw_item in reversed(created):
+        item = as_map(raw_item, "manifest.shotgrid.result.created[]")
+        item_type = string_field(item, "type", "created record")
+        item_id = int_value(item["id"], "created record.id")
+        sg.delete(item_type, item_id)
         deleted.append({"type": item["type"], "id": item["id"]})
         cleanup["deleted"] = deleted
         update_manifest(manifest_path, manifest)
@@ -833,14 +943,16 @@ def command_doctor(args: argparse.Namespace) -> int:
 
 def command_plan(args: argparse.Namespace) -> int:
     manifest = make_publish_manifest(args, "plan")
-    write_json(pathlib.Path(manifest["local"]["runManifest"]), manifest)
+    local = as_map(manifest.get("local"), "manifest.local")
+    write_json(pathlib.Path(string_field(local, "runManifest", "manifest.local")), manifest)
     print_json(manifest)
     return 0
 
 
 def command_publish(args: argparse.Namespace) -> int:
     manifest = make_publish_manifest(args, "publish")
-    manifest_path = pathlib.Path(manifest["local"]["runManifest"])
+    local = as_map(manifest.get("local"), "manifest.local")
+    manifest_path = pathlib.Path(string_field(local, "runManifest", "manifest.local"))
     write_json(manifest_path, manifest)
     if args.dry_run:
         print_json(manifest)
@@ -862,16 +974,18 @@ def command_run(args: argparse.Namespace) -> int:
 
 def command_resume(args: argparse.Namespace) -> int:
     manifest = load_json(args.run_manifest)
-    payload: dict[str, Any] = {
+    shotgrid = as_map(manifest.get("shotgrid", {}), "manifest.shotgrid")
+    result = as_map(shotgrid.get("result", {}), "manifest.shotgrid.result")
+    payload: JsonMap = {
         "runId": manifest.get("runId"),
         "status": manifest.get("status"),
-        "shotgrid": manifest.get("shotgrid", {}).get("result"),
+        "shotgrid": result,
         "cleanup": manifest.get("cleanup"),
     }
     if args.live:
         config = config_from_args(args)
         sg = make_shotgrid_client(config)
-        version = manifest.get("shotgrid", {}).get("result", {}).get("version")
+        version = optional_map(result.get("version"), "manifest.shotgrid.result.version")
         if version:
             payload["liveVersion"] = sg.find_one(
                 "Version",
@@ -884,7 +998,10 @@ def command_resume(args: argparse.Namespace) -> int:
 
 def command_cleanup(args: argparse.Namespace) -> int:
     manifest = load_json(args.run_manifest)
-    cleanup = manifest.setdefault("cleanup", {"default": "none", "status": "not-started"})
+    cleanup = as_map(
+        manifest.setdefault("cleanup", {"default": "none", "status": "not-started"}),
+        "manifest.cleanup",
+    )
     if not args.delete_created_records:
         cleanup["status"] = "skipped"
         cleanup["reason"] = "ShotGrid cleanup is destructive; pass --delete-created-records with --confirm-run-id to retire plugin-created records"
@@ -899,8 +1016,8 @@ def command_cleanup(args: argparse.Namespace) -> int:
     return 0
 
 
-def task_filters(args: argparse.Namespace, project: dict[str, Any]) -> list[list[Any]]:
-    filters: list[list[Any]] = [["project", "is", project]]
+def task_filters(args: argparse.Namespace, project: JsonMap) -> ShotGridFilters:
+    filters: ShotGridFilters = [["project", "is", project]]
     if args.status:
         filters.append(["sg_status_list", "in", args.status])
     if args.assignee_id:
@@ -910,8 +1027,8 @@ def task_filters(args: argparse.Namespace, project: dict[str, Any]) -> list[list
     return filters
 
 
-def task_to_job(task: dict[str, Any], *, project: dict[str, Any], tool: str) -> dict[str, Any]:
-    entity = task.get("entity") or {}
+def task_to_job(task: JsonMap, *, project: JsonMap, tool: str) -> JsonMap:
+    entity = optional_map(task.get("entity"), "task.entity") or {}
     entity_label = entity.get("name") or entity.get("code") or entity.get("id") or "entity"
     prompt = f"{task.get('content') or 'Task'} for {entity.get('type') or 'Shot'} {entity_label}"
     return {
@@ -920,7 +1037,7 @@ def task_to_job(task: dict[str, Any], *, project: dict[str, Any], tool: str) -> 
             "prompt": prompt,
             "shotgrid": {
                 "project": project,
-                "task": entity_ref("Task", task["id"]),
+                "task": entity_ref("Task", int_value(task["id"], "Task.id")),
                 "entity": entity if isinstance(entity, dict) else None,
                 "status": task.get("sg_status_list"),
             },
@@ -930,7 +1047,7 @@ def task_to_job(task: dict[str, Any], *, project: dict[str, Any], tool: str) -> 
     }
 
 
-def pull_tasks(args: argparse.Namespace, *, sg: Any | None = None, config: ShotGridConfig | None = None) -> dict[str, Any]:
+def pull_tasks(args: argparse.Namespace, *, sg: ShotGridClient | None = None, config: ShotGridConfig | None = None) -> JsonMap:
     if sg is None:
         sg = make_shotgrid_client(config or config_from_args(args))
     project = resolve_project(sg, project_target(args, {}))

@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check
+        name: repo readiness gate
+        entry: ./scripts/check.sh
+        language: system
+        pass_filenames: false
