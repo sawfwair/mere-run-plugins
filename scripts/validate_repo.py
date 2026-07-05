@@ -139,6 +139,7 @@ def plugin_env() -> dict[str, str]:
         ROOT / "packages" / "mere-image-tools" / "src",
         ROOT / "packages" / "mere-workflow-tools" / "src",
         ROOT / "packages" / "mere-animatic-tools" / "src",
+        ROOT / "packages" / "mere-shotgrid-tools" / "src",
     ]
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in package_paths)
     return env
@@ -209,6 +210,11 @@ def validate_plugin_manifests() -> None:
             "style-lock",
             "delivery-prep",
         },
+    )
+    validate_plugin_manifest(
+        "mere_shotgrid_tools",
+        "mere-shotgrid-tools",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "publish", "pull-tasks"},
     )
     workflow_tools = [
         ("mere_workflow_tools.doc_cli", "mere-doc-tools", "process"),
@@ -427,6 +433,52 @@ def validate_animatic_tools_plan() -> None:
             fail("animatic tools plan should write run manifest")
 
 
+def validate_shotgrid_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        review = root / "review.mov"
+        output = root / "shotgrid"
+        review.write_bytes(b"not-a-real-movie-but-plan-only")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_shotgrid_tools",
+                "plan",
+                "--project-id",
+                "123",
+                "--entity-type",
+                "Shot",
+                "--entity-id",
+                "456",
+                "--artifact",
+                str(review),
+                "--output-dir",
+                str(output),
+                "--run-id",
+                "validate-shotgrid",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-shotgrid-tools plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["plugin"]["name"] != "mere-shotgrid-tools":
+            fail("shotgrid-tools plan reported wrong plugin name")
+        if manifest["status"] != "planned":
+            fail("shotgrid-tools plan manifest should have status planned")
+        if manifest["shotgrid"]["version"]["code"] != "Shot_456_validate-shotgrid":
+            fail("shotgrid-tools plan should derive a stable Version code")
+        if manifest["shotgrid"]["uploads"][0]["fieldName"] != "sg_uploaded_movie":
+            fail("shotgrid-tools movie upload should plan sg_uploaded_movie field")
+        if not (output / "run.json").is_file():
+            fail("shotgrid-tools plan should write run manifest")
+
+
 def validate_volume_dry_run() -> None:
     result = subprocess.run(
         [
@@ -471,6 +523,7 @@ def main() -> int:
     validate_image_tools_plan()
     validate_workflow_tools_plans()
     validate_animatic_tools_plan()
+    validate_shotgrid_tools_plan()
     validate_volume_dry_run()
     print("validate_repo: ok")
     return 0

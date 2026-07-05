@@ -120,6 +120,62 @@ These tools call existing `mere.run` surfaces such as `vision ocr`,
 The plugin layer owns planning, artifact hashes, resumability, and local cleanup
 state.
 
+## Animatic Tools Plugin
+
+`mere-animatic-tools` contains local production helpers for relay-connected
+Animatic workflows: character knockouts, reference packs, continuity checks,
+shot kits, storyboard repair, edit review, voice kits, location plates, style
+locks, and delivery prep.
+
+```bash
+mere-animatic-tools manifest --json
+mere-animatic-tools doctor
+mere-animatic-tools shot-kit \
+  --request-json ./request.json \
+  --output-dir ./animatic-out \
+  --run-id shot-kit-001
+```
+
+The plugin writes local artifacts and a durable `run.json`; it does not create
+paid resources.
+
+## ShotGrid Tools Plugin
+
+`mere-shotgrid-tools` publishes local `mere.run` artifacts into ShotGrid, now
+Autodesk Flow Production Tracking, without moving inference into ShotGrid.
+
+Install the plugin with `pipx`:
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
+```
+
+Use `plan` to record the exact remote mutations before any ShotGrid write:
+
+```bash
+mere-shotgrid-tools manifest --json
+mere-shotgrid-tools doctor
+mere-shotgrid-tools plan \
+  --project-id 123 \
+  --entity-type Shot \
+  --entity-id 456 \
+  --task-id 789 \
+  --artifact ./review.mov \
+  --thumbnail ./poster.png \
+  --note "Ready for review." \
+  --output-dir ./shotgrid-publish \
+  --run-id shot010-v003
+mere-shotgrid-tools run ./shotgrid-publish/run.json
+```
+
+`publish` combines planning and execution. It writes `run.json` before creating
+the ShotGrid Version, then records each created Version, upload, thumbnail, Note,
+Playlist link, and Task status update as it succeeds. `cleanup` skips by default;
+deleting plugin-created tracking records requires explicit confirmation.
+
+`pull-tasks` queries ShotGrid Tasks and writes JSONL job requests for local relay
+or batch tooling.
+
 ## Catalog
 
 The live catalog is published from this repo:
@@ -174,6 +230,8 @@ eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
 packages/mere-image-tools/ local image-production plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
+packages/mere-animatic-tools/ local Animatic production helpers
+packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
 SECURITY.md                private vulnerability reporting policy
