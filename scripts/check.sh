@@ -13,16 +13,18 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-shotgrid-tools/src"
 
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-shotgrid-tools/src scripts
 "$PYTHON" -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m unittest discover -s packages/mere-image-tools/tests
+"$PYTHON" -m unittest discover -s packages/mere-shotgrid-tools/tests
 "$PYTHON" scripts/validate_repo.py
 
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-shotgrid-tools
 "$PYTHON" - <<'PY'
 import pathlib
 import subprocess
@@ -85,4 +87,33 @@ result = subprocess.run(
 )
 if '"runId": "installed-image-smoke"' not in result.stdout:
     raise SystemExit("installed image-tools smoke did not produce expected run manifest")
+
+shotgrid_cli = pathlib.Path(sys.executable).with_name("mere-shotgrid-tools")
+review = root / "review.mov"
+review.write_bytes(b"fake movie")
+result = subprocess.run(
+    [
+        str(shotgrid_cli),
+        "plan",
+        "--project-id",
+        "123",
+        "--entity-type",
+        "Shot",
+        "--entity-id",
+        "456",
+        "--artifact",
+        str(review),
+        "--output-dir",
+        str(root / "shotgrid"),
+        "--run-id",
+        "installed-shotgrid-smoke",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"runId": "installed-shotgrid-smoke"' not in result.stdout:
+    raise SystemExit("installed shotgrid-tools smoke did not produce expected run manifest")
 PY

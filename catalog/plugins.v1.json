@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-07-03T09:51:34Z",
+  "updatedAt": "2026-07-05T01:52:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -46,6 +46,34 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-shotgrid-tools",
+      "name": "ShotGrid Tools",
+      "description": "Publish local mere.run artifacts to ShotGrid review Versions and pull task-backed production jobs.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-shotgrid-tools",
+      "subdirectory": "packages/mere-shotgrid-tools",
+      "entrypoint": "mere-shotgrid-tools",
+      "capabilities": [
+        "production-tracking",
+        "shotgrid",
+        "flow-production-tracking",
+        "version-publish",
+        "review-upload",
+        "note-create",
+        "playlist-link",
+        "task-status",
+        "task-query",
+        "jsonl-jobs"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
         }
       }
     }

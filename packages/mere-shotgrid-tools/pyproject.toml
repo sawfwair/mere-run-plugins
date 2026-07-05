@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-shotgrid-tools"
+version = "0.1.0"
+description = "ShotGrid production-tracking companion tools for mere.run"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = [
+  "shotgun-api3>=3.10,<4",
+]
+
+[project.scripts]
+mere-shotgrid-tools = "mere_shotgrid_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
