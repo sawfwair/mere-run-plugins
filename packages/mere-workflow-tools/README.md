@@ -1,0 +1,43 @@
+# mere-workflow-tools
+
+Local workflow companion tools for `mere.run`.
+
+This package installs six small commands. They do not ship model runtimes and do
+not call hosted APIs; each command writes a run manifest, shells out to the
+installed `mere.run` CLI, records artifacts, and marks cleanup as local-only.
+
+## Commands
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+
+mere-doc-tools process --input ./scan.png --output-dir ./doc-out
+mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
+mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
+mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
+mere-image-compose generate --prompt "a product render" --output-dir ./image-out
+mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
+```
+
+Set `MERE_WORKFLOW_TOOLS_MERE_RUN` or pass `--mere-run-command` to target a
+source-checkout binary.
+
+## Tool Map
+
+- `mere-doc-tools`: `mere.run vision ocr` plus optional `mere.run text anonymize`
+- `mere-media-scrub`: OCR/redaction over image folders or single frames
+- `mere-dataset-tools`: `mere.run vision caption`, optional OCR sidecars, and a contact sheet
+- `mere-transcript-tools`: `mere.run speech transcribe` plus optional PII redaction
+- `mere-image-compose`: `mere.run image generate` with ref image and LoRA flags recorded
+- `mere-batch-runner`: JSONL batch runner for explicit `mere.run` argv lists
+
+Every command supports:
+
+```bash
+<tool> manifest --json
+<tool> doctor
+<tool> plan ...
+<tool> run ./run.json
+<tool> resume ./run.json
+<tool> cleanup ./run.json
+```

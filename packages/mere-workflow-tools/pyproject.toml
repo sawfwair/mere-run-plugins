@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-workflow-tools"
+version = "0.1.0"
+description = "Local workflow companion tools for mere.run"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = [
+  "Pillow>=10",
+]
+
+[project.scripts]
+mere-doc-tools = "mere_workflow_tools.doc_cli:main"
+mere-media-scrub = "mere_workflow_tools.media_cli:main"
+mere-dataset-tools = "mere_workflow_tools.dataset_cli:main"
+mere-transcript-tools = "mere_workflow_tools.transcript_cli:main"
+mere-image-compose = "mere_workflow_tools.image_compose_cli:main"
+mere-batch-runner = "mere_workflow_tools.batch_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

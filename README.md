@@ -101,6 +101,44 @@ vision-segment-sam31`. Set `MERE_IMAGE_TOOLS_MERE_RUN` or pass
 `--mere-run-command` when you need to target a source checkout or non-standard
 binary path.
 
+## Workflow Tools
+
+`mere-workflow-tools` installs six focused companion commands that turn common
+local inference workflows into repeatable manifests:
+
+```bash
+mere-doc-tools process --input ./scan.png --output-dir ./doc-out
+mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
+mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
+mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
+mere-image-compose generate --prompt "a product render" --output-dir ./image-out
+mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
+```
+
+These tools call existing `mere.run` surfaces such as `vision ocr`,
+`text anonymize`, `vision caption`, `speech transcribe`, and `image generate`.
+The plugin layer owns planning, artifact hashes, resumability, and local cleanup
+state.
+
+## Animatic Tools Plugin
+
+`mere-animatic-tools` contains local production helpers for relay-connected
+Animatic workflows: character knockouts, reference packs, continuity checks,
+shot kits, storyboard repair, edit review, voice kits, location plates, style
+locks, and delivery prep.
+
+```bash
+mere-animatic-tools manifest --json
+mere-animatic-tools doctor
+mere-animatic-tools shot-kit \
+  --request-json ./request.json \
+  --output-dir ./animatic-out \
+  --run-id shot-kit-001
+```
+
+The plugin writes local artifacts and a durable `run.json`; it does not create
+paid resources.
+
 ## ShotGrid Tools Plugin
 
 `mere-shotgrid-tools` publishes local `mere.run` artifacts into ShotGrid, now
@@ -191,6 +229,8 @@ recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
 packages/mere-image-tools/ local image-production plugin
+packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
+packages/mere-animatic-tools/ local Animatic production helpers
 packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
