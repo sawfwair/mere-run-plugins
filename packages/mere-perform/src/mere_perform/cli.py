@@ -18,7 +18,8 @@ import subprocess
 import sys
 import threading
 import time
-from typing import NoReturn, TextIO, cast
+import webbrowser
+from typing import IO, NoReturn, cast
 
 from . import __version__
 
@@ -28,6 +29,9 @@ JsonList = list[object]
 PLUGIN_NAME = "mere-perform"
 DEFAULT_MERE_RUN = "mere.run"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+MIDI_NOTE_ON_RE = re.compile(r"\bMIDI note-on ch=(\d+) note=(\d+) velocity=(\d+)")
+MIDI_NOTE_OFF_RE = re.compile(r"\bMIDI note-off ch=(\d+) note=(\d+)")
+MIDI_CC_RE = re.compile(r"\bMIDI cc ch=(\d+) cc=(\d+) value=(\d+)")
 PALETTE = ["#ff2fb3", "#84f3ed", "#ffc23c", "#7fb2ff", "#ae5cff", "#ff4c8d", "#7c89ff", "#81d5fa"]
 PROMPT_MODES = {"jam", "solo"}
 PROMPT_ROLES = {"texture", "groove", "lead", "space", "room", "rhythm", "scene", "control"}
@@ -38,6 +42,11 @@ DEFAULT_PROMPT_STRATEGY: JsonMap = {
     "promptDebounceMs": 400,
     "resetAfterPrompt": True,
 }
+
+
+class StageServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 class PluginError(RuntimeError):
@@ -144,6 +153,12 @@ def command_available(command: list[str]) -> bool:
     if os.sep in executable:
         return pathlib.Path(executable).is_file()
     return shutil.which(executable) is not None
+
+
+def realtime_value(value: object) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
 def validate_run_id(run_id: str) -> None:
@@ -409,13 +424,16 @@ def normalize_prompt_strategy(show: JsonMap) -> JsonMap:
 
 def normalize_midi_pads(raw_pads: object, scenes: list[JsonMap]) -> list[JsonMap]:
     scene_ids = {string_field(scene, "id", "scene") for scene in scenes}
-    source_pads = raw_pads if isinstance(raw_pads, list) and raw_pads else [
-        {"id": f"pad-{index + 1}", "label": str(index + 1), "sceneId": scene.get("id"), "target": "scene"}
-        for index, scene in enumerate(scenes[:8])
+    if isinstance(raw_pads, list) and raw_pads:
+        source_pads: list[object] = raw_pads
+    else:
+        source_pads = [
+            {"id": f"pad-{index + 1}", "label": str(index + 1), "sceneId": scene.get("id"), "target": "scene"}
+            for index, scene in enumerate(scenes[:8])
     ]
     pads: list[JsonMap] = []
     for index, raw_pad in enumerate(source_pads):
-        pad = as_map(raw_pad, "show.midi.pads[]").copy() if isinstance(raw_pad, dict) else {"label": str(raw_pad)}
+        pad: JsonMap = as_map(raw_pad, "show.midi.pads[]").copy() if isinstance(raw_pad, dict) else {"label": str(raw_pad)}
         pad_id = optional_string(pad, "id") or f"pad-{index + 1}"
         label = optional_string(pad, "label") or str(index + 1)
         target = normalize_label(pad.get("target"), "scene", {"scene", "prompt", "control"})
@@ -454,11 +472,19 @@ def normalize_midi_control(midi: JsonMap, scenes: list[JsonMap], args: argparse.
     gate = as_map(midi.get("gate"), "show.midi.gate") if isinstance(midi.get("gate"), dict) else {}
     activity = as_map(midi.get("activity"), "show.midi.activity") if isinstance(midi.get("activity"), dict) else {}
     note_offset = args.midi_note_offset if args.midi_note_offset is not None else int_value(midi.get("noteOffset"), 0)
+    midi_input = args.midi_input or optional_string(midi, "input")
+    stage_live = int_value(getattr(args, "stage_port", 0), 0) > 0
+    default_log_events = bool_value(getattr(args, "midi_log_events", False), False) or (bool(midi_input) and stage_live)
+    configured_log_events = bool_value(midi.get("logEvents"), False)
+    configured_log_raw = bool_value(midi.get("logRaw"), False)
     return {
-        "input": args.midi_input or optional_string(midi, "input"),
+        "input": midi_input,
         "channel": args.midi_channel or optional_string(midi, "channel") or "all",
         "noteOffset": max(-48, min(48, note_offset)),
         "cc": midi_cc,
+        "instrumentMode": bool_value(midi.get("instrumentMode"), bool(midi_input) and not bool_value(getattr(args, "sequence_scenes", False), False)),
+        "logEvents": configured_log_events or default_log_events,
+        "logRaw": configured_log_raw or bool_value(getattr(args, "midi_log_raw", False), False),
         "keyboard": {
             "enabled": bool_value(keyboard.get("enabled"), True),
             "baseNote": clamped_int(keyboard.get("baseNote"), 60, 0, 127),
@@ -588,6 +614,27 @@ def initial_runtime_prompt(show: JsonMap) -> str:
     return runtime_prompt_text(string_field(prompt, "text", "prompt"), optional_string(prompt, "mode") or "jam")
 
 
+def instrument_seed_prompt(show: JsonMap) -> JsonMap:
+    prompts = [as_map(item, "prompt") for item in as_list(show["prompts"], "show.prompts")]
+    for prompt in prompts:
+        if optional_string(prompt, "mode") == "solo":
+            return prompt
+    return prompts[0]
+
+
+def selected_initial_prompt(show: JsonMap, instrument_mode: bool) -> str:
+    if instrument_mode:
+        return string_field(instrument_seed_prompt(show), "text", "prompt")
+    return initial_prompt(show)
+
+
+def selected_initial_runtime_prompt(show: JsonMap, instrument_mode: bool) -> str:
+    if instrument_mode:
+        prompt = instrument_seed_prompt(show)
+        return runtime_prompt_text(string_field(prompt, "text", "prompt"), optional_string(prompt, "mode") or "jam")
+    return initial_runtime_prompt(show)
+
+
 def manifest_paths(args: argparse.Namespace, show: JsonMap) -> JsonMap:
     output_dir = args.output_dir
     manifest_path = args.manifest or output_dir / "run.json"
@@ -604,21 +651,24 @@ def manifest_paths(args: argparse.Namespace, show: JsonMap) -> JsonMap:
         "stageDirectory": str(stage_dir),
         "stageHtml": str(stage_dir / "index.html"),
         "stageState": str(stage_dir / "state.json"),
+        "stageLive": str(stage_dir / "live.json"),
         "showJson": str(output_dir / "show.json"),
     }
 
 
 def command_for_manifest(manifest: JsonMap) -> list[str]:
     runtime = as_map(manifest["runtime"], "runtime")
-    show = as_map(as_map(manifest["performance"], "performance")["show"], "performance.show")
+    performance = as_map(manifest["performance"], "performance")
+    show = as_map(performance["show"], "performance.show")
     audio = as_map(show["audio"], "show.audio")
     midi = as_map(show["midi"], "show.midi")
     paths = as_map(manifest["local"], "local")
+    instrument_mode = bool_value(midi.get("instrumentMode"), False)
     command = [
         *as_list(runtime["mereRunCommand"], "runtime.mereRunCommand"),
         "music",
         "realtime",
-        initial_runtime_prompt(show),
+        selected_initial_runtime_prompt(show, instrument_mode),
         "--model",
         string_field(show, "model", "show"),
         "--duration",
@@ -637,6 +687,10 @@ def command_for_manifest(manifest: JsonMap) -> list[str]:
     note_offset = int_value(midi.get("noteOffset"), 0)
     if note_offset:
         command.extend(["--midi-note-offset", str(note_offset)])
+    if bool_value(midi.get("logEvents"), False):
+        command.append("--midi-log-events")
+    if bool_value(midi.get("logRaw"), False):
+        command.append("--midi-log-raw")
     for raw_cc in as_list(midi.get("cc"), "show.midi.cc") if isinstance(midi.get("cc"), list) else []:
         command.extend(["--midi-cc", str(raw_cc)])
     return [str(part) for part in command]
@@ -648,6 +702,8 @@ def make_manifest(args: argparse.Namespace) -> JsonMap:
     paths = manifest_paths(args, show)
     created = now_iso()
     dataset_path = str(args.show) if args.show else str(args.output_dir)
+    midi = as_map(show["midi"], "show.midi")
+    instrument_mode = bool_value(midi.get("instrumentMode"), False)
     manifest: JsonMap = {
         "contractVersion": "mere.run/plugin-run.v1",
         "runId": args.run_id,
@@ -669,12 +725,14 @@ def make_manifest(args: argparse.Namespace) -> JsonMap:
         },
         "performance": {
             "mode": "magenta-heart",
-            "initialPrompt": initial_prompt(show),
-            "initialRuntimePrompt": initial_runtime_prompt(show),
+            "sequenceScenes": bool_value(getattr(args, "sequence_scenes", False), False),
+            "initialPrompt": selected_initial_prompt(show, instrument_mode),
+            "initialRuntimePrompt": selected_initial_runtime_prompt(show, instrument_mode),
             "show": show,
             "stage": {
                 "host": args.stage_host,
                 "port": args.stage_port,
+                "open": bool_value(getattr(args, "open_stage", False), False),
                 "entrypoint": str(paths["stageHtml"]),
             },
         },
@@ -685,6 +743,7 @@ def make_manifest(args: argparse.Namespace) -> JsonMap:
             "stageDirectory": str(paths["stageDirectory"]),
             "stageHtml": str(paths["stageHtml"]),
             "stageState": str(paths["stageState"]),
+            "stageLive": str(paths["stageLive"]),
             "showJson": str(paths["showJson"]),
             "files": [],
             "items": [],
@@ -703,6 +762,112 @@ def append_event(manifest: JsonMap, event: JsonMap) -> None:
     payload = {"at": now_iso(), "runId": manifest.get("runId"), **event}
     with events_path.open("a") as handle:
         handle.write(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def live_state_path(manifest: JsonMap) -> pathlib.Path:
+    local = as_map(manifest["local"], "local")
+    return pathlib.Path(string_field(local, "stageLive", "local"))
+
+
+def write_live_state(
+    manifest: JsonMap,
+    *,
+    active_notes: list[int] | None = None,
+    event_count: int = 0,
+    last_event: JsonMap | None = None,
+    status: str | None = None,
+) -> JsonMap:
+    performance = as_map(manifest["performance"], "performance")
+    show = as_map(performance["show"], "performance.show")
+    midi = as_map(show["midi"], "show.midi")
+    payload: JsonMap = {
+        "runId": manifest.get("runId"),
+        "status": status or str(manifest.get("status") or "planned"),
+        "updatedAt": now_iso(),
+        "midi": {
+            "input": optional_string(midi, "input"),
+            "channel": optional_string(midi, "channel") or "all",
+            "activeNotes": active_notes or [],
+            "eventCount": event_count,
+            "lastEvent": last_event,
+        },
+    }
+    path = live_state_path(manifest)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    write_json(tmp_path, payload)
+    tmp_path.replace(path)
+    artifacts = as_map(manifest["artifacts"], "artifacts")
+    artifacts["stageLive"] = str(path)
+    return payload
+
+
+def ensure_live_state(manifest: JsonMap) -> None:
+    path = live_state_path(manifest)
+    if not path.is_file():
+        write_live_state(manifest)
+    else:
+        artifacts = as_map(manifest["artifacts"], "artifacts")
+        artifacts["stageLive"] = str(path)
+
+
+class LiveMidiBridge:
+    def __init__(self, manifest: JsonMap) -> None:
+        self.manifest = manifest
+        self.active_notes: set[int] = set()
+        self.event_count = 0
+        self.last_event: JsonMap | None = None
+        self.lock = threading.Lock()
+        self.write()
+
+    def handle_line(self, line: str) -> bool:
+        note_on = MIDI_NOTE_ON_RE.search(line)
+        if note_on:
+            channel = int(note_on.group(1))
+            note = int(note_on.group(2))
+            velocity = int(note_on.group(3))
+            event_type = "note-on" if velocity > 0 else "note-off"
+            self._record(event_type, channel=channel, note=note, velocity=velocity)
+            return True
+        note_off = MIDI_NOTE_OFF_RE.search(line)
+        if note_off:
+            self._record("note-off", channel=int(note_off.group(1)), note=int(note_off.group(2)))
+            return True
+        cc = MIDI_CC_RE.search(line)
+        if cc:
+            self._record("cc", channel=int(cc.group(1)), cc=int(cc.group(2)), value=int(cc.group(3)))
+            return True
+        return False
+
+    def finish(self, status: str) -> None:
+        with self.lock:
+            self.active_notes.clear()
+            self.write_locked(status=status)
+
+    def write(self) -> None:
+        with self.lock:
+            self.write_locked()
+
+    def _record(self, event_type: str, **fields: int) -> None:
+        with self.lock:
+            note = fields.get("note")
+            if note is not None:
+                if event_type == "note-on":
+                    self.active_notes.add(note)
+                elif event_type == "note-off":
+                    self.active_notes.discard(note)
+            self.event_count += 1
+            self.last_event = {"type": event_type, **fields}
+            self.write_locked()
+
+    def write_locked(self, *, status: str | None = None) -> None:
+        write_live_state(
+            self.manifest,
+            active_notes=sorted(self.active_notes),
+            event_count=self.event_count,
+            last_event=self.last_event,
+            status=status,
+        )
 
 
 def stage_html(manifest: JsonMap) -> str:
@@ -728,6 +893,7 @@ def stage_html(manifest: JsonMap) -> str:
       --amber: oklch(0.83 0.16 82);
     }}
     * {{ box-sizing: border-box; }}
+    [hidden] {{ display: none !important; }}
     html, body {{ height: 100%; margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }}
     body {{ overflow: hidden; }}
     .shell {{ height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 320px; }}
@@ -837,11 +1003,11 @@ def stage_html(manifest: JsonMap) -> str:
           <div class="control-chip"><span>keys</span><b id="controller-keys"></b></div>
         </div>
       </div>
-      <div class="section">
-        <span class="kicker">Scenes</span>
+      <div class="section" id="patch-section">
+        <span class="kicker" id="patch-kicker">Patch</span>
         <div id="scenes" class="scene-list"></div>
       </div>
-      <div class="section">
+      <div class="section" id="prompt-section">
         <span class="kicker">Prompt Palette</span>
         <div id="prompts" class="prompt-list"></div>
       </div>
@@ -851,6 +1017,8 @@ def stage_html(manifest: JsonMap) -> str:
   <script>
     const state = JSON.parse(document.getElementById('mere-perform-state').textContent);
     const show = state.show;
+    const performanceState = state.performance || {{}};
+    const sequenceScenes = performanceState.sequenceScenes === true;
     const midi = show.midi || {{}};
     const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d');
@@ -860,8 +1028,12 @@ def stage_html(manifest: JsonMap) -> str:
     const padsEl = document.getElementById('midi-pads');
     const pianoEl = document.getElementById('piano');
     const midiLed = document.getElementById('midi-led');
-    const activeNotes = new Set((midi.activity?.demoNotes || []).filter(note => Number.isFinite(note)));
+    const useDemoNotes = state.status !== 'running' && !midi.input;
+    const activeNotes = new Set((useDemoNotes ? midi.activity?.demoNotes || [] : []).filter(note => Number.isFinite(note)));
     const pressedKeys = new Map();
+    let liveMidiEventCount = 0;
+    let liveLastEvent = null;
+    let liveSignature = '';
     let manualSceneIndex = null;
     let manualSceneUntil = 0;
     const keyToSemitone = {{ a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16 }};
@@ -898,7 +1070,10 @@ def stage_html(manifest: JsonMap) -> str:
     }}
     function updateMidiReadouts() {{
       const source = midi.input || (keyboard.enabled ? 'computer keyboard' : 'none');
-      const noteLabel = activeNotes.size ? `${{activeNotes.size}} held` : 'idle';
+      let noteLabel = activeNotes.size ? `${{activeNotes.size}} held` : 'idle';
+      if (midi.input && !activeNotes.size) {{
+        noteLabel = liveLastEvent?.note !== undefined ? `last ${{noteName(liveLastEvent.note)}}` : 'waiting midi';
+      }}
       document.getElementById('midi-source').textContent = source;
       document.getElementById('midi-gate').textContent = gate.enabled ? 'gate on' : 'gate off';
       document.getElementById('midi-offset').textContent = `offset ${{midi.noteOffset || 0}}`;
@@ -907,7 +1082,7 @@ def stage_html(manifest: JsonMap) -> str:
       document.getElementById('controller-channel').textContent = midi.channel || 'all';
       document.getElementById('controller-gate').textContent = gate.enabled ? `${{gate.releaseMs || 0}}ms` : 'off';
       document.getElementById('controller-keys').textContent = keyboard.enabled ? `${{noteName(keyboardBaseNote)}} + ${{noteCount}}` : 'disabled';
-      midiLed.classList.toggle('active', activeNotes.size > 0);
+      midiLed.classList.toggle('active', activeNotes.size > 0 || liveMidiEventCount > 0 || (state.status === 'running' && Boolean(midi.input)));
     }}
     function setNote(note, on) {{
       if (on) activeNotes.add(note);
@@ -935,11 +1110,24 @@ def stage_html(manifest: JsonMap) -> str:
     document.getElementById('title').textContent = show.title;
     document.getElementById('model').textContent = show.model;
     document.getElementById('duration').textContent = `${{Math.round(show.durationSeconds)}}s`;
-    document.getElementById('strategy').textContent = `${{show.prompts.length}} anchors`;
+    document.getElementById('strategy').textContent = sequenceScenes ? `${{show.prompts.length}} anchors` : 'instrument';
     document.getElementById('audio').textContent = show.audio.play ? 'play + capture' : 'capture only';
     document.getElementById('midi').textContent = midi.input || (keyboard.enabled ? 'computer keys' : 'none');
     document.getElementById('footer').textContent = `run ${{state.runId}} · ${{state.status}}`;
-    const sceneNodes = show.scenes.map((scene, index) => {{
+    document.getElementById('patch-kicker').textContent = sequenceScenes ? 'Sequence' : 'Patch';
+    document.getElementById('prompt-section').hidden = !sequenceScenes;
+    const seedPrompt = show.prompts.find(prompt => prompt.text === performanceState.initialPrompt) || show.prompts[0];
+    const instrumentScene = seedPrompt ? {{
+      id: seedPrompt.id || 'instrument',
+      title: seedPrompt.id || 'Instrument',
+      promptId: seedPrompt.id,
+      role: seedPrompt.role || seedPrompt.mode || 'instrument',
+      mode: seedPrompt.mode || 'jam',
+      cfgMusicCoCa: seedPrompt.cfgMusicCoCa,
+      prompt: seedPrompt.text,
+    }} : show.scenes[0];
+    const visibleScenes = sequenceScenes ? show.scenes : [instrumentScene].filter(Boolean);
+    const sceneNodes = visibleScenes.map((scene, index) => {{
       const el = document.createElement('div');
       el.className = 'scene';
       const title = document.createElement('strong');
@@ -952,13 +1140,16 @@ def stage_html(manifest: JsonMap) -> str:
       scenesEl.appendChild(el);
       return el;
     }});
-    const padNodes = (midi.pads || []).map((pad, index) => {{
+    if (!sequenceScenes) {{
+      padsEl.hidden = true;
+    }}
+    const padNodes = sequenceScenes ? (midi.pads || []).map((pad, index) => {{
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pad';
       button.textContent = pad.label || String(index + 1);
       button.addEventListener('click', () => {{
-        const targetIndex = show.scenes.findIndex(scene => scene.id === pad.sceneId);
+      const targetIndex = visibleScenes.findIndex(scene => scene.id === pad.sceneId);
         if (targetIndex >= 0) {{
           manualSceneIndex = targetIndex;
           manualSceneUntil = performance.now() + 4200;
@@ -966,8 +1157,8 @@ def stage_html(manifest: JsonMap) -> str:
       }});
       padsEl.appendChild(button);
       return {{ pad, button }};
-    }});
-    const promptNodes = show.prompts.map(prompt => {{
+    }}) : [];
+    const promptNodes = sequenceScenes ? show.prompts.map(prompt => {{
       const el = document.createElement('div');
       el.className = 'prompt-card';
       el.style.borderColor = prompt.color;
@@ -986,9 +1177,39 @@ def stage_html(manifest: JsonMap) -> str:
       el.append(top, meta, text);
       promptsEl.appendChild(el);
       return el;
-    }});
+    }}) : [];
     renderPiano();
     updateMidiReadouts();
+    function applyLiveState(live) {{
+      const liveMidi = live?.midi || {{}};
+      const notes = Array.isArray(liveMidi.activeNotes) ? liveMidi.activeNotes.filter(note => Number.isFinite(note)) : [];
+      const eventCount = Number.isFinite(liveMidi.eventCount) ? liveMidi.eventCount : 0;
+      const lastEvent = liveMidi.lastEvent || null;
+      const signature = `${{eventCount}}:${{notes.join(',')}}:${{lastEvent?.type || ''}}:${{lastEvent?.note ?? ''}}:${{lastEvent?.cc ?? ''}}:${{lastEvent?.value ?? ''}}`;
+      if (signature === liveSignature) return;
+      liveSignature = signature;
+      activeNotes.clear();
+      notes.forEach(note => activeNotes.add(note));
+      liveMidiEventCount = eventCount;
+      liveLastEvent = lastEvent;
+      renderPiano();
+      updateMidiReadouts();
+    }}
+    async function pollLiveState() {{
+      try {{
+        const response = await fetch(`live.json?ts=${{Date.now()}}`, {{ cache: 'no-store' }});
+        if (response.ok) {{
+          applyLiveState(await response.json());
+        }}
+      }} catch (error) {{
+        // Static file previews cannot always fetch sibling JSON. Live HTTP stage can.
+      }} finally {{
+        window.setTimeout(pollLiveState, 140);
+      }}
+    }}
+    if (midi.input) {{
+      pollLiveState();
+    }}
     if (keyboard.enabled) {{
       window.addEventListener('keydown', event => {{
         if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1042,10 +1263,12 @@ def stage_html(manifest: JsonMap) -> str:
       const elapsed = (t / 1000) % total;
       let cursor = 0;
       let sceneIndex = 0;
-      for (let i = 0; i < show.scenes.length; i++) {{
-        const dur = show.scenes[i].durationSeconds || total / show.scenes.length;
-        if (elapsed >= cursor && elapsed < cursor + dur) {{ sceneIndex = i; break; }}
-        cursor += dur;
+      if (sequenceScenes) {{
+        for (let i = 0; i < visibleScenes.length; i++) {{
+          const dur = visibleScenes[i].durationSeconds || total / visibleScenes.length;
+          if (elapsed >= cursor && elapsed < cursor + dur) {{ sceneIndex = i; break; }}
+          cursor += dur;
+        }}
       }}
       if (manualSceneIndex !== null && t < manualSceneUntil) {{
         sceneIndex = manualSceneIndex;
@@ -1053,7 +1276,7 @@ def stage_html(manifest: JsonMap) -> str:
         manualSceneIndex = null;
       }}
       sceneNodes.forEach((el, i) => el.classList.toggle('current', i === sceneIndex));
-      const scene = show.scenes[sceneIndex] || show.scenes[0];
+      const scene = visibleScenes[sceneIndex] || visibleScenes[0] || show.scenes[0];
       padNodes.forEach(({{pad, button}}) => button.classList.toggle('current', pad.sceneId === scene.id));
       promptNodes.forEach((el, i) => {{
         const prompt = show.prompts[i];
@@ -1067,7 +1290,9 @@ def stage_html(manifest: JsonMap) -> str:
       const heart = show.heart || {{x: 0.5, y: 0.5, color: '#ff2fb3'}};
       const hx = heart.x * w + Math.sin(t / 1800) * w * 0.08;
       const hy = heart.y * h + Math.cos(t / 2200) * h * 0.06;
-      show.prompts.forEach((p, i) => {{
+      const activePrompt = show.prompts.find(prompt => prompt.id === scene.promptId || prompt.text === scene.prompt) || show.prompts[0];
+      const canvasPrompts = sequenceScenes ? show.prompts : [activePrompt].filter(Boolean);
+      canvasPrompts.forEach((p, i) => {{
         const px = p.x * w;
         const py = p.y * h;
         const dx = px - hx;
@@ -1134,6 +1359,13 @@ def stage_state(manifest: JsonMap) -> JsonMap:
         "runId": manifest.get("runId"),
         "status": manifest.get("status"),
         "plugin": manifest.get("plugin"),
+        "performance": {
+            "mode": performance.get("mode"),
+            "sequenceScenes": bool_value(performance.get("sequenceScenes"), False),
+            "initialPrompt": performance.get("initialPrompt"),
+            "initialRuntimePrompt": performance.get("initialRuntimePrompt"),
+            "stage": performance.get("stage"),
+        },
         "show": performance["show"],
         "artifacts": manifest.get("artifacts"),
     }
@@ -1150,14 +1382,44 @@ def write_stage_assets(manifest: JsonMap) -> JsonMap:
     html_path.write_text(stage_html(manifest))
     write_json(state_path, stage_state(manifest))
     write_json(show_path, as_map(as_map(manifest["performance"], "performance")["show"], "performance.show"))
+    ensure_live_state(manifest)
     artifacts["stageHtml"] = str(html_path)
     artifacts["stageState"] = str(state_path)
+    artifacts["stageLive"] = string_field(local, "stageLive", "local")
     artifacts["showJson"] = str(show_path)
-    return {"stageHtml": str(html_path), "stageState": str(state_path), "showJson": str(show_path)}
+    return {
+        "stageHtml": str(html_path),
+        "stageState": str(state_path),
+        "stageLive": string_field(local, "stageLive", "local"),
+        "showJson": str(show_path),
+    }
 
 
-def send_scene_commands(stdin: TextIO, manifest: JsonMap) -> None:
-    show = as_map(as_map(manifest["performance"], "performance")["show"], "performance.show")
+def create_stage_server(manifest: JsonMap, host: str, port: int) -> tuple[StageServer, str]:
+    local = as_map(manifest["local"], "local")
+    stage_dir = pathlib.Path(string_field(local, "stageDirectory", "local"))
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(stage_dir))
+    server = StageServer((host, port), handler)
+    bound_address = cast(tuple[object, ...], server.server_address)
+    raw_host = bound_address[0] if bound_address else host
+    raw_port = bound_address[1] if len(bound_address) > 1 else port
+    bound_host = raw_host.decode("utf-8") if isinstance(raw_host, bytes) else str(raw_host)
+    if isinstance(raw_port, int):
+        bound_port = raw_port
+    elif isinstance(raw_port, bytes):
+        bound_port = int(raw_port.decode("utf-8"))
+    elif isinstance(raw_port, str):
+        bound_port = int(raw_port)
+    else:
+        raise PluginError(f"unsupported stage server address: {server.server_address!r}", 1)
+    return server, f"http://{bound_host}:{bound_port}/"
+
+
+def send_scene_commands(stdin: IO[str], manifest: JsonMap) -> None:
+    performance = as_map(manifest["performance"], "performance")
+    if not bool_value(performance.get("sequenceScenes"), False):
+        return
+    show = as_map(performance["show"], "performance.show")
     scenes = [as_map(item, "scene") for item in as_list(show["scenes"], "show.scenes")]
     if len(scenes) <= 1:
         return
@@ -1176,7 +1438,7 @@ def send_scene_commands(stdin: TextIO, manifest: JsonMap) -> None:
             ("unmaskWidth", "unmask"),
         ):
             if key in scene:
-                stdin.write(f"{command_name} {scene[key]}\n")
+                stdin.write(f"{command_name} {realtime_value(scene[key])}\n")
         if "drumless" in scene:
             stdin.write("drumless on\n" if bool_value(scene["drumless"], False) else "drumless off\n")
         stdin.flush()
@@ -1198,12 +1460,15 @@ def send_scene_commands(stdin: TextIO, manifest: JsonMap) -> None:
         previous = scene
 
 
-def stream_child_output(process: subprocess.Popen[str]) -> None:
+def stream_child_output(process: subprocess.Popen[str], bridge: LiveMidiBridge | None = None) -> None:
     stdout = process.stdout
     if stdout is None:
         return
     for line in stdout:
-        eprint("mere.run: " + line.rstrip())
+        stripped = line.rstrip()
+        if bridge is not None:
+            bridge.handle_line(stripped)
+        eprint("mere.run: " + stripped)
 
 
 def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
@@ -1211,13 +1476,37 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
     artifacts = as_map(manifest["artifacts"], "artifacts")
     output_dir = pathlib.Path(string_field(local, "outputDirectory", "local"))
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_stage_assets(manifest)
-    append_event(manifest, {"type": "started"})
-    update_manifest(manifest_path, manifest, status="running")
     command = [str(part) for part in as_list(manifest["command"], "command")]
     if not command_available(command):
+        update_manifest(manifest_path, manifest, status="failed", error=f"mere.run command not found: {command[0]}")
+        write_stage_assets(manifest)
         raise PluginError(f"mere.run command not found: {command[0]}", 3)
+    append_event(manifest, {"type": "started"})
+    update_manifest(manifest_path, manifest, status="running")
+    write_stage_assets(manifest)
+    performance = as_map(manifest["performance"], "performance")
+    stage = as_map(performance.get("stage", {}), "performance.stage")
+    stage_port = int_value(stage.get("port"), 0)
+    stage_server: StageServer | None = None
+    stage_thread: threading.Thread | None = None
+    process: subprocess.Popen[str] | None = None
+    bridge: LiveMidiBridge | None = None
     try:
+        if stage_port > 0:
+            stage_host = optional_string(stage, "host") or "127.0.0.1"
+            stage_server, stage_url = create_stage_server(manifest, stage_host, stage_port)
+            stage["url"] = stage_url
+            append_event(manifest, {"type": "stage-started", "url": stage_url})
+            update_manifest(manifest_path, manifest)
+            write_stage_assets(manifest)
+            stage_thread = threading.Thread(target=stage_server.serve_forever, daemon=True)
+            stage_thread.start()
+            eprint(f"serving live stage UI at {stage_url}")
+            if bool_value(stage.get("open"), False):
+                opened = webbrowser.open(stage_url)
+                if not opened:
+                    eprint(f"open failed; browse to {stage_url}")
+        bridge = LiveMidiBridge(manifest)
         process = subprocess.Popen(
             command,
             cwd=output_dir,
@@ -1226,7 +1515,7 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
             stderr=subprocess.STDOUT,
             text=True,
         )
-        reader = threading.Thread(target=stream_child_output, args=(process,), daemon=True)
+        reader = threading.Thread(target=stream_child_output, args=(process, bridge), daemon=True)
         reader.start()
         if process.stdin is not None:
             with contextlib.suppress(BrokenPipeError):
@@ -1241,7 +1530,8 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
         events_path = pathlib.Path(string_field(local, "eventsJsonl", "local"))
         sha: JsonMap = {}
         files: list[str] = []
-        for path in (audio_path, events_path, pathlib.Path(string_field(local, "stageHtml", "local")), pathlib.Path(string_field(local, "stageState", "local")), pathlib.Path(string_field(local, "showJson", "local"))):
+        live_path = pathlib.Path(string_field(local, "stageLive", "local"))
+        for path in (audio_path, events_path, pathlib.Path(string_field(local, "stageHtml", "local")), pathlib.Path(string_field(local, "stageState", "local")), live_path, pathlib.Path(string_field(local, "showJson", "local"))):
             if path.is_file():
                 files.append(str(path))
                 sha[str(path)] = file_sha256(path)
@@ -1249,13 +1539,42 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
         artifacts["sha256"] = sha
         append_event(manifest, {"type": "finished", "exitCode": returncode})
         update_manifest(manifest_path, manifest, status="succeeded")
+        if bridge is not None:
+            bridge.finish("succeeded")
+        write_stage_assets(manifest)
         return manifest
-    except PluginError:
-        update_manifest(manifest_path, manifest, status="failed")
+    except KeyboardInterrupt:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=3)
+            if process.poll() is None:
+                process.kill()
+        append_event(manifest, {"type": "interrupted"})
+        update_manifest(manifest_path, manifest, status="failed", error="interrupted")
+        if bridge is not None:
+            bridge.finish("failed")
+        write_stage_assets(manifest)
+        raise PluginError("mere.run music realtime interrupted", 130) from None
+    except PluginError as exc:
+        update_manifest(manifest_path, manifest, status="failed", error=str(exc))
+        if bridge is not None:
+            bridge.finish("failed")
+        write_stage_assets(manifest)
         raise
     except OSError as exc:
         update_manifest(manifest_path, manifest, status="failed", error=str(exc))
+        if bridge is not None:
+            bridge.finish("failed")
+        write_stage_assets(manifest)
         raise PluginError(str(exc), 1) from None
+    finally:
+        if stage_server is not None:
+            if stage_thread is not None:
+                stage_server.shutdown()
+                stage_thread.join(timeout=2)
+            stage_server.server_close()
+            eprint("live stage server stopped")
 
 
 def command_manifest(args: argparse.Namespace) -> int:
@@ -1345,14 +1664,15 @@ def command_stage(args: argparse.Namespace) -> int:
     if not args.serve:
         print_json({"runId": manifest.get("runId"), **exported})
         return 0
-    stage_dir = pathlib.Path(string_field(as_map(manifest["local"], "local"), "stageDirectory", "local"))
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(stage_dir))
-    with socketserver.TCPServer((args.host, args.port), handler) as server:
-        host, port = server.server_address
-        url = f"http://{host}:{port}/"
+    server, url = create_stage_server(manifest, args.host, args.port)
+    with server:
         print_json({"runId": manifest.get("runId"), **exported, "url": url})
         sys.stdout.flush()
         eprint(f"serving stage UI at {url}")
+        if args.open:
+            opened = webbrowser.open(url)
+            if not opened:
+                eprint(f"open failed; browse to {url}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
@@ -1413,8 +1733,12 @@ def add_plan_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--midi-channel", help="MIDI channel 1-16 or all.")
     parser.add_argument("--midi-note-offset", type=int, help="Transpose incoming MIDI notes before they reach Magenta RT2.")
     parser.add_argument("--midi-cc", action="append", default=[], help="Repeatable CC mapping cc=target:min:max.")
+    parser.add_argument("--midi-log-events", action="store_true", help="Log incoming MIDI note and CC events from mere.run.")
+    parser.add_argument("--midi-log-raw", action="store_true", help="Log raw CoreMIDI packets from mere.run.")
     parser.add_argument("--stage-host", default="127.0.0.1")
     parser.add_argument("--stage-port", type=int, default=0)
+    parser.add_argument("--open-stage", action="store_true", help="Open the live stage when --stage-port starts a server.")
+    parser.add_argument("--sequence-scenes", action="store_true", help="Opt into timed prompt/parameter scene changes.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1455,6 +1779,7 @@ def build_parser() -> argparse.ArgumentParser:
     stage = sub.add_parser("stage", help="Export or serve the stage UI.")
     stage.add_argument("run_manifest", type=pathlib.Path)
     stage.add_argument("--serve", action="store_true")
+    stage.add_argument("--open", action="store_true")
     stage.add_argument("--host", default="127.0.0.1")
     stage.add_argument("--port", type=int, default=8765)
     stage.set_defaults(func=command_stage)
