@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-07-05T10:00:53Z",
+  "updatedAt": "2026-07-06T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -103,6 +103,32 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-perform",
+      "name": "Perform",
+      "description": "Run local realtime Magenta Heart performances with mere.run music realtime, MIDI mappings, stage UI export, event logs, and WAV capture.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-perform",
+      "subdirectory": "packages/mere-perform",
+      "entrypoint": "mere-perform",
+      "capabilities": [
+        "performance",
+        "realtime-audio",
+        "magenta-rt2",
+        "midi",
+        "stage-ui",
+        "prompt-blending",
+        "artifact-capture",
+        "local-runner"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform"
         }
       }
     },

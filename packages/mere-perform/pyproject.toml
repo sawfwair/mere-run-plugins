@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-perform"
+version = "0.1.0"
+description = "Realtime performance companion plugin for mere.run"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = []
+
+[project.scripts]
+mere-perform = "mere_perform.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mere_perform = ["py.typed"]

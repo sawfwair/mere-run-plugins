@@ -163,6 +163,7 @@ def plugin_env() -> dict[str, str]:
         ROOT / "packages" / "mere-workflow-tools" / "src",
         ROOT / "packages" / "mere-animatic-tools" / "src",
         ROOT / "packages" / "mere-shotgrid-tools" / "src",
+        ROOT / "packages" / "mere-perform" / "src",
     ]
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in package_paths)
     return env
@@ -238,6 +239,11 @@ def validate_plugin_manifests() -> None:
         "mere_shotgrid_tools",
         "mere-shotgrid-tools",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup", "publish", "pull-tasks"},
+    )
+    validate_plugin_manifest(
+        "mere_perform",
+        "mere-perform",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "stage", "devices", "show-template", "perform"},
     )
     workflow_tools = [
         ("mere_workflow_tools.doc_cli", "mere-doc-tools", "process"),
@@ -502,6 +508,78 @@ def validate_shotgrid_tools_plan() -> None:
             fail("shotgrid-tools plan should write run manifest")
 
 
+def validate_perform_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        show = root / "show.json"
+        output = root / "perform"
+        show.write_text(json.dumps({
+            "contractVersion": "mere.run/perform-show.v1",
+            "title": "Validate Heart",
+            "durationSeconds": 0.2,
+            "promptStrategy": {"resetAfterPrompt": True, "promptDebounceMs": 0},
+            "midi": {
+                "noteOffset": 7,
+                "keyboard": {"enabled": True, "baseNote": 60, "octaveRange": 2},
+                "gate": {"enabled": True, "releaseMs": 800},
+                "pads": [{"id": "pad-one", "label": "1", "sceneId": "one"}],
+                "activity": {"demoNotes": [60, 64, 67]},
+            },
+            "prompts": [{"id": "pulse", "role": "texture", "mode": "jam", "text": "drumless glassy arpeggios", "x": 0.5, "y": 0.2, "cfgMusicCoCa": 2.4}],
+            "scenes": [{"id": "one", "durationSeconds": 0.2, "promptId": "pulse"}],
+        }))
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_perform",
+                "plan",
+                "--show",
+                str(show),
+                "--output-dir",
+                str(output),
+                "--run-id",
+                "validate-perform",
+                "--mere-run-command",
+                "fake-mere-run",
+                "--no-play",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-perform plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["plugin"]["name"] != "mere-perform":
+            fail("perform plan reported wrong plugin name")
+        if manifest["status"] != "planned":
+            fail("perform plan manifest should have status planned")
+        if manifest["runtime"]["backend"] != "mere.run/music-realtime":
+            fail("perform plan should call mere.run music realtime")
+        if "--no-play" not in manifest["command"]:
+            fail("perform plan should preserve no-play capture mode")
+        if "--midi-note-offset" not in manifest["command"]:
+            fail("perform plan should pass native MIDI note offset")
+        show_payload = as_map(as_map(manifest["performance"], "performance")["show"], "perform show")
+        midi = as_map(show_payload["midi"], "perform midi")
+        if midi["noteOffset"] != 7:
+            fail("perform plan should preserve MIDI note offset")
+        if as_map(midi["keyboard"], "perform midi keyboard")["baseNote"] != 60:
+            fail("perform plan should preserve MIDI keyboard base note")
+        if as_map(midi["gate"], "perform midi gate")["releaseMs"] != 800:
+            fail("perform plan should preserve MIDI gate release")
+        scene = as_map(as_list(show_payload["scenes"], "perform scenes")[0], "perform scene")
+        if scene["promptId"] != "pulse":
+            fail("perform plan should preserve promptId scene references")
+        if scene["cfgMusicCoCa"] != 2.4:
+            fail("perform plan should inherit prompt strength from prompt anchors")
+        if not (output / "run.json").is_file():
+            fail("perform plan should write run manifest")
+
+
 def validate_volume_dry_run() -> None:
     result = subprocess.run(
         [
@@ -547,6 +625,7 @@ def main() -> int:
     validate_workflow_tools_plans()
     validate_animatic_tools_plan()
     validate_shotgrid_tools_plan()
+    validate_perform_plan()
     validate_volume_dry_run()
     sys.stdout.write("validate_repo: ok\n")
     return 0

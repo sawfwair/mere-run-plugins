@@ -176,6 +176,40 @@ deleting plugin-created tracking records requires explicit confirmation.
 `pull-tasks` queries ShotGrid Tasks and writes JSONL job requests for local relay
 or batch tooling.
 
+## Perform Plugin
+
+`mere-perform` plans and runs realtime Magenta Heart performances through the
+installed `mere.run music realtime` command. It records a durable `run.json`,
+exports a local stage UI, passes MIDI mappings through to CoreMIDI, writes event
+JSONL, and captures WAV output when requested. The show file treats prompts as
+a palette of blendable anchors with roles, jam/solo modes, prompt strength, and
+scene-level realtime controls. Its stage UI also renders a Jam-inspired MIDI
+controller surface with source/gate readouts, scene pads, and an interactive
+piano strip while the actual MIDI ingestion stays in native `mere.run`.
+
+Install the plugin with `pipx`:
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform"
+```
+
+```bash
+mere-perform manifest --json
+mere-perform doctor
+mere-perform show-template --output ./show.json
+mere-perform plan \
+  --show ./show.json \
+  --output-dir ./runs/heart-demo \
+  --run-id heart-demo \
+  --no-play
+mere-perform stage ./runs/heart-demo/run.json
+mere-perform run ./runs/heart-demo/run.json
+```
+
+The plugin does not create paid resources and does not ship another Magenta
+runtime. It wraps the local `mere.run` realtime surface and owns planning,
+stage export, event recording, artifact hashes, and cleanup state.
+
 ## Catalog
 
 The live catalog is published from this repo:
@@ -232,6 +266,7 @@ packages/mere-image-tools/ local image-production plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
 packages/mere-animatic-tools/ local Animatic production helpers
 packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
+packages/mere-perform/     realtime performance and stage UI plugin
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
 SECURITY.md                private vulnerability reporting policy
