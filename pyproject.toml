@@ -4,6 +4,7 @@ line-length = 120
 src = [
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
+  "packages/mere-perform/src",
   "packages/mere-runpod/src",
   "packages/mere-shotgrid-tools/src",
   "packages/mere-workflow-tools/src",
@@ -43,6 +44,7 @@ explicit_package_bases = true
 mypy_path = [
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
+  "packages/mere-perform/src",
   "packages/mere-runpod/src",
   "packages/mere-shotgrid-tools/src",
   "packages/mere-workflow-tools/src",
@@ -50,6 +52,7 @@ mypy_path = [
 files = [
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
+  "packages/mere-perform/src",
   "packages/mere-runpod/src",
   "packages/mere-shotgrid-tools/src",
   "packages/mere-workflow-tools/src",
@@ -65,6 +68,7 @@ ignore_missing_imports = true
 source = [
   "packages/mere-animatic-tools/src/mere_animatic_tools",
   "packages/mere-image-tools/src/mere_image_tools",
+  "packages/mere-perform/src/mere_perform",
   "packages/mere-runpod/src/mere_runpod",
   "packages/mere-shotgrid-tools/src/mere_shotgrid_tools",
   "packages/mere-workflow-tools/src/mere_workflow_tools",

@@ -17,17 +17,37 @@ mere-perform plan \
   --output-dir ./runs/heart-demo \
   --run-id heart-demo \
   --no-play
-mere-perform stage ./runs/heart-demo/run.json
+mere-perform perform \
+  --show ./show.json \
+  --output-dir ./runs/heart-live \
+  --run-id heart-live \
+  --midi-input "OP-1 Bluetooth" \
+  --stage-port 8880 \
+  --open-stage
 mere-perform run ./runs/heart-demo/run.json
 ```
 
-The stage view is a static local HTML export. It visualizes the prompt nodes,
-scene list, MIDI controller state, on-screen piano strip, scene pads, and
-magenta heart cursor for rehearsal, projection, or stream overlays. Use
-`stage --serve` when a browser needs an HTTP URL:
+The default performance mode is instrument mode: `mere.run music realtime`
+holds the initial prompt, OP-1 notes drive the model through native CoreMIDI,
+and CC mappings shape parameters without timed prompt jumps. Pass
+`--sequence-scenes` only when you explicitly want an arranged prompt sequence.
+When a MIDI input is configured, instrument mode starts from the first
+`mode: "solo"` prompt so the realtime command gets a note-following
+`SOLO ...` seed.
+
+The stage view is a local HTML export. It visualizes the prompt nodes,
+patch list, MIDI controller state, on-screen piano strip, and magenta heart
+cursor for rehearsal, projection, or stream overlays. Pass
+`--stage-port` and `--open-stage` to `perform`, or to `plan` before `run`, so
+the stage is served while `mere.run music realtime` is actually alive. During a
+live staged MIDI run, `mere-perform` mirrors observed `mere.run` note logs into
+`stage/live.json` so the piano strip reflects physical key presses. Use
+`stage --serve` only to inspect an exported run after the realtime process has
+finished. Add `--open` to launch the default browser after the local server
+starts:
 
 ```bash
-mere-perform stage ./runs/heart-demo/run.json --serve --port 8765
+mere-perform stage ./runs/heart-demo/run.json --serve --open --port 8765
 ```
 
 ## Show File
@@ -52,9 +72,11 @@ mere-perform stage ./runs/heart-demo/run.json --serve --port 8765
 - `prompts`
 - `scenes`
 
-Scene prompts are sent to `mere.run music realtime --interactive` while the run
-is active. MIDI CC mappings are passed through to the native CoreMIDI surface.
-Incoming note transposition is passed through to native `--midi-note-offset`.
+Scene prompts are not sent automatically in the default instrument mode. With
+`--sequence-scenes`, scene prompts are sent to
+`mere.run music realtime --interactive` while the run is active. MIDI CC
+mappings are passed through to the native CoreMIDI surface. Incoming note
+transposition is passed through to native `--midi-note-offset`.
 
 ## Prompt Strategy
 
@@ -106,8 +128,9 @@ note-following lead or instrument prompts. Solo mode keeps the authored prompt
 clean in the show file and sends the Magenta-style `SOLO ` runtime prefix to
 `mere.run`.
 
-Scenes should usually reference palette nodes by `promptId` instead of
-duplicating prompt text:
+Patches should usually reference palette nodes by `promptId` instead of
+duplicating prompt text. They become timed prompt changes only when the run uses
+`--sequence-scenes`:
 
 ```json
 {
@@ -139,6 +162,8 @@ setup and renders it on the stage.
     "input": "OP-1",
     "channel": "all",
     "noteOffset": 0,
+    "logEvents": false,
+    "logRaw": false,
     "cc": ["1=temp:0.2:1.4", "2=drums:0:2", "3=mc:1:5"],
     "keyboard": {
       "enabled": true,
@@ -161,11 +186,34 @@ setup and renders it on the stage.
 }
 ```
 
-The stage uses this metadata to show a MIDI source strip, activity LED, scene
-pads, and piano strip. Computer-keyboard preview follows the Magenta Jam
-pattern: home-row keys map to white notes, nearby top-row keys map to black
-notes, and held notes pulse the heart. It is a stage/operator visualization;
-live hardware ingestion remains the native `mere.run` process.
+The stage uses this metadata to show a MIDI source strip, observed note status,
+optional sequence pads, and a piano reference strip. Computer-keyboard preview
+follows the Magenta Jam pattern: home-row keys map to white notes, nearby
+top-row keys map to black notes, and locally held preview notes pulse the heart.
+Physical OP-1 note ingestion stays inside native `mere.run`; the browser only
+mirrors note events that `mere.run` actually logs into the local `stage/live.json`
+feed.
+
+Use `mere.run` or `mere-perform` MIDI logs to prove hardware input:
+
+```bash
+mere.run music realtime --midi-monitor \
+  --midi-input "OP-1 Bluetooth" \
+  --midi-channel all \
+  --midi-log-raw \
+  --midi-log-events \
+  --duration 45
+
+mere-perform perform \
+  --output-dir ./runs/op1-debug \
+  --run-id op1-debug \
+  --midi-input "OP-1 Bluetooth" \
+  --midi-channel 4 \
+  --midi-log-events \
+  --midi-log-raw \
+  --stage-port 8880 \
+  --open-stage
+```
 
 ## Artifacts
 
@@ -176,6 +224,7 @@ Successful runs record:
 - `events.jsonl`
 - `stage/index.html`
 - `stage/state.json`
+- `stage/live.json`
 - WAV capture when `mere.run` writes it
 
 `cleanup` is a no-op by default because no remote resources are created.

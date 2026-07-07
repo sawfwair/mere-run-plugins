@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import socket
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -13,6 +14,11 @@ from mere_perform import cli
 
 
 class MerePerformTests(unittest.TestCase):
+    def free_port(self) -> int:
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            return int(sock.getsockname()[1])
+
     def write_show(self, root: pathlib.Path) -> pathlib.Path:
         show = root / "show.json"
         show.write_text(json.dumps({
@@ -25,6 +31,8 @@ class MerePerformTests(unittest.TestCase):
                 "input": "OP-1",
                 "channel": "all",
                 "noteOffset": 12,
+                "logEvents": False,
+                "logRaw": False,
                 "cc": ["1=temp:0.2:1.4"],
                 "keyboard": {"enabled": True, "baseNote": 48, "octaveRange": 2},
                 "gate": {"enabled": True, "releaseMs": 700, "idleStopSeconds": 20},
@@ -72,6 +80,11 @@ class MerePerformTests(unittest.TestCase):
                     "--mere-run-command",
                     "fake-mere-run",
                     "--no-play",
+                    "--stage-port",
+                    "8880",
+                    "--open-stage",
+                    "--midi-log-events",
+                    "--midi-log-raw",
                 ])
             self.assertEqual(exit_code, 0)
             payload = json.loads(stdout.getvalue())
@@ -82,15 +95,51 @@ class MerePerformTests(unittest.TestCase):
             self.assertIn("--no-play", payload["command"])
             self.assertIn("--midi-note-offset", payload["command"])
             self.assertIn("12", payload["command"])
+            self.assertIn("SOLO tape bass tilt", payload["command"])
+            self.assertIn("--midi-log-events", payload["command"])
+            self.assertIn("--midi-log-raw", payload["command"])
             self.assertEqual(payload["performance"]["show"]["prompts"][1]["role"], "lead")
+            self.assertEqual(payload["performance"]["initialPrompt"], "tape bass tilt")
+            self.assertEqual(payload["performance"]["initialRuntimePrompt"], "SOLO tape bass tilt")
             self.assertEqual(payload["performance"]["show"]["midi"]["noteOffset"], 12)
+            self.assertEqual(payload["performance"]["show"]["midi"]["instrumentMode"], True)
+            self.assertEqual(payload["performance"]["show"]["midi"]["logEvents"], True)
+            self.assertEqual(payload["performance"]["show"]["midi"]["logRaw"], True)
             self.assertEqual(payload["performance"]["show"]["midi"]["keyboard"]["baseNote"], 48)
             self.assertEqual(payload["performance"]["show"]["midi"]["gate"]["releaseMs"], 700)
             self.assertEqual(payload["performance"]["show"]["midi"]["pads"][1]["sceneId"], "two")
             self.assertEqual(payload["performance"]["show"]["scenes"][1]["runtimePrompt"], "SOLO tape bass tilt")
             self.assertEqual(payload["performance"]["show"]["scenes"][1]["cfgMusicCoCa"], 3.4)
             self.assertEqual(payload["performance"]["show"]["scenes"][1]["unmaskWidth"], 127.0)
+            self.assertEqual(payload["performance"]["stage"]["port"], 8880)
+            self.assertEqual(payload["performance"]["stage"]["open"], True)
+            self.assertEqual(payload["performance"]["sequenceScenes"], False)
             self.assertTrue((root / "out" / "run.json").is_file())
+
+    def test_run_marks_missing_runtime_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            show = self.write_show(root)
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "missing-heart",
+                    "--mere-run-command",
+                    str(root / "does-not-exist"),
+                ]), 0)
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                exit_code = cli.main(["run", str(root / "out" / "run.json")])
+            self.assertEqual(exit_code, 3)
+            manifest = json.loads((root / "out" / "run.json").read_text())
+            self.assertEqual(manifest["status"], "failed")
+            self.assertIn("command not found", manifest["error"])
+            state = json.loads((root / "out" / "stage" / "state.json").read_text())
+            self.assertEqual(state["status"], "failed")
 
     def test_stage_exports_static_ui(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,15 +166,120 @@ class MerePerformTests(unittest.TestCase):
             state_path = pathlib.Path(payload["stageState"])
             self.assertTrue(html_path.is_file())
             self.assertTrue(state_path.is_file())
-            self.assertIn("mere.perform", html_path.read_text())
-            self.assertIn("midi-pads", html_path.read_text())
-            self.assertIn("piano", html_path.read_text())
+            html = html_path.read_text()
+            self.assertIn("mere.perform", html)
+            self.assertIn("midi-pads", html)
+            self.assertIn("piano", html)
+            self.assertIn("useDemoNotes", html)
+            self.assertIn("live.json", html)
+            self.assertIn("pollLiveState", html)
+            self.assertIn("waiting midi", html)
+            self.assertIn("prompt-section", html)
+            live_path = (root / "out" / "stage" / "live.json").resolve()
+            self.assertTrue(live_path.is_file())
             state = json.loads(state_path.read_text())
             self.assertEqual(state["show"]["title"], "Unit Heart")
             self.assertEqual(state["show"]["prompts"][1]["mode"], "solo")
+            self.assertEqual(state["performance"]["sequenceScenes"], False)
+            live = json.loads(live_path.read_text())
+            self.assertEqual(live["midi"]["activeNotes"], [])
+            self.assertEqual(live["midi"]["eventCount"], 0)
+            args = cli.build_parser().parse_args(["stage", str(root / "out" / "run.json"), "--serve", "--open"])
+            self.assertTrue(args.open)
             self.assertEqual(state["show"]["midi"]["activity"]["demoNotes"], [48, 52, 55])
 
+    def test_live_midi_bridge_tracks_mere_run_note_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            show = self.write_show(root)
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "bridge-heart",
+                    "--mere-run-command",
+                    "fake-mere-run",
+                    "--stage-port",
+                    "9999",
+                ]), 0)
+            manifest = json.loads(stdout.getvalue())
+            bridge = cli.LiveMidiBridge(manifest)
+            self.assertTrue(bridge.handle_line("MIDI note-on ch=4 note=60 velocity=127"))
+            self.assertTrue(bridge.handle_line("MIDI note-on ch=4 note=64 velocity=127"))
+            self.assertTrue(bridge.handle_line("MIDI note-off ch=4 note=60"))
+            live = json.loads((root / "out" / "stage" / "live.json").read_text())
+            self.assertEqual(live["midi"]["activeNotes"], [64])
+            self.assertEqual(live["midi"]["eventCount"], 3)
+            self.assertEqual(live["midi"]["lastEvent"], {"channel": 4, "note": 60, "type": "note-off"})
+
     def test_run_executes_fake_realtime_and_records_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            fake = root / "fake-mere-run"
+            fake.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib, sys\n"
+                "args = sys.argv[1:]\n"
+                "if '--output' in args:\n"
+                "    pathlib.Path(args[args.index('--output') + 1]).write_bytes(b'fake wav')\n"
+                "pathlib.Path('stdin.txt').write_text(sys.stdin.read())\n"
+                "print('MIDI note-on ch=4 note=60 velocity=127')\n"
+                "print('MIDI note-on ch=4 note=64 velocity=127')\n"
+                "print('MIDI note-off ch=4 note=60')\n"
+                "print('MIDI note-off ch=4 note=64')\n"
+                "print('fake realtime ok')\n"
+            )
+            fake.chmod(fake.stat().st_mode | 0o111)
+            show = self.write_show(root)
+            port = self.free_port()
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "run-heart",
+                    "--mere-run-command",
+                    str(fake),
+                    "--no-play",
+                    "--stage-port",
+                    str(port),
+                ]), 0)
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = cli.main(["run", str(root / "out" / "run.json")])
+            self.assertEqual(exit_code, 0)
+            self.assertIn("serving live stage UI", stderr.getvalue())
+            self.assertIn("live stage server stopped", stderr.getvalue())
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], "succeeded")
+            self.assertTrue((root / "out" / "unit.wav").is_file())
+            self.assertTrue((root / "out" / "events.jsonl").is_file())
+            self.assertTrue((root / "out" / "stage" / "index.html").is_file())
+            live_path = (root / "out" / "stage" / "live.json").resolve()
+            self.assertTrue(live_path.is_file())
+            self.assertIn(str(live_path), payload["artifacts"]["files"])
+            self.assertEqual(payload["artifacts"]["stageLive"], str(live_path))
+            live = json.loads(live_path.read_text())
+            self.assertEqual(live["status"], "succeeded")
+            self.assertEqual(live["midi"]["activeNotes"], [])
+            self.assertEqual(live["midi"]["eventCount"], 4)
+            self.assertEqual(live["midi"]["lastEvent"], {"channel": 4, "note": 64, "type": "note-off"})
+            self.assertIn("--midi-log-events", payload["command"])
+            commands = (root / "out" / "stdin.txt").read_text()
+            self.assertNotIn("prompt SOLO tape bass tilt", commands)
+            self.assertNotIn("mc 3.4", commands)
+            self.assertNotIn("unmask 127", commands)
+
+    def test_sequence_scenes_opt_in_sends_prompt_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             fake = root / "fake-mere-run"
@@ -148,24 +302,22 @@ class MerePerformTests(unittest.TestCase):
                     "--output-dir",
                     str(root / "out"),
                     "--run-id",
-                    "run-heart",
+                    "sequence-heart",
                     "--mere-run-command",
                     str(fake),
                     "--no-play",
+                    "--sequence-scenes",
                 ]), 0)
             stdout = StringIO()
             with redirect_stdout(stdout), redirect_stderr(StringIO()):
                 exit_code = cli.main(["run", str(root / "out" / "run.json")])
             self.assertEqual(exit_code, 0)
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["status"], "succeeded")
-            self.assertTrue((root / "out" / "unit.wav").is_file())
-            self.assertTrue((root / "out" / "events.jsonl").is_file())
-            self.assertTrue((root / "out" / "stage" / "index.html").is_file())
+            self.assertEqual(payload["performance"]["sequenceScenes"], True)
             commands = (root / "out" / "stdin.txt").read_text()
             self.assertIn("prompt SOLO tape bass tilt", commands)
             self.assertIn("mc 3.4", commands)
-            self.assertIn("unmask 127.0", commands)
+            self.assertIn("unmask 127", commands)
             self.assertIn("reset", commands)
 
     def test_cleanup_and_devices_dry_run(self) -> None:

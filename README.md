@@ -183,9 +183,12 @@ installed `mere.run music realtime` command. It records a durable `run.json`,
 exports a local stage UI, passes MIDI mappings through to CoreMIDI, writes event
 JSONL, and captures WAV output when requested. The show file treats prompts as
 a palette of blendable anchors with roles, jam/solo modes, prompt strength, and
-scene-level realtime controls. Its stage UI also renders a Jam-inspired MIDI
-controller surface with source/gate readouts, scene pads, and an interactive
-piano strip while the actual MIDI ingestion stays in native `mere.run`.
+patch-level realtime controls. By default, the initial prompt stays stable and
+the MIDI controller drives the performance; timed prompt changes require
+`--sequence-scenes`. Its stage UI also renders a Jam-inspired MIDI controller
+surface with source/gate readouts and an interactive piano strip. Physical MIDI
+ingestion stays in native `mere.run`; the live stage mirrors observed
+`mere.run` note logs through a local `stage/live.json` feed.
 
 Install the plugin with `pipx`:
 
