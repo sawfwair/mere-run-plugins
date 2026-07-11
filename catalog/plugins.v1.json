@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-07-06T00:00:00Z",
+  "updatedAt": "2026-07-11T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -46,6 +46,51 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-vfx-tools",
+      "name": "VFX Tools",
+      "description": "Run local shot-oriented VFX workflows for roto, mattes, tracking, motion passes, keying, QC, in-betweens, turntables, and character sheets.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-vfx-tools",
+      "subdirectory": "packages/mere-vfx-tools",
+      "entrypoint": "mere-vfx-tools",
+      "capabilities": [
+        "vfx",
+        "roto",
+        "alpha-matte",
+        "track-export",
+        "keying",
+        "shot-qc",
+        "inbetween",
+        "turntable",
+        "character-sheet",
+        "pose-sequence",
+        "markerless-motion",
+        "motion-pass",
+        "optical-flow",
+        "clean-plate",
+        "object-removal",
+        "set-extension",
+        "outpainting",
+        "restoration",
+        "super-resolution",
+        "depth-pass",
+        "normal-pass",
+        "relighting",
+        "shadow-catcher",
+        "image-to-3d",
+        "video-to-3d",
+        "point-cloud",
+        "mesh"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools"
         }
       }
     },

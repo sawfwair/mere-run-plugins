@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -21,7 +21,7 @@ if rg -n "\bAny\b" packages/*/src scripts; then
   echo "Production code must not use the dynamic top type; define typed JSON/provider boundaries instead." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-workflow-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-workflow-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
 "$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
@@ -29,6 +29,7 @@ fi
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-animatic-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-shotgrid-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-perform/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-vfx-tools/tests
 "$PYTHON" -m coverage report
 "$PYTHON" scripts/check_structure.py
 "$PYTHON" scripts/validate_repo.py
@@ -40,6 +41,7 @@ unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-animatic-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-shotgrid-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-perform
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-vfx-tools
 "$PYTHON" - <<'PY'
 import pathlib
 import subprocess
@@ -182,6 +184,35 @@ result = subprocess.run(
 )
 if '"runId": "installed-perform-smoke"' not in result.stdout:
     raise SystemExit("installed perform smoke did not produce expected run manifest")
+
+vfx_cli = pathlib.Path(sys.executable).with_name("mere-vfx-tools")
+vfx_request = root / "vfx-request.json"
+vfx_request.write_text('{"inputs":{"masks":"' + str(root) + '"}}')
+result = subprocess.run(
+    [
+        str(vfx_cli),
+        "plan",
+        "--tool",
+        "matte-refine",
+        "--request-json",
+        str(vfx_request),
+        "--output-dir",
+        str(root / "vfx"),
+        "--run-id",
+        "installed-vfx-smoke",
+        "--mere-run-command",
+        "fake-mere-run",
+        "--ffmpeg-command",
+        "fake-ffmpeg",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"runId": "installed-vfx-smoke"' not in result.stdout:
+    raise SystemExit("installed vfx-tools smoke did not produce expected run manifest")
 
 for executable in [
     "mere-doc-tools",

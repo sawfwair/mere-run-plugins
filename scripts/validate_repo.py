@@ -164,6 +164,7 @@ def plugin_env() -> dict[str, str]:
         ROOT / "packages" / "mere-animatic-tools" / "src",
         ROOT / "packages" / "mere-shotgrid-tools" / "src",
         ROOT / "packages" / "mere-perform" / "src",
+        ROOT / "packages" / "mere-vfx-tools" / "src",
     ]
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in package_paths)
     return env
@@ -244,6 +245,21 @@ def validate_plugin_manifests() -> None:
         "mere_perform",
         "mere-perform",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup", "stage", "devices", "show-template", "perform"},
+    )
+    validate_plugin_manifest(
+        "mere_vfx_tools",
+        "mere-vfx-tools",
+        {
+            "manifest", "doctor", "plan", "run", "resume", "cleanup", "roto", "matte-refine",
+            "track-export", "key", "shot-qc", "inbetween", "turntable", "character-sheet",
+            "pose-sequence",
+            "motion-pass",
+            "clean-plate",
+            "set-extension", "restore",
+            "depth-normal",
+            "relight",
+            "image-to-3d",
+        },
     )
     workflow_tools = [
         ("mere_workflow_tools.doc_cli", "mere-doc-tools", "process"),
@@ -580,6 +596,53 @@ def validate_perform_plan() -> None:
             fail("perform plan should write run manifest")
 
 
+def validate_vfx_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        frames = root / "frames"
+        frames.mkdir()
+        (frames / "frame.png").write_bytes(b"plan-only")
+        request = root / "request.json"
+        request.write_text(json.dumps({"inputs": {"masks": str(frames)}, "options": {"featherRadius": 1.5}}))
+        output = root / "vfx"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_vfx_tools",
+                "plan",
+                "--tool",
+                "matte-refine",
+                "--request-json",
+                str(request),
+                "--output-dir",
+                str(output),
+                "--run-id",
+                "validate-vfx-tools",
+                "--mere-run-command",
+                "fake-mere-run",
+                "--ffmpeg-command",
+                "fake-ffmpeg",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-vfx-tools plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["plugin"]["name"] != "mere-vfx-tools":
+            fail("vfx tools plan reported wrong plugin name")
+        if manifest["tool"]["name"] != "matte-refine":
+            fail("vfx tools plan reported wrong workflow")
+        if manifest["status"] != "planned":
+            fail("vfx tools plan should have planned status")
+        if not (output / "run.json").is_file():
+            fail("vfx tools plan should write run manifest")
+
+
 def validate_volume_dry_run() -> None:
     result = subprocess.run(
         [
@@ -626,6 +689,7 @@ def main() -> int:
     validate_animatic_tools_plan()
     validate_shotgrid_tools_plan()
     validate_perform_plan()
+    validate_vfx_tools_plan()
     validate_volume_dry_run()
     sys.stdout.write("validate_repo: ok\n")
     return 0

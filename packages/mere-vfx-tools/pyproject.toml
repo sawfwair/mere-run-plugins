@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-vfx-tools"
+version = "0.1.0"
+description = "Local VFX production workflows powered by native mere.run inference"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = [
+  "Pillow>=10",
+]
+
+[project.scripts]
+mere-vfx-tools = "mere_vfx_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mere_vfx_tools = ["py.typed"]
