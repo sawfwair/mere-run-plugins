@@ -41,10 +41,11 @@ cursor for rehearsal, projection, or stream overlays. Pass
 `--stage-port` and `--open-stage` to `perform`, or to `plan` before `run`, so
 the stage is served while `mere.run music realtime` is actually alive. During a
 live staged MIDI run, `mere-perform` mirrors observed `mere.run` note logs into
-`stage/live.json` so the piano strip reflects physical key presses. Use
-`stage --serve` only to inspect an exported run after the realtime process has
-finished. Add `--open` to launch the default browser after the local server
-starts:
+`stage/live.json` so the piano strip reflects physical key presses. The prompt
+field in that live stage sends typed text to the running
+`mere.run --interactive` process as `prompt <text>`. Use `stage --serve` only to
+inspect an exported run after the realtime process has finished. Add `--open`
+to launch the default browser after the local server starts:
 
 ```bash
 mere-perform stage ./runs/heart-demo/run.json --serve --open --port 8765
@@ -192,7 +193,8 @@ follows the Magenta Jam pattern: home-row keys map to white notes, nearby
 top-row keys map to black notes, and locally held preview notes pulse the heart.
 Physical OP-1 note ingestion stays inside native `mere.run`; the browser only
 mirrors note events that `mere.run` actually logs into the local `stage/live.json`
-feed.
+feed. The MIDI activity meter and LED are event-driven; they do not animate as
+fake level meters during silence.
 
 Use `mere.run` or `mere-perform` MIDI logs to prove hardware input:
 

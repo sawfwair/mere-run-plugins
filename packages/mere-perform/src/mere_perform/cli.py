@@ -10,6 +10,7 @@ import http.server
 import json
 import os
 import pathlib
+import queue
 import re
 import shlex
 import shutil
@@ -28,6 +29,7 @@ JsonList = list[object]
 
 PLUGIN_NAME = "mere-perform"
 DEFAULT_MERE_RUN = "mere.run"
+DEFAULT_MAGENTA_RT2_MODEL = "music-magenta-rt2-base"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 MIDI_NOTE_ON_RE = re.compile(r"\bMIDI note-on ch=(\d+) note=(\d+) velocity=(\d+)")
 MIDI_NOTE_OFF_RE = re.compile(r"\bMIDI note-off ch=(\d+) note=(\d+)")
@@ -47,6 +49,7 @@ DEFAULT_PROMPT_STRATEGY: JsonMap = {
 class StageServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
+    control_bridge: object | None = None
 
 
 class PluginError(RuntimeError):
@@ -245,7 +248,7 @@ def template_show() -> JsonMap:
         "contractVersion": "mere.run/perform-show.v1",
         "title": "Magenta Heart Session",
         "durationSeconds": 30,
-        "model": "music-magenta-rt2-small",
+        "model": DEFAULT_MAGENTA_RT2_MODEL,
         "promptStrategy": {
             **DEFAULT_PROMPT_STRATEGY,
             "notes": [
@@ -580,7 +583,7 @@ def normalize_show(show: JsonMap, args: argparse.Namespace) -> JsonMap:
         "contractVersion": "mere.run/perform-show.v1",
         "title": title,
         "durationSeconds": duration,
-        "model": args.model or optional_string(show, "model") or "music-magenta-rt2-small",
+        "model": args.model or optional_string(show, "model") or DEFAULT_MAGENTA_RT2_MODEL,
         "promptStrategy": prompt_strategy,
         "audio": {
             "play": not args.no_play if args.no_play else bool_value(audio.get("play"), True),
@@ -773,13 +776,21 @@ def write_live_state(
     manifest: JsonMap,
     *,
     active_notes: list[int] | None = None,
-    event_count: int = 0,
+    event_count: int | None = None,
     last_event: JsonMap | None = None,
+    control: JsonMap | None = None,
     status: str | None = None,
 ) -> JsonMap:
     performance = as_map(manifest["performance"], "performance")
     show = as_map(performance["show"], "performance.show")
     midi = as_map(show["midi"], "show.midi")
+    path = live_state_path(manifest)
+    existing: JsonMap = {}
+    if path.is_file():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            existing = as_map(json.loads(path.read_text()), "stage.live")
+    existing_midi = as_map(existing.get("midi"), "stage.live.midi") if isinstance(existing.get("midi"), dict) else {}
+    existing_control = as_map(existing.get("control"), "stage.live.control") if isinstance(existing.get("control"), dict) else {}
     payload: JsonMap = {
         "runId": manifest.get("runId"),
         "status": status or str(manifest.get("status") or "planned"),
@@ -787,12 +798,12 @@ def write_live_state(
         "midi": {
             "input": optional_string(midi, "input"),
             "channel": optional_string(midi, "channel") or "all",
-            "activeNotes": active_notes or [],
-            "eventCount": event_count,
-            "lastEvent": last_event,
+            "activeNotes": active_notes if active_notes is not None else existing_midi.get("activeNotes", []),
+            "eventCount": event_count if event_count is not None else existing_midi.get("eventCount", 0),
+            "lastEvent": last_event if last_event is not None else existing_midi.get("lastEvent"),
         },
+        "control": control if control is not None else existing_control,
     }
-    path = live_state_path(manifest)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(path.name + ".tmp")
     write_json(tmp_path, payload)
@@ -870,6 +881,60 @@ class LiveMidiBridge:
         )
 
 
+class StageControlBridge:
+    def __init__(self, manifest: JsonMap) -> None:
+        self.manifest = manifest
+        self.commands: queue.Queue[str | None] = queue.Queue()
+        self.stdin: IO[str] | None = None
+        self.write_lock = threading.Lock()
+        self.prompt_count = 0
+
+    def attach_stdin(self, stdin: IO[str]) -> None:
+        self.stdin = stdin
+
+    def submit_prompt(self, prompt: object) -> JsonMap:
+        if not isinstance(prompt, str):
+            raise PluginError("prompt must be a string", 2)
+        stripped = prompt.strip()
+        if not stripped:
+            raise PluginError("prompt cannot be empty", 2)
+        if len(stripped) > 500:
+            raise PluginError("prompt cannot be longer than 500 characters", 2)
+        self.prompt_count += 1
+        self.commands.put(f"prompt {stripped}")
+        control = {
+            "eventCount": self.prompt_count,
+            "lastPrompt": stripped,
+            "updatedAt": now_iso(),
+        }
+        append_event(self.manifest, {"type": "web-prompt", "prompt": stripped, "runtimePrompt": stripped})
+        write_live_state(self.manifest, control=control)
+        return control
+
+    def send_line(self, line: str) -> None:
+        self.commands.put(line.rstrip("\n"))
+
+    def run(self) -> None:
+        while True:
+            line = self.commands.get()
+            if line is None:
+                return
+            self.write_line(line)
+
+    def write_line(self, line: str) -> bool:
+        stdin = self.stdin
+        if stdin is None:
+            return False
+        with self.write_lock, contextlib.suppress(BrokenPipeError, OSError):
+            stdin.write(line.rstrip("\n") + "\n")
+            stdin.flush()
+            return True
+        return False
+
+    def stop(self) -> None:
+        self.commands.put(None)
+
+
 def stage_html(manifest: JsonMap) -> str:
     state = json.dumps(stage_state(manifest), sort_keys=True)
     escaped_state = html.escape(state, quote=False)
@@ -944,6 +1009,12 @@ def stage_html(manifest: JsonMap) -> str:
     .control-chip b {{ color: var(--ink); font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .meter {{ height: 6px; background: oklch(0.26 0.025 314); overflow: hidden; }}
     .meter i {{ display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--heart), var(--cyan), var(--amber)); }}
+    .prompt-control {{ display: grid; gap: 7px; min-width: 0; }}
+    .prompt-row {{ display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }}
+    .prompt-control input {{ min-width: 0; height: 34px; border: 1px solid color-mix(in oklch, var(--line), transparent 18%); border-radius: 8px; background: oklch(0.15 0.019 314); color: var(--ink); padding: 0 10px; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui; }}
+    .prompt-control input:focus {{ outline: 1px solid var(--heart); border-color: var(--heart); }}
+    .prompt-control button {{ height: 34px; border: 1px solid var(--heart); border-radius: 8px; background: oklch(0.25 0.11 336); color: var(--ink); padding: 0 12px; font: 650 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui; }}
+    .prompt-control small {{ min-height: 14px; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .footer {{ color: var(--muted); font-size: 12px; line-height: 1.5; }}
     @media (max-width: 820px) {{
       .shell {{ grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }}
@@ -993,6 +1064,13 @@ def stage_html(manifest: JsonMap) -> str:
           <span>midi</span><b id="midi"></b>
         </div>
         <div class="meter"><i id="meter"></i></div>
+        <form id="prompt-form" class="prompt-control">
+          <div class="prompt-row">
+            <input id="prompt-input" name="prompt" maxlength="500" autocomplete="off" spellcheck="false" aria-label="Prompt" placeholder="type prompt">
+            <button type="submit">Send</button>
+          </div>
+          <small id="prompt-status"></small>
+        </form>
       </div>
       <div class="section">
         <span class="kicker">Controller</span>
@@ -1028,12 +1106,18 @@ def stage_html(manifest: JsonMap) -> str:
     const padsEl = document.getElementById('midi-pads');
     const pianoEl = document.getElementById('piano');
     const midiLed = document.getElementById('midi-led');
+    const promptForm = document.getElementById('prompt-form');
+    const promptInput = document.getElementById('prompt-input');
+    const promptStatus = document.getElementById('prompt-status');
     const useDemoNotes = state.status !== 'running' && !midi.input;
     const activeNotes = new Set((useDemoNotes ? midi.activity?.demoNotes || [] : []).filter(note => Number.isFinite(note)));
     const pressedKeys = new Map();
     let liveMidiEventCount = 0;
     let liveLastEvent = null;
     let liveSignature = '';
+    let livePromptText = performanceState.initialPrompt || '';
+    let liveControlEventCount = 0;
+    let lastMidiEventAt = 0;
     let manualSceneIndex = null;
     let manualSceneUntil = 0;
     const keyToSemitone = {{ a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16 }};
@@ -1082,11 +1166,12 @@ def stage_html(manifest: JsonMap) -> str:
       document.getElementById('controller-channel').textContent = midi.channel || 'all';
       document.getElementById('controller-gate').textContent = gate.enabled ? `${{gate.releaseMs || 0}}ms` : 'off';
       document.getElementById('controller-keys').textContent = keyboard.enabled ? `${{noteName(keyboardBaseNote)}} + ${{noteCount}}` : 'disabled';
-      midiLed.classList.toggle('active', activeNotes.size > 0 || liveMidiEventCount > 0 || (state.status === 'running' && Boolean(midi.input)));
+      midiLed.classList.toggle('active', activeNotes.size > 0 || (lastMidiEventAt > 0 && performance.now() - lastMidiEventAt < 420));
     }}
     function setNote(note, on) {{
       if (on) activeNotes.add(note);
       else activeNotes.delete(note);
+      lastMidiEventAt = performance.now();
       renderPiano();
       updateMidiReadouts();
     }}
@@ -1127,6 +1212,7 @@ def stage_html(manifest: JsonMap) -> str:
       prompt: seedPrompt.text,
     }} : show.scenes[0];
     const visibleScenes = sequenceScenes ? show.scenes : [instrumentScene].filter(Boolean);
+    const scenePromptTextNodes = [];
     const sceneNodes = visibleScenes.map((scene, index) => {{
       const el = document.createElement('div');
       el.className = 'scene';
@@ -1138,6 +1224,7 @@ def stage_html(manifest: JsonMap) -> str:
       prompt.textContent = scene.prompt;
       el.append(title, meta, prompt);
       scenesEl.appendChild(el);
+      scenePromptTextNodes.push(prompt);
       return el;
     }});
     if (!sequenceScenes) {{
@@ -1182,19 +1269,57 @@ def stage_html(manifest: JsonMap) -> str:
     updateMidiReadouts();
     function applyLiveState(live) {{
       const liveMidi = live?.midi || {{}};
+      const liveControl = live?.control || {{}};
       const notes = Array.isArray(liveMidi.activeNotes) ? liveMidi.activeNotes.filter(note => Number.isFinite(note)) : [];
       const eventCount = Number.isFinite(liveMidi.eventCount) ? liveMidi.eventCount : 0;
       const lastEvent = liveMidi.lastEvent || null;
-      const signature = `${{eventCount}}:${{notes.join(',')}}:${{lastEvent?.type || ''}}:${{lastEvent?.note ?? ''}}:${{lastEvent?.cc ?? ''}}:${{lastEvent?.value ?? ''}}`;
+      const controlCount = Number.isFinite(liveControl.eventCount) ? liveControl.eventCount : 0;
+      const signature = `${{eventCount}}:${{notes.join(',')}}:${{lastEvent?.type || ''}}:${{lastEvent?.note ?? ''}}:${{lastEvent?.cc ?? ''}}:${{lastEvent?.value ?? ''}}:${{controlCount}}:${{liveControl.lastPrompt || ''}}`;
       if (signature === liveSignature) return;
       liveSignature = signature;
+      if (eventCount !== liveMidiEventCount) {{
+        lastMidiEventAt = performance.now();
+      }}
       activeNotes.clear();
       notes.forEach(note => activeNotes.add(note));
       liveMidiEventCount = eventCount;
       liveLastEvent = lastEvent;
+      if (controlCount !== liveControlEventCount && liveControl.lastPrompt) {{
+        liveControlEventCount = controlCount;
+        applyPromptControl(String(liveControl.lastPrompt), false);
+      }}
       renderPiano();
       updateMidiReadouts();
     }}
+    function applyPromptControl(prompt, markSent = true) {{
+      livePromptText = prompt;
+      if (!sequenceScenes && scenePromptTextNodes[0]) {{
+        scenePromptTextNodes[0].textContent = prompt;
+      }}
+      if (markSent) {{
+        promptStatus.textContent = 'sent';
+      }}
+    }}
+    promptForm.addEventListener('submit', async event => {{
+      event.preventDefault();
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+      promptStatus.textContent = 'sending';
+      try {{
+        const response = await fetch('/control/prompt', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ prompt }}),
+        }});
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {{
+          throw new Error(payload.error || 'prompt failed');
+        }}
+        applyPromptControl(payload.prompt || prompt);
+      }} catch (error) {{
+        promptStatus.textContent = error instanceof Error ? error.message : 'prompt failed';
+      }}
+    }});
     async function pollLiveState() {{
       try {{
         const response = await fetch(`live.json?ts=${{Date.now()}}`, {{ cache: 'no-store' }});
@@ -1212,6 +1337,8 @@ def stage_html(manifest: JsonMap) -> str:
     }}
     if (keyboard.enabled) {{
       window.addEventListener('keydown', event => {{
+        const target = event.target;
+        if (target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)) return;
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         const semi = keyToSemitone[event.key.toLowerCase()];
         if (semi === undefined || event.repeat) return;
@@ -1283,10 +1410,13 @@ def stage_html(manifest: JsonMap) -> str:
         const active = prompt.id === scene.promptId || prompt.text === scene.prompt;
         el.classList.toggle('current', active);
       }});
-      document.getElementById('prompt-line').textContent = `${{scene.role || 'scene'}} · ${{scene.prompt}}`;
-      const noteBoost = Math.min(0.22, activeNotes.size * 0.055);
-      const energy = 0.48 + noteBoost + Math.sin(t / 210) * 0.22 + Math.sin(t / 89) * 0.08;
-      meter.style.width = `${{Math.max(0, Math.min(1, energy)) * 100}}%`;
+      const displayPrompt = livePromptText || scene.prompt;
+      document.getElementById('prompt-line').textContent = `${{scene.role || 'scene'}} · ${{displayPrompt}}`;
+      const eventDecay = lastMidiEventAt > 0 ? Math.max(0, 1 - ((performance.now() - lastMidiEventAt) / 520)) : 0;
+      const midiLevel = Math.max(Math.min(1, activeNotes.size / 4), activeNotes.size ? 0.35 : eventDecay * 0.28);
+      const energy = 0.42 + midiLevel * 0.5;
+      meter.style.width = `${{Math.max(0, Math.min(1, midiLevel)) * 100}}%`;
+      updateMidiReadouts();
       const heart = show.heart || {{x: 0.5, y: 0.5, color: '#ff2fb3'}};
       const hx = heart.x * w + Math.sin(t / 1800) * w * 0.08;
       const hy = heart.y * h + Math.cos(t / 2200) * h * 0.06;
@@ -1395,11 +1525,50 @@ def write_stage_assets(manifest: JsonMap) -> JsonMap:
     }
 
 
-def create_stage_server(manifest: JsonMap, host: str, port: int) -> tuple[StageServer, str]:
+class StageRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def do_POST(self) -> None:
+        if self.path.split("?", 1)[0] != "/control/prompt":
+            self.send_json({"ok": False, "error": "not found"}, status=404)
+            return
+        bridge = cast(StageServer, self.server).control_bridge
+        if not isinstance(bridge, StageControlBridge):
+            self.send_json({"ok": False, "error": "stage control is not attached to a live run"}, status=409)
+            return
+        raw_length = self.headers.get("Content-Length") or "0"
+        try:
+            length = int(raw_length)
+        except ValueError:
+            self.send_json({"ok": False, "error": "invalid content length"}, status=400)
+            return
+        if length > 4096:
+            self.send_json({"ok": False, "error": "prompt request too large"}, status=413)
+            return
+        try:
+            payload = as_map(json.loads(self.rfile.read(length).decode("utf-8")), "prompt request")
+            control = bridge.submit_prompt(payload.get("prompt"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.send_json({"ok": False, "error": "invalid JSON"}, status=400)
+            return
+        except PluginError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, status=400)
+            return
+        self.send_json({"ok": True, "prompt": control.get("lastPrompt"), "control": control})
+
+    def send_json(self, payload: JsonMap, *, status: int = 200) -> None:
+        encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+
+def create_stage_server(manifest: JsonMap, host: str, port: int, control_bridge: StageControlBridge | None = None) -> tuple[StageServer, str]:
     local = as_map(manifest["local"], "local")
     stage_dir = pathlib.Path(string_field(local, "stageDirectory", "local"))
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(stage_dir))
+    handler = functools.partial(StageRequestHandler, directory=str(stage_dir))
     server = StageServer((host, port), handler)
+    server.control_bridge = control_bridge
     bound_address = cast(tuple[object, ...], server.server_address)
     raw_host = bound_address[0] if bound_address else host
     raw_port = bound_address[1] if len(bound_address) > 1 else port
@@ -1415,7 +1584,7 @@ def create_stage_server(manifest: JsonMap, host: str, port: int) -> tuple[StageS
     return server, f"http://{bound_host}:{bound_port}/"
 
 
-def send_scene_commands(stdin: IO[str], manifest: JsonMap) -> None:
+def send_scene_commands(control: StageControlBridge, manifest: JsonMap) -> None:
     performance = as_map(manifest["performance"], "performance")
     if not bool_value(performance.get("sequenceScenes"), False):
         return
@@ -1428,7 +1597,7 @@ def send_scene_commands(stdin: IO[str], manifest: JsonMap) -> None:
     for scene in scenes[1:]:
         time.sleep(max(0.0, float_value(previous.get("durationSeconds"), 0.1)))
         prompt = string_field(scene, "prompt", "scene")
-        stdin.write(f"prompt {runtime_scene_prompt(scene)}\n")
+        control.send_line(f"prompt {runtime_scene_prompt(scene)}")
         for key, command_name in (
             ("temperature", "temp"),
             ("topK", "topk"),
@@ -1438,16 +1607,14 @@ def send_scene_commands(stdin: IO[str], manifest: JsonMap) -> None:
             ("unmaskWidth", "unmask"),
         ):
             if key in scene:
-                stdin.write(f"{command_name} {realtime_value(scene[key])}\n")
+                control.send_line(f"{command_name} {realtime_value(scene[key])}")
         if "drumless" in scene:
-            stdin.write("drumless on\n" if bool_value(scene["drumless"], False) else "drumless off\n")
-        stdin.flush()
+            control.send_line("drumless on" if bool_value(scene["drumless"], False) else "drumless off")
         if bool_value(scene.get("resetAfterPrompt"), bool_value(strategy.get("resetAfterPrompt"), False)):
             debounce_seconds = max(0.0, float_value(scene.get("promptDebounceMs"), float_value(strategy.get("promptDebounceMs"), 400.0)) / 1000.0)
             if debounce_seconds > 0:
                 time.sleep(debounce_seconds)
-            stdin.write("reset\n")
-            stdin.flush()
+            control.send_line("reset")
         append_event(manifest, {
             "type": "scene",
             "sceneId": scene.get("id"),
@@ -1491,10 +1658,13 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
     stage_thread: threading.Thread | None = None
     process: subprocess.Popen[str] | None = None
     bridge: LiveMidiBridge | None = None
+    control = StageControlBridge(manifest)
+    control_thread: threading.Thread | None = None
+    scene_thread: threading.Thread | None = None
     try:
         if stage_port > 0:
             stage_host = optional_string(stage, "host") or "127.0.0.1"
-            stage_server, stage_url = create_stage_server(manifest, stage_host, stage_port)
+            stage_server, stage_url = create_stage_server(manifest, stage_host, stage_port, control)
             stage["url"] = stage_url
             append_event(manifest, {"type": "stage-started", "url": stage_url})
             update_manifest(manifest_path, manifest)
@@ -1518,11 +1688,24 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
         reader = threading.Thread(target=stream_child_output, args=(process, bridge), daemon=True)
         reader.start()
         if process.stdin is not None:
-            with contextlib.suppress(BrokenPipeError):
-                send_scene_commands(process.stdin, manifest)
-            with contextlib.suppress(BrokenPipeError):
-                process.stdin.close()
+            control.attach_stdin(process.stdin)
+            control_thread = threading.Thread(target=control.run, daemon=True)
+            control_thread.start()
+            if stage_port > 0:
+                scene_thread = threading.Thread(target=send_scene_commands, args=(control, manifest), daemon=True)
+                scene_thread.start()
+            else:
+                send_scene_commands(control, manifest)
+                control.stop()
+                control_thread.join(timeout=2)
+                with contextlib.suppress(BrokenPipeError, OSError):
+                    process.stdin.close()
         returncode = process.wait()
+        control.stop()
+        if scene_thread is not None:
+            scene_thread.join(timeout=1)
+        if control_thread is not None:
+            control_thread.join(timeout=2)
         reader.join(timeout=1)
         if returncode != 0:
             raise PluginError(f"mere.run music realtime failed with exit {returncode}", 1)
@@ -1569,6 +1752,9 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
         write_stage_assets(manifest)
         raise PluginError(str(exc), 1) from None
     finally:
+        control.stop()
+        if control_thread is not None:
+            control_thread.join(timeout=1)
         if stage_server is not None:
             if stage_thread is not None:
                 stage_server.shutdown()

@@ -5,7 +5,10 @@ import os
 import pathlib
 import socket
 import tempfile
+import threading
 import unittest
+import urllib.error
+import urllib.request
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest import mock
@@ -91,6 +94,8 @@ class MerePerformTests(unittest.TestCase):
             self.assertEqual(payload["status"], "planned")
             self.assertEqual(payload["plugin"]["name"], "mere-perform")
             self.assertEqual(payload["runtime"]["backend"], "mere.run/music-realtime")
+            self.assertEqual(payload["performance"]["show"]["model"], "music-magenta-rt2-base")
+            self.assertIn("music-magenta-rt2-base", payload["command"])
             self.assertIn("--interactive", payload["command"])
             self.assertIn("--no-play", payload["command"])
             self.assertIn("--midi-note-offset", payload["command"])
@@ -174,6 +179,10 @@ class MerePerformTests(unittest.TestCase):
             self.assertIn("live.json", html)
             self.assertIn("pollLiveState", html)
             self.assertIn("waiting midi", html)
+            self.assertIn("prompt-form", html)
+            self.assertIn("/control/prompt", html)
+            self.assertIn("lastMidiEventAt", html)
+            self.assertIn("midiLevel", html)
             self.assertIn("prompt-section", html)
             live_path = (root / "out" / "stage" / "live.json").resolve()
             self.assertTrue(live_path.is_file())
@@ -184,9 +193,145 @@ class MerePerformTests(unittest.TestCase):
             live = json.loads(live_path.read_text())
             self.assertEqual(live["midi"]["activeNotes"], [])
             self.assertEqual(live["midi"]["eventCount"], 0)
+            self.assertEqual(live["control"], {})
             args = cli.build_parser().parse_args(["stage", str(root / "out" / "run.json"), "--serve", "--open"])
             self.assertTrue(args.open)
             self.assertEqual(state["show"]["midi"]["activity"]["demoNotes"], [48, 52, 55])
+
+    def test_stage_control_bridge_sends_prompt_to_interactive_stdin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            show = self.write_show(root)
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "control-heart",
+                    "--mere-run-command",
+                    "fake-mere-run",
+                    "--stage-port",
+                    "9999",
+                ]), 0)
+            manifest = json.loads(stdout.getvalue())
+            stdin = StringIO()
+            control = cli.StageControlBridge(manifest)
+            control.attach_stdin(stdin)
+            worker = threading.Thread(target=control.run)
+            worker.start()
+            result = control.submit_prompt("granular piano over tape hiss")
+            control.stop()
+            worker.join(timeout=2)
+            self.assertEqual(result["lastPrompt"], "granular piano over tape hiss")
+            self.assertEqual(stdin.getvalue(), "prompt granular piano over tape hiss\n")
+            live = json.loads((root / "out" / "stage" / "live.json").read_text())
+            self.assertEqual(live["control"]["lastPrompt"], "granular piano over tape hiss")
+            events = (root / "out" / "events.jsonl").read_text()
+            self.assertIn('"type": "web-prompt"', events)
+
+    def test_stage_server_control_endpoint_accepts_prompt_posts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            show = self.write_show(root)
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "endpoint-heart",
+                    "--mere-run-command",
+                    "fake-mere-run",
+                    "--stage-port",
+                    "9999",
+                ]), 0)
+            manifest = json.loads(stdout.getvalue())
+            stdin = StringIO()
+            control = cli.StageControlBridge(manifest)
+            control.attach_stdin(stdin)
+            worker = threading.Thread(target=control.run)
+            worker.start()
+            server, url = cli.create_stage_server(manifest, "127.0.0.1", 0, control)
+            server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+            server_thread.start()
+            try:
+                with redirect_stderr(StringIO()):
+                    request = urllib.request.Request(
+                        f"{url}control/prompt",
+                        data=json.dumps({"prompt": "warm brass swells"}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(request, timeout=5) as response:
+                        payload = json.loads(response.read().decode("utf-8"))
+                    self.assertTrue(payload["ok"])
+                    self.assertEqual(payload["prompt"], "warm brass swells")
+                    self.assertEqual(payload["control"]["lastPrompt"], "warm brass swells")
+                    empty = urllib.request.Request(
+                        f"{url}control/prompt",
+                        data=json.dumps({"prompt": "   "}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        urllib.request.urlopen(empty, timeout=5)
+                    self.assertEqual(denied.exception.code, 400)
+            finally:
+                server.shutdown()
+                server_thread.join(timeout=2)
+                server.server_close()
+                control.stop()
+                worker.join(timeout=2)
+            self.assertEqual(stdin.getvalue(), "prompt warm brass swells\n")
+            live = json.loads((root / "out" / "stage" / "live.json").read_text())
+            self.assertEqual(live["control"]["lastPrompt"], "warm brass swells")
+
+    def test_stage_serve_without_live_run_rejects_prompt_posts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            show = self.write_show(root)
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                self.assertEqual(cli.main([
+                    "plan",
+                    "--show",
+                    str(show),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--run-id",
+                    "static-heart",
+                    "--mere-run-command",
+                    "fake-mere-run",
+                ]), 0)
+            manifest = json.loads(stdout.getvalue())
+            server, url = cli.create_stage_server(manifest, "127.0.0.1", 0)
+            server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+            server_thread.start()
+            try:
+                with redirect_stderr(StringIO()):
+                    request = urllib.request.Request(
+                        f"{url}control/prompt",
+                        data=json.dumps({"prompt": "warm brass swells"}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        urllib.request.urlopen(request, timeout=5)
+                    self.assertEqual(denied.exception.code, 409)
+                    payload = json.loads(denied.exception.read().decode("utf-8"))
+                    self.assertFalse(payload["ok"])
+                    self.assertIn("not attached", payload["error"])
+            finally:
+                server.shutdown()
+                server_thread.join(timeout=2)
+                server.server_close()
 
     def test_live_midi_bridge_tracks_mere_run_note_logs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -227,7 +372,7 @@ class MerePerformTests(unittest.TestCase):
                 "args = sys.argv[1:]\n"
                 "if '--output' in args:\n"
                 "    pathlib.Path(args[args.index('--output') + 1]).write_bytes(b'fake wav')\n"
-                "pathlib.Path('stdin.txt').write_text(sys.stdin.read())\n"
+                "pathlib.Path('stdin.txt').write_text('')\n"
                 "print('MIDI note-on ch=4 note=60 velocity=127')\n"
                 "print('MIDI note-on ch=4 note=64 velocity=127')\n"
                 "print('MIDI note-off ch=4 note=60')\n"
