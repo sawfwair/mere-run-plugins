@@ -188,7 +188,8 @@ the MIDI controller drives the performance; timed prompt changes require
 `--sequence-scenes`. Its stage UI also renders a Jam-inspired MIDI controller
 surface with source/gate readouts and an interactive piano strip. Physical MIDI
 ingestion stays in native `mere.run`; the live stage mirrors observed
-`mere.run` note logs through a local `stage/live.json` feed.
+`mere.run` note logs through a local `stage/live.json` feed and can send typed
+prompts back into the running `mere.run --interactive` process.
 
 Install the plugin with `pipx`:
 

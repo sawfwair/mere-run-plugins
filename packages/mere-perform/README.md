@@ -42,6 +42,12 @@ Use `--stage-port` with `--open-stage` on `perform`, or on `plan` before
 Use `stage --serve --open` only to inspect an exported run after the realtime
 process has finished.
 
+When the stage is attached to a live `perform` or `run`, the prompt field sends
+typed text to the child process as `prompt <text>` over the same
+`mere.run --interactive` stdin channel used by sequenced scene changes. The
+local `stage/live.json` feed records the last web prompt so the stage reflects
+what was actually sent.
+
 Default mode is instrument mode: the initial prompt stays put and the MIDI
 controller drives the model. When a MIDI input is configured, instrument mode
 starts from the first `mode: "solo"` prompt so Magenta RT2 gets a note-following
@@ -98,7 +104,9 @@ The plugin passes physical MIDI through to native `mere.run` with
 - MIDI source, channel, note offset, and gate readouts
 - on-screen piano strip with active-note highlighting from observed
   `mere.run` note logs
+- MIDI activity meter and LED that stay idle until note events are observed
 - computer-keyboard preview with local active-note highlighting
+- live prompt input for sending `prompt <text>` to `mere.run --interactive`
 - optional sequence pads when `--sequence-scenes` is enabled
 - local `stage/live.json` feed for physical controllers such as OP-1 Bluetooth
 
