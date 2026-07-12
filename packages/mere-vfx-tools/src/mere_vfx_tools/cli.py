@@ -26,6 +26,42 @@ JsonList = list[object]
 PLUGIN_NAME = "mere-vfx-tools"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+MOGE_MODEL_ID = "vision-geometry-moge2-small"
+MOGE_REPOSITORY = "Ruicheng/moge-2-vits-normal-onnx"
+MOGE_REVISION = "e50ffda41565591092adea54c6ac83d6212e1e23"
+MOGE_WEIGHTS_SHA256 = "24eacb5dc7a2c54c7bc98f7de085ffbed79ad006ea5b664c2c2cdc02ff3a52f0"
+VDA_MODEL_PINS: dict[str, tuple[str, str, str, frozenset[str]]] = {
+    "vision-depth-vda-small": (
+        "depth-anything/Video-Depth-Anything-Small",
+        "256875362cff76724b920335dfb4b29dd611f66e",
+        "affine-relative",
+        frozenset({
+            "13379300b739e659f076a59d52e9801bd8d38c541a7e71f73bbca4dcfb013609",
+            "85c583474dcafda4d417776431343afcdfdfc97952d8ec00029d3452c55a05a2",
+        }),
+    ),
+    "vision-depth-vda-small-metric": (
+        "depth-anything/Metric-Video-Depth-Anything-Small",
+        "273d090f2ce17df50c2872d82c8322c45da5b4dd",
+        "metric-meters",
+        frozenset({
+            "3c28432b4e1f0d7bb31cad5151b6313b49457db5aa58d82e85bfb0f8b1311b33",
+            "0acf1e186750abddf5ae867a3a659ed67cd0c041e4e524e698a0dcb40195c779",
+        }),
+    ),
+}
+INSTANTMESH_MODEL_ID = "image-3d-instantmesh-base"
+INSTANTMESH_REPOSITORY = "TencentARC/InstantMesh"
+INSTANTMESH_REVISION = "b785b4ecfb6636ef34a08c748f96f6a5686244d0"
+INSTANTMESH_SOURCE_REVISION = "08822c52fdc399b93ea00e4fa9e596344ed52ccc"
+INSTANTMESH_LICENSE = "Apache-2.0 reconstruction weights; view generation excluded"
+INSTANTMESH_WEIGHTS_BYTE_COUNT = 1_253_463_832
+INSTANTMESH_WEIGHTS_SHA256 = "2380601d17f6a817de0bf5328188ccea397af9d75c07b4b3cc476322dcca76af"
+INSTANTMESH_SOURCE_SHA256 = "22701cd25201d624ebb1568b93cf91b43a2c32006835c08fe73e1f3c9f6c44b5"
+INSTANTMESH_CONFIGURATION_SHA256 = "33f89581172ab2d46759a1632b6e57ca9f9f1c6c23567468157cb4b48a3bc781"
+INSTANTMESH_SOURCE_MANIFEST_SHA256 = "74787d99b53952df12722323521b16056bb91d7ed708cb757b7efff519ee39fa"
+INSTANTMESH_EXTRACTION_ALGORITHM = "native-marching-tetrahedra"
+INSTANTMESH_TOPOLOGY_COMPATIBILITY = "learned-field-parity-no-topology-parity-with-upstream-flexicubes"
 
 
 class PluginError(RuntimeError):
@@ -40,6 +76,15 @@ class ToolSpec:
     title: str
     description: str
     capabilities: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NativeRun:
+    payload: JsonMap
+    manifest_path: pathlib.Path
+    manifest: JsonMap
+    artifacts_by_kind: dict[str, list[pathlib.Path]]
+    artifact_records: list[JsonMap]
 
 
 TOOLS: dict[str, ToolSpec] = {
@@ -84,20 +129,47 @@ TOOLS: dict[str, ToolSpec] = {
     "depth-normal": ToolSpec(
         "depth-normal",
         "Depth and Normal Passes",
-        "Generate non-metric depth proxies and deterministic image-space normal maps.",
-        ("depth-pass", "normal-pass", "image-generation", "blender", "nuke"),
+        "Generate native metric depth, normal, camera, and point-cloud passes.",
+        ("depth-pass", "normal-pass", "camera", "point-cloud", "blender", "nuke"),
     ),
     "relight": ToolSpec(
         "relight",
         "Relight and Shadow Catcher",
-        "Relight frames from image-space normals and project matte-based shadow layers.",
+        "Relight frames from supplied or native geometry normals and project matte-based shadow layers.",
         ("relighting", "shadow-catcher", "normal-pass", "alpha-matte"),
+    ),
+    "video-depth": ToolSpec(
+        "video-depth",
+        "Video Depth",
+        "Generate temporally consistent native video-depth sequences and review media.",
+        ("video-depth", "depth-pass", "depth-sequence", "nuke", "blender"),
+    ),
+    "multiview-geometry": ToolSpec(
+        "multiview-geometry",
+        "Multi-view Geometry",
+        "Solve ordered views into native relative cameras and colored point-cloud handoffs.",
+        ("multi-view", "relative-depth", "camera", "point-cloud", "glb", "3dgs-initialization"),
     ),
     "image-to-3d": ToolSpec(
         "image-to-3d",
-        "Image/Video to 3D",
-        "Project depth passes into camera-space PLY point clouds and OBJ surface meshes.",
-        ("image-to-3d", "video-to-3d", "point-cloud", "mesh", "blender"),
+        "Image to Native 3D",
+        "Reconstruct one image into verified native TripoSR OBJ, PLY, and GLB meshes.",
+        ("image-to-3d", "triposr", "obj", "ply", "glb", "mesh", "blender"),
+    ),
+    "multiview-image-to-3d": ToolSpec(
+        "multiview-image-to-3d",
+        "Multi-view Image to Native 3D",
+        "Reconstruct exactly 4 or 6 ordered user views into verified native InstantMesh meshes.",
+        (
+            "multiview-image-to-3d",
+            "instantmesh",
+            "multi-view",
+            "obj",
+            "ply",
+            "glb",
+            "mesh",
+            "blender",
+        ),
     ),
 }
 
@@ -333,6 +405,222 @@ def run_process(argv: list[str], label: str) -> None:
         raise PluginError(f"{label} failed with exit {return_code}")
 
 
+def run_json_process(argv: list[str], label: str) -> JsonMap:
+    if not command_available(argv):
+        raise PluginError(f"{label} command not found: {argv[0]}", 3)
+    eprint("$ " + shlex.join(argv))
+    process = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    if process.stderr:
+        for line in process.stderr.splitlines():
+            eprint(line)
+    if process.returncode != 0:
+        if process.stdout:
+            for line in process.stdout.splitlines():
+                eprint(line)
+        raise PluginError(f"{label} failed with exit {process.returncode}")
+    try:
+        payload = json.loads(process.stdout)
+    except json.JSONDecodeError as exc:
+        raise PluginError(f"{label} did not return valid JSON: {exc}") from None
+    return as_map(payload, f"{label} result")
+
+
+def read_json_map(path: pathlib.Path, context: str) -> JsonMap:
+    try:
+        return as_map(json.loads(path.read_text()), context)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PluginError(f"could not read {context} {path}: {exc}") from None
+
+
+def confined_path(root: pathlib.Path, value: str, context: str) -> pathlib.Path:
+    root = root.resolve()
+    candidate = pathlib.Path(value)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    candidate = candidate.resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        raise PluginError(f"{context} escapes native output directory: {candidate}") from None
+    if not candidate.is_file():
+        raise PluginError(f"{context} does not exist: {candidate}")
+    return candidate
+
+
+def normalized_sha256(value: str) -> str:
+    return value if value.startswith("sha256:") else "sha256:" + value
+
+
+def validate_native_input_identity(
+    document: JsonMap,
+    source: pathlib.Path,
+    label: str,
+) -> JsonMap:
+    if document.get("schemaVersion") != 2:
+        raise PluginError(f"{label} manifest schemaVersion must be 2")
+    source = source.resolve()
+    input_path = document.get("inputPath")
+    if not isinstance(input_path, str) or pathlib.Path(input_path).resolve() != source:
+        raise PluginError(f"{label} manifest inputPath does not match the requested source")
+    byte_count = document.get("inputByteCount")
+    if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count != source.stat().st_size:
+        raise PluginError(f"{label} manifest inputByteCount does not match the requested source")
+    input_sha = validated_sha256(document.get("inputSHA256"), f"{label} manifest inputSHA256")
+    if normalized_sha256(input_sha) != sha256(source):
+        raise PluginError(f"{label} manifest inputSHA256 does not match the requested source")
+    return {
+        "path": str(source),
+        "byteCount": byte_count,
+        "sha256": normalized_sha256(input_sha),
+    }
+
+
+def validate_native_model_identity(
+    value: object,
+    *,
+    label: str,
+    model_id: str,
+    repository: str,
+    revision: str,
+    license_name: str,
+    allowed_weight_hashes: frozenset[str],
+) -> JsonMap:
+    model = as_map(value, f"{label} model")
+    expected = {
+        "modelID": model_id,
+        "upstreamRepository": repository,
+        "upstreamRevision": revision,
+        "license": license_name,
+        "inferenceBackend": "mere.run-native-mlx",
+    }
+    for key, expected_value in expected.items():
+        if model.get(key) != expected_value:
+            raise PluginError(f"{label} model {key} does not match the pinned native contract")
+    weights_sha = validated_sha256(model.get("weightsSHA256"), f"{label} model weightsSHA256")
+    if weights_sha.removeprefix("sha256:") not in allowed_weight_hashes:
+        raise PluginError(f"{label} model weightsSHA256 is not an accepted pinned runtime digest")
+    return model
+
+
+def load_native_run(
+    payload: JsonMap,
+    output_directory: pathlib.Path,
+    label: str,
+    artifact_items: JsonList | None = None,
+) -> NativeRun:
+    if payload.get("status") != "completed":
+        raise PluginError(f"{label} did not report completed status")
+    manifest_value = payload.get("manifestPath")
+    if not isinstance(manifest_value, str) or not manifest_value:
+        raise PluginError(f"{label} result is missing manifestPath")
+    manifest_path = confined_path(output_directory, manifest_value, f"{label} manifest")
+    manifest = read_json_map(manifest_path, f"{label} manifest")
+    manifest_sha = sha256(manifest_path)
+    expected_manifest_sha = payload.get("manifestSHA256")
+    if expected_manifest_sha is not None:
+        if not isinstance(expected_manifest_sha, str):
+            raise PluginError(f"{label} result manifestSHA256 must be a string")
+        if normalized_sha256(expected_manifest_sha) != manifest_sha:
+            raise PluginError(f"{label} manifest checksum mismatch: {manifest_path}")
+    if artifact_items is None:
+        artifact_items = as_list(manifest.get("artifacts", []), f"{label} manifest artifacts")
+    artifacts_by_kind: dict[str, list[pathlib.Path]] = {}
+    records: list[JsonMap] = []
+    for index, value in enumerate(artifact_items):
+        item = as_map(value, f"{label} artifact {index}")
+        kind = item.get("kind")
+        relative_path = item.get("relativePath")
+        if not isinstance(kind, str) or not kind:
+            raise PluginError(f"{label} artifact {index} is missing kind")
+        if not isinstance(relative_path, str) or not relative_path:
+            raise PluginError(f"{label} artifact {index} is missing relativePath")
+        path = confined_path(output_directory, relative_path, f"{label} artifact {kind}")
+        actual_sha = sha256(path)
+        expected_sha = item.get("sha256")
+        if not isinstance(expected_sha, str) or not expected_sha:
+            raise PluginError(f"{label} artifact {index} is missing sha256")
+        if normalized_sha256(expected_sha) != actual_sha:
+            raise PluginError(f"{label} artifact checksum mismatch: {path}")
+        byte_count = item.get("byteCount")
+        if byte_count is not None:
+            if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count < 0:
+                raise PluginError(f"{label} artifact {index} has invalid byteCount")
+            if path.stat().st_size != byte_count:
+                raise PluginError(f"{label} artifact byte count mismatch: {path}")
+        record: JsonMap = {
+            "kind": kind,
+            "path": str(path),
+            "relativePath": str(path.relative_to(output_directory.resolve())),
+            "sha256": actual_sha,
+        }
+        media_type = item.get("mediaType")
+        if isinstance(media_type, str):
+            record["mediaType"] = media_type
+        if isinstance(byte_count, int):
+            record["byteCount"] = byte_count
+        view_index = item.get("viewIndex")
+        if isinstance(view_index, int):
+            record["viewIndex"] = view_index
+        artifacts_by_kind.setdefault(kind, []).append(path)
+        records.append(record)
+    return NativeRun(payload, manifest_path, manifest, artifacts_by_kind, records)
+
+
+def one_native_artifact(run: NativeRun, kind: str, label: str) -> pathlib.Path:
+    paths = run.artifacts_by_kind.get(kind, [])
+    if len(paths) != 1:
+        raise PluginError(f"{label} expected exactly one {kind} artifact, found {len(paths)}")
+    return paths[0]
+
+
+def geometry_model_option(options: JsonMap) -> str:
+    return option_string(options, "geometryModel")
+
+
+def run_native_geometry(
+    manifest: JsonMap,
+    source_path: pathlib.Path,
+    output_directory: pathlib.Path,
+    options: JsonMap,
+) -> NativeRun:
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "vision", "geometry", str(source_path),
+        "--output", str(output_directory),
+        "--resolution-level", str(option_int(options, "resolutionLevel", 9)),
+        "--json",
+    ]
+    model = geometry_model_option(options)
+    if model:
+        argv.extend(["--model", model])
+    if isinstance(options.get("tokenCount"), (int, float)):
+        argv.extend(["--token-count", str(option_int(options, "tokenCount", 0))])
+    if isinstance(options.get("maxPoints"), (int, float)):
+        argv.extend(["--max-points", str(option_int(options, "maxPoints", 0))])
+    payload = run_json_process(argv, "mere.run vision geometry")
+    run = load_native_run(payload, output_directory, "mere.run vision geometry")
+    input_identity = validate_native_input_identity(run.manifest, source_path, "native geometry")
+    if run.manifest.get("outputDirectory") != str(output_directory.resolve()):
+        raise PluginError("native geometry manifest outputDirectory is not confined to the native run")
+    model_identity = validate_native_model_identity(
+        run.manifest.get("model"),
+        label="native geometry",
+        model_id=MOGE_MODEL_ID,
+        repository=MOGE_REPOSITORY,
+        revision=MOGE_REVISION,
+        license_name="MIT",
+        allowed_weight_hashes=frozenset({MOGE_WEIGHTS_SHA256}),
+    )
+    if payload.get("modelID") != MOGE_MODEL_ID:
+        raise PluginError("native geometry result modelID does not match the pinned manifest")
+    if run.manifest.get("units") != "meters":
+        raise PluginError("native geometry did not report metric meter depth")
+    for kind in ("depth-exr", "depth-preview", "normal-exr", "normal-preview", "camera", "point-cloud"):
+        one_native_artifact(run, kind, "native geometry")
+    run.manifest["validatedInput"] = input_identity
+    run.manifest["validatedModel"] = model_identity
+    return run
+
+
 def refine_mask(image: Image.Image, grow: int, choke: int, feather: float) -> Image.Image:
     matte = ImageOps.grayscale(image.convert("RGB")) if image.mode not in {"L", "LA", "RGBA"} else image.getchannel("A") if image.mode in {"LA", "RGBA"} else image
     matte = matte.convert("L")
@@ -351,6 +639,24 @@ def image_files(path: pathlib.Path) -> list[pathlib.Path]:
     if path.is_dir():
         return sorted(item for item in path.rglob("*") if item.is_file() and item.suffix.lower() in IMAGE_EXTENSIONS)
     raise PluginError(f"no supported image input at {path}", 2)
+
+
+def ordered_image_inputs(request: JsonMap, key: str = "images") -> list[pathlib.Path]:
+    inputs = as_map(request["inputs"], "request.inputs")
+    value = inputs.get(key)
+    if isinstance(value, str):
+        return image_files(input_path(request, key))
+    if not isinstance(value, list) or not value:
+        raise PluginError(f"request.inputs.{key} must be a local image path or ordered path array", 2)
+    paths: list[pathlib.Path] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item:
+            raise PluginError(f"request.inputs.{key}[{index}] must be a local image path", 2)
+        path = pathlib.Path(item).expanduser().resolve()
+        if not path.is_file() or path.suffix.lower() not in IMAGE_EXTENSIONS:
+            raise PluginError(f"request image does not exist or is unsupported: {path}", 2)
+        paths.append(path)
+    return paths
 
 
 def options_for(manifest: JsonMap) -> JsonMap:
@@ -1184,74 +1490,123 @@ def execute_depth_normal(manifest: JsonMap, output_dir: pathlib.Path) -> None:
         provided_depth = image_files(input_path(request, "depthImages"))
         if len(provided_depth) not in {1, len(source_files)}:
             raise PluginError("depth-normal requires one shared depth image or one per source image", 2)
-    raw_dir = output_dir / "depth-candidates"
-    depth_dir = output_dir / "depth"
-    normal_dir = output_dir / "normals"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    depth_dir.mkdir(parents=True, exist_ok=True)
-    normal_dir.mkdir(parents=True, exist_ok=True)
+    elif inputs.get("depthImages") is not None:
+        raise PluginError("request.inputs.depthImages must be a local image or directory path", 2)
     deliveries: list[JsonMap] = []
-    for index, source_path in enumerate(source_files):
-        source = Image.open(source_path).convert("RGB")
-        raw_depth = raw_dir / f"frame_{index + 1:06d}.png"
-        if provided_depth:
+    if provided_depth:
+        raw_dir = output_dir / "provided-depth"
+        depth_dir = output_dir / "depth"
+        normal_dir = output_dir / "normals"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        depth_dir.mkdir(parents=True, exist_ok=True)
+        normal_dir.mkdir(parents=True, exist_ok=True)
+        for index, source_path in enumerate(source_files):
+            source = Image.open(source_path).convert("RGB")
+            raw_depth = raw_dir / f"frame_{index + 1:06d}.png"
             provided = provided_depth[0] if len(provided_depth) == 1 else provided_depth[index]
             shutil.copy2(provided, raw_depth)
-        else:
-            argv = runtime_command(manifest, "mereRunCommand") + [
-                "image", "generate",
-                "--model", option_string(options, "model", "image-klein-nano"),
-                "--ref-image", str(source_path),
-                "--strength", str(option_float(options, "strength", 0.25)),
-                "--prompt", option_string(
-                    options,
-                    "prompt",
-                    "grayscale monocular depth map of the exact source composition, white is nearest, black is farthest, no color, no text",
-                ),
-                "--seed", str(option_int(options, "seed", 737373) + index),
-                "--steps", str(option_int(options, "steps", 4)),
-                "--width", str(source.width),
-                "--height", str(source.height),
-                "--output", str(raw_depth),
-            ]
-            run_process(argv, "mere.run image generate")
-        depth = ImageOps.grayscale(Image.open(raw_depth)).resize(source.size, Image.Resampling.LANCZOS)
-        if option_bool(options, "autocontrast", True):
-            depth = ImageOps.autocontrast(depth)
-        if option_bool(options, "invertDepth", False):
-            depth = ImageOps.invert(depth)
-        depth_path = depth_dir / f"frame_{index + 1:06d}.png"
-        normal_path = normal_dir / f"frame_{index + 1:06d}.png"
-        depth.save(depth_path)
-        normal_map_from_depth(depth, option_float(options, "normalStrength", 2.0)).save(normal_path)
-        deliveries.append({
-            "frameIndex": index,
-            "source": str(source_path),
-            "depth": str(depth_path),
-            "depthSha256": sha256(depth_path),
-            "normal": str(normal_path),
-            "normalSha256": sha256(normal_path),
-        })
+            depth = ImageOps.grayscale(Image.open(raw_depth)).resize(source.size, Image.Resampling.LANCZOS)
+            if option_bool(options, "autocontrast", True):
+                depth = ImageOps.autocontrast(depth)
+            if option_bool(options, "invertDepth", False):
+                depth = ImageOps.invert(depth)
+            depth_path = depth_dir / f"frame_{index + 1:06d}.png"
+            normal_path = normal_dir / f"frame_{index + 1:06d}.png"
+            depth.save(depth_path)
+            normal_map_from_depth(depth, option_float(options, "normalStrength", 2.0)).save(normal_path)
+            deliveries.append({
+                "frameIndex": index,
+                "source": str(source_path),
+                "depth": str(depth_path),
+                "depthSha256": sha256(depth_path),
+                "normalPreview": str(normal_path),
+                "normalPreviewSha256": sha256(normal_path),
+                "camera": None,
+                "pointCloud": None,
+            })
+        artifact(manifest, raw_dir, "directory", "provided-depth-source")
+        artifact(manifest, depth_dir, "directory", "normalized-provided-depth")
+        artifact(manifest, normal_dir, "directory", "image-space-derived-normals")
+    else:
+        native_root = output_dir / "native-geometry"
+        for index, source_path in enumerate(source_files):
+            native_output = native_root / f"frame_{index + 1:06d}"
+            run = run_native_geometry(manifest, source_path, native_output, options)
+            depth_path = one_native_artifact(run, "depth-exr", "native geometry")
+            depth_preview = one_native_artifact(run, "depth-preview", "native geometry")
+            normal_path = one_native_artifact(run, "normal-exr", "native geometry")
+            normal_preview = one_native_artifact(run, "normal-preview", "native geometry")
+            camera_path = one_native_artifact(run, "camera", "native geometry")
+            point_cloud_path = one_native_artifact(run, "point-cloud", "native geometry")
+            deliveries.append({
+                "frameIndex": index,
+                "source": str(source_path),
+                "depth": str(depth_path),
+                "depthSha256": sha256(depth_path),
+                "depthPreview": str(depth_preview),
+                "depthPreviewSha256": sha256(depth_preview),
+                "normal": str(normal_path),
+                "normalSha256": sha256(normal_path),
+                "normalPreview": str(normal_preview),
+                "normalPreviewSha256": sha256(normal_preview),
+                "camera": str(camera_path),
+                "cameraSha256": sha256(camera_path),
+                "pointCloud": str(point_cloud_path),
+                "pointCloudSha256": sha256(point_cloud_path),
+                "geometryManifest": str(run.manifest_path),
+                "geometryManifestSha256": sha256(run.manifest_path),
+                "input": run.manifest.get("validatedInput"),
+                "model": run.manifest.get("validatedModel"),
+                "units": run.manifest.get("units"),
+                "coordinateSystem": run.manifest.get("coordinateSystem"),
+                "nativeArtifacts": run.artifact_records,
+            })
+            artifact(manifest, run.manifest_path, "json", f"native-geometry-manifest-{index + 1}")
+            for kind in ("depth-exr", "depth-preview", "normal-exr", "normal-preview", "camera", "point-cloud"):
+                path = one_native_artifact(run, kind, "native geometry")
+                artifact(manifest, path, "file", f"native-{kind}-{index + 1}")
+        artifact(manifest, native_root, "directory", "native-geometry-runs")
     delivery = output_dir / "depth-normal.json"
     write_json(delivery, {
-        "schemaVersion": "mere.run/vfx-depth-normal.v1",
-        "depthSource": "provided" if provided_depth else "generative proxy",
-        "metricDepth": False,
-        "depthConvention": "white-near-black-far" if not option_bool(options, "invertDepth", False) else "black-near-white-far",
-        "normalSpace": "image-space-derived",
+        "schemaVersion": "mere.run/vfx-depth-normal.v2",
+        "depthSource": "provided grayscale fallback" if provided_depth else "mere.run vision geometry",
+        "metricDepth": not provided_depth,
+        "depthUnits": "normalized-display-values" if provided_depth else "meters",
+        "depthConvention": (
+            "white-near-black-far" if provided_depth and not option_bool(options, "invertDepth", False)
+            else "black-near-white-far" if provided_depth
+            else "positive-camera-space-z"
+        ),
+        "normalSource": "depth-gradient fallback" if provided_depth else "native geometry normal output",
+        "normalSpace": "image-space-derived" if provided_depth else "native camera coordinate system; see each frame",
+        "cameraSource": None if provided_depth else "native model-inferred camera metadata",
         "frames": deliveries,
     })
-    artifact(manifest, raw_dir, "directory", "depth-candidates")
-    artifact(manifest, depth_dir, "directory", "depth-passes")
-    artifact(manifest, normal_dir, "directory", "normal-passes")
     artifact(manifest, delivery, "json", "depth-normal-manifest")
 
 
 def execute_relight(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
     options = options_for(manifest)
     source_files = image_files(input_path(request, "images"))
-    normal_files = image_files(input_path(request, "normalMaps"))
+    normal_files: list[pathlib.Path] = []
+    native_geometry_runs: list[NativeRun] = []
+    if isinstance(inputs.get("normalMaps"), str):
+        normal_files = image_files(input_path(request, "normalMaps"))
+    elif inputs.get("normalMaps") is not None:
+        raise PluginError("request.inputs.normalMaps must be a local image or directory path", 2)
+    else:
+        native_root = output_dir / "native-geometry"
+        for index, source_path in enumerate(source_files):
+            run = run_native_geometry(
+                manifest,
+                source_path,
+                native_root / f"frame_{index + 1:06d}",
+                options,
+            )
+            native_geometry_runs.append(run)
+            normal_files.append(one_native_artifact(run, "normal-preview", "native geometry"))
     mask_files = image_files(input_path(request, "masks"))
     if len(normal_files) not in {1, len(source_files)}:
         raise PluginError("relight requires one shared normal map or one per source image", 2)
@@ -1329,17 +1684,39 @@ def execute_relight(manifest: JsonMap, output_dir: pathlib.Path) -> None:
         shadow_preview.convert("RGB").save(shadow_preview_path)
         deliveries.append({
             "frameIndex": index,
+            "source": str(source_path),
+            "normal": str(normal_path),
+            "normalSha256": sha256(normal_path),
             "relit": str(relit_path),
             "relitSha256": sha256(relit_path),
             "shadowCatcher": str(shadow_path),
             "shadowCatcherSha256": sha256(shadow_path),
             "shadowPreview": str(shadow_preview_path),
             "shadowPreviewSha256": sha256(shadow_preview_path),
+            "geometryManifest": (
+                str(native_geometry_runs[index].manifest_path) if native_geometry_runs else None
+            ),
+            "geometryManifestSha256": (
+                sha256(native_geometry_runs[index].manifest_path) if native_geometry_runs else None
+            ),
         })
     delivery = output_dir / "relight.json"
     write_json(delivery, {
-        "schemaVersion": "mere.run/vfx-relight.v1",
+        "schemaVersion": "mere.run/vfx-relight.v2",
         "relightingMode": "image-space-normal-diffuse",
+        "normalSource": "mere.run vision geometry" if native_geometry_runs else "provided normal maps",
+        "nativeGeometry": [
+            {
+                "manifest": str(run.manifest_path),
+                "manifestSha256": sha256(run.manifest_path),
+                "input": run.manifest.get("validatedInput"),
+                "model": run.manifest.get("validatedModel"),
+                "units": run.manifest.get("units"),
+                "coordinateSystem": run.manifest.get("coordinateSystem"),
+                "artifacts": run.artifact_records,
+            }
+            for run in native_geometry_runs
+        ],
         "shadowMode": "projected-matte-proxy",
         "lightDirection": [light_x, light_y, light_z],
         "lightColor": list(light_color),
@@ -1350,10 +1727,606 @@ def execute_relight(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     artifact(manifest, relit_dir, "directory", "relit-sequence")
     artifact(manifest, shadow_dir, "directory", "shadow-catcher-sequence")
     artifact(manifest, shadow_preview_dir, "directory", "shadow-catcher-review")
+    if native_geometry_runs:
+        native_root = output_dir / "native-geometry"
+        artifact(manifest, native_root, "directory", "native-geometry-runs")
+        for index, run in enumerate(native_geometry_runs):
+            artifact(manifest, run.manifest_path, "json", f"native-geometry-manifest-{index + 1}")
+            artifact(
+                manifest,
+                one_native_artifact(run, "normal-preview", "native geometry"),
+                "image",
+                f"native-normal-preview-{index + 1}",
+            )
     artifact(manifest, delivery, "json", "relight-manifest")
 
 
-def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+def execute_video_depth(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    options = options_for(manifest)
+    video_path = input_path(request, "video")
+    native_output = output_dir / "native-video-depth"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "vision", "depth-video", str(video_path),
+        "--output", str(native_output),
+        "--input-size", str(option_int(options, "inputSize", 518)),
+        "--json",
+    ]
+    model = option_string(options, "model")
+    if model:
+        argv.extend(["--model", model])
+    if isinstance(options.get("maxFrames"), (int, float)):
+        argv.extend(["--max-frames", str(option_int(options, "maxFrames", 0))])
+    payload = run_json_process(argv, "mere.run vision depth-video")
+    initial = load_native_run(payload, native_output, "mere.run vision depth-video")
+    native_frames = as_list(initial.manifest.get("frames", []), "native video-depth frames")
+    frame_artifacts: JsonList = []
+    for index, value in enumerate(native_frames):
+        frame = as_map(value, f"native video-depth frame {index}")
+        frame_artifacts.extend(as_list(frame.get("artifacts", []), f"native video-depth frame {index} artifacts"))
+    run = load_native_run(
+        payload,
+        native_output,
+        "mere.run vision depth-video",
+        artifact_items=frame_artifacts,
+    )
+    frame_count = payload.get("frameCount")
+    if not isinstance(frame_count, int) or frame_count != len(native_frames):
+        raise PluginError("native video-depth frame count does not match its manifest")
+    if len(run.artifacts_by_kind.get("depth-exr", [])) != frame_count:
+        raise PluginError("native video-depth did not emit one depth EXR per frame")
+    if len(run.artifacts_by_kind.get("depth-preview", [])) != frame_count:
+        raise PluginError("native video-depth did not emit one depth preview per frame")
+    semantics = run.manifest.get("semantics")
+    if semantics not in {"affine-relative", "metric-meters"}:
+        raise PluginError(f"native video-depth reported unsupported semantics: {semantics}")
+    if payload.get("semantics") != semantics:
+        raise PluginError("native video-depth result and manifest semantics disagree")
+    input_identity = validate_native_input_identity(
+        run.manifest,
+        video_path,
+        "native video-depth",
+    )
+    if run.manifest.get("outputDirectory") != str(native_output.resolve()):
+        raise PluginError("native video-depth manifest outputDirectory is not confined to the native run")
+    model_id = payload.get("modelID")
+    if not isinstance(model_id, str) or model_id not in VDA_MODEL_PINS:
+        raise PluginError("native video-depth returned an unsupported modelID")
+    repository, revision, expected_semantics, allowed_hashes = VDA_MODEL_PINS[model_id]
+    if semantics != expected_semantics:
+        raise PluginError("native video-depth modelID and depth semantics disagree")
+    model_identity = validate_native_model_identity(
+        run.manifest.get("model"),
+        label="native video-depth",
+        model_id=model_id,
+        repository=repository,
+        revision=revision,
+        license_name="Apache-2.0",
+        allowed_weight_hashes=allowed_hashes,
+    )
+    checkpoint_sha = validated_sha256(
+        payload.get("checkpointSHA256"),
+        "native video-depth result checkpointSHA256",
+    )
+    if checkpoint_sha != validated_sha256(
+        model_identity.get("weightsSHA256"),
+        "native video-depth model weightsSHA256",
+    ):
+        raise PluginError("native video-depth result and manifest runtime weights disagree")
+    review_value = payload.get("reviewVideo")
+    review = as_map(review_value, "native video-depth reviewVideo")
+    review_relative = review.get("relativePath")
+    if not isinstance(review_relative, str) or not review_relative:
+        raise PluginError("native video-depth result is missing reviewVideo.relativePath")
+    review_path = confined_path(native_output, review_relative, "native video-depth review")
+    expected_review_sha = review.get("sha256")
+    if isinstance(expected_review_sha, str) and normalized_sha256(expected_review_sha) != sha256(review_path):
+        raise PluginError("native video-depth review checksum mismatch")
+    delivery = output_dir / "video-depth.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-video-depth.v1",
+        "source": str(video_path),
+        "input": input_identity,
+        "nativeManifest": str(run.manifest_path),
+        "nativeManifestSha256": sha256(run.manifest_path),
+        "nativeOutputDirectory": str(native_output.resolve()),
+        "reviewVideo": str(review_path),
+        "reviewVideoSha256": sha256(review_path),
+        "modelID": payload.get("modelID"),
+        "model": model_identity,
+        "checkpointSHA256": checkpoint_sha,
+        "depthSemantics": semantics,
+        "metricDepth": semantics == "metric-meters",
+        "width": payload.get("width"),
+        "height": payload.get("height"),
+        "fps": payload.get("fps"),
+        "frameCount": frame_count,
+        "temporalWindowLength": payload.get("temporalWindowLength"),
+        "temporalOverlap": payload.get("temporalOverlap"),
+        "streamsFinalizedFrames": payload.get("streamsFinalizedFrames"),
+        "hasConfidence": payload.get("hasConfidence"),
+        "hasCameraIntrinsics": payload.get("hasCameraIntrinsics"),
+        "hasPointCloud": payload.get("hasPointCloud"),
+        "nativeArtifacts": run.artifact_records,
+    })
+    artifact(manifest, native_output, "directory", "native-video-depth-sequence")
+    artifact(manifest, run.manifest_path, "json", "native-video-depth-manifest")
+    artifact(manifest, review_path, "video", "native-video-depth-review")
+    artifact(manifest, delivery, "json", "video-depth-handoff")
+
+
+def execute_multiview_geometry(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
+    options = options_for(manifest)
+    images = ordered_image_inputs(request)
+    process_resolution = option_int(options, "processResolution", 504)
+    reference_view = option_string(options, "referenceView", "saddle-balanced")
+    confidence_percentile = option_float(options, "confidencePercentile", 40.0)
+    maximum_point_count = option_int(options, "maxPoints", 1_000_000)
+    native_output = output_dir / "native-multiview-geometry"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "vision", "geometry-multiview", *[str(path) for path in images],
+        "--output", str(native_output),
+        "--process-resolution", str(process_resolution),
+        "--reference-view", reference_view,
+        "--confidence-percentile", str(confidence_percentile),
+        "--max-points", str(maximum_point_count),
+        "--json",
+    ]
+    model = option_string(options, "model")
+    if model:
+        argv.extend(["--model", model])
+    camera_path: pathlib.Path | None = None
+    camera_value = inputs.get("cameras")
+    if isinstance(camera_value, str):
+        camera_path = input_path(request, "cameras")
+        argv.extend(["--cameras", str(camera_path)])
+    elif camera_value is not None:
+        raise PluginError("request.inputs.cameras must be a local camera JSON path", 2)
+    payload = run_json_process(argv, "mere.run vision geometry-multiview")
+    run = load_native_run(payload, native_output, "mere.run vision geometry-multiview")
+    if validated_sha256(
+        payload.get("manifestSHA256"), "native multi-view geometry result manifestSHA256"
+    ) != sha256(run.manifest_path):
+        raise PluginError("native multi-view geometry manifest checksum mismatch")
+    if run.manifest.get("schemaVersion") != 2:
+        raise PluginError("native multi-view geometry manifest schemaVersion must be 2")
+    reported_output = run.manifest.get("outputDirectory")
+    if not isinstance(reported_output, str) or pathlib.Path(reported_output).resolve() != native_output.resolve():
+        raise PluginError("native multi-view geometry manifest outputDirectory is not confined to the native run")
+    if payload.get("depthUnits") != "relative" or run.manifest.get("units") != "relative":
+        raise PluginError("native multi-view geometry did not report relative depth units")
+    if payload.get("pointCloudRepresentation") != "colored-points-not-mesh":
+        raise PluginError("native multi-view geometry reported an unexpected point representation")
+    if payload.get("containsGaussianParameters") is not False:
+        raise PluginError("native multi-view geometry must explicitly report no Gaussian parameters")
+    if (camera_path is not None) != (payload.get("poseConditioned") is True):
+        raise PluginError("native multi-view pose-conditioning status does not match the camera request")
+    if payload.get("viewCount") != len(images):
+        raise PluginError("native multi-view geometry result has the wrong view count")
+    if payload.get("referenceViewStrategy") != reference_view:
+        raise PluginError("native multi-view geometry result changed the requested reference view strategy")
+
+    manifest_process_resolution = run.manifest.get("processResolution")
+    if (
+        isinstance(manifest_process_resolution, bool)
+        or not isinstance(manifest_process_resolution, int)
+        or manifest_process_resolution != process_resolution
+    ):
+        raise PluginError("native multi-view geometry manifest changed the requested processResolution")
+    if run.manifest.get("referenceViewStrategy") != reference_view:
+        raise PluginError("native multi-view geometry manifest changed the requested referenceViewStrategy")
+    manifest_confidence_percentile = run.manifest.get("confidencePercentile")
+    if (
+        isinstance(manifest_confidence_percentile, bool)
+        or not isinstance(manifest_confidence_percentile, (int, float))
+        or not math.isfinite(float(manifest_confidence_percentile))
+        or float(manifest_confidence_percentile) != confidence_percentile
+    ):
+        raise PluginError("native multi-view geometry manifest changed the requested confidencePercentile")
+    manifest_maximum_point_count = run.manifest.get("maximumPointCount")
+    if (
+        isinstance(manifest_maximum_point_count, bool)
+        or not isinstance(manifest_maximum_point_count, int)
+        or manifest_maximum_point_count != maximum_point_count
+    ):
+        raise PluginError("native multi-view geometry manifest changed the requested maximumPointCount")
+
+    checkpoint = validated_multiview_geometry_checkpoint(run, payload)
+    native_views = as_list(run.manifest.get("views"), "native multi-view geometry views")
+    if len(native_views) != len(images):
+        raise PluginError("native multi-view geometry manifest has the wrong ordered view count")
+    ordered_view_provenance: list[JsonMap] = []
+    for index, source in enumerate(images):
+        view = as_map(native_views[index], f"native multi-view geometry view {index}")
+        if (
+            isinstance(view.get("index"), bool)
+            or view.get("index") != index
+            or view.get("sourcePath") != str(source)
+        ):
+            raise PluginError("native multi-view geometry changed the requested view order or source path")
+        source_byte_count = view.get("sourceByteCount")
+        if (
+            isinstance(source_byte_count, bool)
+            or not isinstance(source_byte_count, int)
+            or source_byte_count != source.stat().st_size
+        ):
+            raise PluginError(f"native multi-view geometry source byte count mismatch for view {index}")
+        source_sha256 = validated_sha256(
+            view.get("sourceSHA256"),
+            f"native multi-view geometry view {index} sourceSHA256",
+        )
+        if source_sha256 != sha256(source):
+            raise PluginError(f"native multi-view geometry source checksum mismatch for view {index}")
+        ordered_view_provenance.append({
+            "index": index,
+            "sourcePath": str(source),
+            "sourceByteCount": source_byte_count,
+            "sourceSHA256": source_sha256,
+        })
+    handoff = as_map(run.manifest.get("threeDGaussianHandoff"), "native 3DGS handoff")
+    if handoff.get("containsGaussianParameters") is not False:
+        raise PluginError("native multi-view manifest must explicitly report no Gaussian parameters")
+    required = {
+        "point-cloud-ply": one_native_artifact(run, "point-cloud-ply", "native multi-view geometry"),
+        "point-cloud-glb": one_native_artifact(run, "point-cloud-glb", "native multi-view geometry"),
+        "cameras-json": one_native_artifact(run, "cameras-json", "native multi-view geometry"),
+        "3dgs-transforms-json": one_native_artifact(run, "3dgs-transforms-json", "native multi-view geometry"),
+    }
+    delivery = output_dir / "multiview-geometry.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-multiview-geometry.v1",
+        "orderedViews": [str(path) for path in images],
+        "orderedViewProvenance": ordered_view_provenance,
+        "checkpoint": checkpoint,
+        "processResolution": process_resolution,
+        "referenceViewStrategy": reference_view,
+        "confidencePercentile": confidence_percentile,
+        "maximumPointCount": maximum_point_count,
+        "nativeManifest": str(run.manifest_path),
+        "nativeManifestSha256": sha256(run.manifest_path),
+        "nativeOutputDirectory": str(native_output.resolve()),
+        "geometryMode": "native-multiview-relative-reconstruction",
+        "metricGeometry": False,
+        "depthUnits": "relative",
+        "coordinateSystem": run.manifest.get("coordinateSystem"),
+        "cameraSemantics": payload.get("cameraSemantics"),
+        "cameraScaleAlignment": payload.get("cameraScaleAlignment"),
+        "poseConditioned": payload.get("poseConditioned"),
+        "suppliedCameraDocument": str(camera_path) if camera_path else None,
+        "pointCount": payload.get("pointCount"),
+        "pointCloudRepresentation": "colored-points-not-mesh",
+        "meshProduced": False,
+        "pointCloudPLY": str(required["point-cloud-ply"]),
+        "pointCloudGLB": str(required["point-cloud-glb"]),
+        "cameras": str(required["cameras-json"]),
+        "transforms": str(required["3dgs-transforms-json"]),
+        "threeDGaussianHandoff": handoff,
+        "containsGaussianParameters": False,
+        "nativeArtifacts": run.artifact_records,
+    })
+    artifact(manifest, native_output, "directory", "native-multiview-geometry")
+    artifact(manifest, run.manifest_path, "json", "native-multiview-geometry-manifest")
+    for kind, path in required.items():
+        artifact(manifest, path, "file", f"native-{kind}")
+    artifact(manifest, delivery, "json", "multiview-geometry-handoff")
+
+
+def validated_sha256(value: object, context: str) -> str:
+    if not isinstance(value, str):
+        raise PluginError(f"{context} must be a SHA-256 string")
+    normalized = normalized_sha256(value.lower())
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", normalized) is None:
+        raise PluginError(f"{context} must contain exactly 64 hexadecimal digits")
+    return normalized
+
+
+def validated_multiview_geometry_checkpoint(run: NativeRun, payload: JsonMap) -> JsonMap:
+    checkpoint = as_map(run.manifest.get("checkpoint"), "native multi-view geometry checkpoint")
+    model_id = checkpoint.get("modelID")
+    if not isinstance(model_id, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", model_id) is None:
+        raise PluginError("native multi-view geometry checkpoint has an invalid modelID")
+    if payload.get("modelID") != model_id:
+        raise PluginError("native multi-view geometry result and checkpoint modelID disagree")
+    for key in ("repository", "sourceRepository"):
+        value = checkpoint.get(key)
+        if not isinstance(value, str) or re.fullmatch(r"[^/\s]+/[^/\s]+", value) is None:
+            raise PluginError(f"native multi-view geometry checkpoint has an invalid {key}")
+    for key in ("revision", "sourceRevision"):
+        value = checkpoint.get(key)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{40}", value) is None:
+            raise PluginError(f"native multi-view geometry checkpoint has an invalid {key}")
+    for key in ("weightsByteCount", "configurationByteCount"):
+        value = checkpoint.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise PluginError(f"native multi-view geometry checkpoint has an invalid {key}")
+    weights_sha256 = validated_sha256(
+        checkpoint.get("weightsSHA256"),
+        "native multi-view geometry checkpoint weightsSHA256",
+    )
+    validated_sha256(
+        checkpoint.get("configurationSHA256"),
+        "native multi-view geometry checkpoint configurationSHA256",
+    )
+    if validated_sha256(
+        payload.get("checkpointSHA256"),
+        "native multi-view geometry result checkpointSHA256",
+    ) != weights_sha256:
+        raise PluginError("native multi-view geometry result and checkpoint weightsSHA256 disagree")
+    if checkpoint.get("inferenceBackend") != "mere.run-native-mlx":
+        raise PluginError("native multi-view geometry checkpoint must report mere.run-native-mlx inference")
+    return checkpoint
+
+
+def native_artifact_contract(items: JsonList, context: str) -> dict[tuple[str, str], tuple[str, int, str]]:
+    contract: dict[tuple[str, str], tuple[str, int, str]] = {}
+    for index, value in enumerate(items):
+        item = as_map(value, f"{context} artifact {index}")
+        kind = item.get("kind")
+        relative_path = item.get("relativePath")
+        media_type = item.get("mediaType")
+        byte_count = item.get("byteCount")
+        if not isinstance(kind, str) or not kind:
+            raise PluginError(f"{context} artifact {index} is missing kind")
+        if not isinstance(relative_path, str) or not relative_path:
+            raise PluginError(f"{context} artifact {index} is missing relativePath")
+        if not isinstance(media_type, str) or not media_type:
+            raise PluginError(f"{context} artifact {index} is missing mediaType")
+        if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count < 1:
+            raise PluginError(f"{context} artifact {index} has invalid byteCount")
+        key = (kind, relative_path)
+        if key in contract:
+            raise PluginError(f"{context} contains duplicate artifact {kind}: {relative_path}")
+        contract[key] = (
+            validated_sha256(item.get("sha256"), f"{context} artifact {index} sha256"),
+            byte_count,
+            media_type,
+        )
+    return contract
+
+
+def single_image_to_3d_source(request: JsonMap) -> pathlib.Path:
+    inputs = as_map(request["inputs"], "request.inputs")
+    if inputs.get("image") is not None and inputs.get("images") is not None:
+        raise PluginError("image-to-3d accepts request.inputs.image or request.inputs.images, not both", 2)
+    key = "image" if inputs.get("image") is not None else "images"
+    if inputs.get(key) is None:
+        raise PluginError("native image-to-3d requires one image in request.inputs.image or request.inputs.images", 2)
+    value = inputs.get(key)
+    if isinstance(value, list):
+        paths = ordered_image_inputs(request, key)
+    elif isinstance(value, str):
+        paths = image_files(input_path(request, key))
+    else:
+        raise PluginError(f"request.inputs.{key} must be one local image path", 2)
+    if len(paths) != 1:
+        raise PluginError(
+            "native TripoSR image-to-3d requires exactly one image; use multiview-geometry for ordered views",
+            2,
+        )
+    return paths[0].resolve()
+
+
+def execute_native_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
+    options = options_for(manifest)
+    if inputs.get("depthImages") is not None:
+        raise PluginError(
+            "supplied depth is the legacy 2.5D fallback; set request.options.reconstructionMode "
+            "to 'supplied-depth-2.5d' to use it explicitly",
+            2,
+        )
+    if inputs.get("video") is not None or inputs.get("frames") is not None:
+        raise PluginError(
+            "native TripoSR reconstructs one image; use reconstructionMode 'supplied-depth-2.5d' "
+            "for the legacy frame projection fallback",
+            2,
+        )
+    source = single_image_to_3d_source(request)
+    resolution = option_int(options, "resolution", 256)
+    density_threshold = option_float(options, "densityThreshold", 25.0)
+    foreground_ratio = option_float(options, "foregroundRatio", 0.85)
+    if not 2 <= resolution <= 512:
+        raise PluginError("request.options.resolution must be between 2 and 512", 2)
+    if not math.isfinite(density_threshold):
+        raise PluginError("request.options.densityThreshold must be finite", 2)
+    if not math.isfinite(foreground_ratio) or not 0 < foreground_ratio <= 1:
+        raise PluginError("request.options.foregroundRatio must be greater than 0 and at most 1", 2)
+
+    already_framed = option_bool(options, "alreadyFramed", False)
+    no_vertex_colors = option_bool(options, "noVertexColors", False)
+    native_output = output_dir / "native-triposr"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "image", "reconstruct-3d", str(source),
+        "--output", str(native_output),
+        "--resolution", str(resolution),
+        "--density-threshold", str(density_threshold),
+        "--foreground-ratio", str(foreground_ratio),
+    ]
+    model = option_string(options, "model")
+    if model:
+        argv.extend(["--model", model])
+    if already_framed:
+        argv.append("--already-framed")
+    if no_vertex_colors:
+        argv.append("--no-vertex-colors")
+    argv.append("--json")
+
+    payload = run_json_process(argv, "mere.run image reconstruct-3d")
+    run = load_native_run(payload, native_output, "mere.run image reconstruct-3d")
+    if validated_sha256(payload.get("manifestSHA256"), "native TripoSR result manifestSHA256") != sha256(
+        run.manifest_path
+    ):
+        raise PluginError("native TripoSR manifest checksum mismatch")
+    if run.manifest.get("schemaVersion") != 1:
+        raise PluginError("native TripoSR run manifest has an unsupported schemaVersion")
+    reported_output = run.manifest.get("outputDirectory")
+    if not isinstance(reported_output, str) or pathlib.Path(reported_output).resolve() != native_output.resolve():
+        raise PluginError("native TripoSR manifest outputDirectory does not match the confined output directory")
+
+    checkpoint = as_map(run.manifest.get("checkpoint"), "native TripoSR checkpoint")
+    if checkpoint.get("modelID") != "image-3d-triposr":
+        raise PluginError("native reconstruction did not report the audited image-3d-triposr model")
+    if checkpoint.get("repository") != "stabilityai/TripoSR" or checkpoint.get("sourceRepository") != "VAST-AI-Research/TripoSR":
+        raise PluginError("native reconstruction manifest has unexpected TripoSR provenance")
+    if checkpoint.get("license") != "MIT":
+        raise PluginError("native TripoSR checkpoint did not report its MIT license")
+    for field in ("revision", "sourceRevision", "format"):
+        if not isinstance(checkpoint.get(field), str) or not checkpoint.get(field):
+            raise PluginError(f"native TripoSR checkpoint is missing {field}")
+    weights_byte_count = checkpoint.get("weightsByteCount")
+    if isinstance(weights_byte_count, bool) or not isinstance(weights_byte_count, int) or weights_byte_count < 1:
+        raise PluginError("native TripoSR checkpoint has invalid weightsByteCount")
+    checkpoint_sha = validated_sha256(checkpoint.get("weightsSHA256"), "native TripoSR checkpoint weightsSHA256")
+    source_checkpoint_sha = validated_sha256(
+        checkpoint.get("sourceSHA256"), "native TripoSR checkpoint sourceSHA256"
+    )
+    validated_sha256(checkpoint.get("configurationSHA256"), "native TripoSR checkpoint configurationSHA256")
+    if payload.get("modelID") != checkpoint.get("modelID"):
+        raise PluginError("native TripoSR result and manifest modelID disagree")
+    if validated_sha256(payload.get("checkpointSHA256"), "native TripoSR result checkpointSHA256") != checkpoint_sha:
+        raise PluginError("native TripoSR result and manifest checkpoint checksum disagree")
+    if validated_sha256(
+        payload.get("sourceCheckpointSHA256"), "native TripoSR result sourceCheckpointSHA256"
+    ) != source_checkpoint_sha:
+        raise PluginError("native TripoSR result and manifest source checkpoint checksum disagree")
+
+    native_input = as_map(run.manifest.get("input"), "native TripoSR input")
+    if native_input.get("path") != str(source):
+        raise PluginError("native TripoSR manifest input path does not match the requested image")
+    expected_policy = "already-framed" if already_framed else "automatic-transparent-alpha"
+    if native_input.get("foregroundPolicy") != expected_policy:
+        raise PluginError("native TripoSR foreground policy does not match the request")
+    if payload.get("foregroundPolicy") != native_input.get("foregroundPolicy") or payload.get(
+        "foregroundRatio"
+    ) != native_input.get("foregroundRatio"):
+        raise PluginError("native TripoSR result and manifest foreground preprocessing disagree")
+
+    extraction = as_map(run.manifest.get("extraction"), "native TripoSR extraction")
+    if extraction.get("resolution") != resolution:
+        raise PluginError("native TripoSR extraction resolution does not match the request")
+    if extraction.get("includesVertexColors") != (not no_vertex_colors):
+        raise PluginError("native TripoSR vertex-color status does not match the request")
+    if extraction.get("algorithm") != "native-marching-tetrahedra":
+        raise PluginError("native TripoSR manifest reported an unexpected mesh extraction algorithm")
+    if extraction.get("topologyCompatibility") != "same-sampled-isosurface-not-byte-topology-parity-with-torchmcubes":
+        raise PluginError("native TripoSR manifest is missing the topology compatibility boundary")
+    for payload_key, manifest_key in (
+        ("extractionResolution", "resolution"),
+        ("densityThreshold", "densityThreshold"),
+        ("includesVertexColors", "includesVertexColors"),
+        ("meshExtractionAlgorithm", "algorithm"),
+    ):
+        if payload.get(payload_key) != extraction.get(manifest_key):
+            raise PluginError(f"native TripoSR result and manifest disagree on {payload_key}")
+
+    mesh = as_map(run.manifest.get("mesh"), "native TripoSR mesh")
+    if mesh.get("coordinateSystem") != "model-x-right-y-up-z-forward":
+        raise PluginError("native TripoSR mesh reported an unexpected coordinate system")
+    if mesh.get("units") != "normalized-object-space":
+        raise PluginError("native TripoSR mesh must report normalized object-space units")
+    if mesh.get("inferredUnseenGeometry") is not True:
+        raise PluginError("native TripoSR mesh must disclose inferred unseen geometry")
+    for count_key in ("vertexCount", "triangleCount"):
+        count = mesh.get(count_key)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise PluginError(f"native TripoSR mesh has invalid {count_key}")
+    for key in ("coordinateSystem", "units", "inferredUnseenGeometry", "vertexCount", "triangleCount", "bounds"):
+        if payload.get(key) != mesh.get(key):
+            raise PluginError(f"native TripoSR result and manifest disagree on {key}")
+
+    required = {
+        "obj": one_native_artifact(run, "obj", "native TripoSR"),
+        "ply": one_native_artifact(run, "ply", "native TripoSR"),
+        "glb": one_native_artifact(run, "glb", "native TripoSR"),
+        "mesh-manifest": one_native_artifact(run, "mesh-manifest", "native TripoSR"),
+    }
+    manifest_artifacts = as_list(run.manifest.get("artifacts"), "native TripoSR manifest artifacts")
+    payload_artifacts = as_list(payload.get("artifacts"), "native TripoSR result artifacts")
+    if native_artifact_contract(manifest_artifacts, "native TripoSR manifest") != native_artifact_contract(
+        payload_artifacts, "native TripoSR result"
+    ):
+        raise PluginError("native TripoSR result and manifest artifact contracts disagree")
+
+    mesh_manifest_value = payload.get("meshManifestPath")
+    if not isinstance(mesh_manifest_value, str) or not mesh_manifest_value:
+        raise PluginError("native TripoSR result is missing meshManifestPath")
+    mesh_manifest_path = confined_path(native_output, mesh_manifest_value, "native TripoSR mesh manifest")
+    if mesh_manifest_path != required["mesh-manifest"]:
+        raise PluginError("native TripoSR result points to a different mesh manifest artifact")
+    expected_mesh_manifest_sha = validated_sha256(
+        payload.get("meshManifestSHA256"), "native TripoSR result meshManifestSHA256"
+    )
+    if expected_mesh_manifest_sha != sha256(mesh_manifest_path):
+        raise PluginError("native TripoSR mesh manifest checksum mismatch")
+    mesh_document = read_json_map(mesh_manifest_path, "native TripoSR mesh manifest")
+    if mesh_document.get("schemaVersion") != 1:
+        raise PluginError("native TripoSR mesh manifest has an unsupported schemaVersion")
+    if mesh_document.get("outputDirectory") != str(native_output.resolve()):
+        raise PluginError("native TripoSR mesh manifest outputDirectory is not confined to the native run")
+    if mesh_document.get("inputPaths") != [str(source)]:
+        raise PluginError("native TripoSR mesh manifest input path does not match the requested image")
+    for key in ("coordinateSystem", "units", "inferredUnseenGeometry", "vertexCount", "triangleCount", "bounds"):
+        if mesh_document.get(key) != mesh.get(key):
+            raise PluginError(f"native TripoSR run and mesh manifests disagree on {key}")
+    mesh_model = as_map(mesh_document.get("model"), "native TripoSR mesh model")
+    if mesh_model.get("modelID") != "image-3d-triposr" or mesh_model.get("inferenceBackend") != "mere.run-native-mlx":
+        raise PluginError("native TripoSR mesh manifest does not identify the native MLX backend")
+    if (
+        mesh_model.get("upstreamRepository") != checkpoint.get("repository")
+        or mesh_model.get("upstreamRevision") != checkpoint.get("revision")
+        or mesh_model.get("license") != checkpoint.get("license")
+    ):
+        raise PluginError("native TripoSR run and mesh manifests disagree on model provenance")
+    mesh_artifacts = native_artifact_contract(
+        as_list(mesh_document.get("artifacts"), "native TripoSR mesh artifacts"),
+        "native TripoSR mesh manifest",
+    )
+    run_mesh_artifacts = {
+        key: value
+        for key, value in native_artifact_contract(manifest_artifacts, "native TripoSR run manifest").items()
+        if key[0] in {"obj", "ply", "glb"}
+    }
+    if mesh_artifacts != run_mesh_artifacts:
+        raise PluginError("native TripoSR run and mesh manifest artifact contracts disagree")
+
+    delivery = output_dir / "image-to-3d.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-image-to-3d.v2",
+        "source": str(source),
+        "reconstructionMode": "native-triposr",
+        "geometryMode": "native-single-image-object-reconstruction",
+        "nativeInference": True,
+        "modelID": checkpoint.get("modelID"),
+        "checkpoint": checkpoint,
+        "nativeManifest": str(run.manifest_path),
+        "nativeManifestSha256": sha256(run.manifest_path),
+        "meshManifest": str(mesh_manifest_path),
+        "meshManifestSha256": sha256(mesh_manifest_path),
+        "nativeOutputDirectory": str(native_output.resolve()),
+        "coordinateSystem": mesh.get("coordinateSystem"),
+        "units": mesh.get("units"),
+        "metricGeometry": False,
+        "inferredUnseenGeometry": True,
+        "extraction": extraction,
+        "mesh": mesh,
+        "assets": {
+            kind: {"path": str(path), "sha256": sha256(path)}
+            for kind, path in required.items() if kind != "mesh-manifest"
+        },
+        "nativeArtifacts": run.artifact_records,
+    })
+    artifact(manifest, native_output, "directory", "native-triposr-reconstruction")
+    artifact(manifest, run.manifest_path, "json", "native-triposr-run-manifest")
+    artifact(manifest, mesh_manifest_path, "json", "native-triposr-mesh-manifest")
+    for kind in ("obj", "ply", "glb"):
+        artifact(manifest, required[kind], "mesh", f"native-triposr-{kind}")
+    artifact(manifest, delivery, "json", "image-to-3d-handoff")
+
+
+def execute_supplied_depth_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     request = as_map(manifest["request"], "request")
     inputs = as_map(request["inputs"], "request.inputs")
     options = options_for(manifest)
@@ -1442,10 +2415,18 @@ def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
         })
     delivery = output_dir / "image-to-3d.json"
     write_json(delivery, {
-        "schemaVersion": "mere.run/vfx-image-to-3d.v1",
+        "schemaVersion": "mere.run/vfx-image-to-3d.v2",
         "source": source_label,
-        "geometryMode": "2.5D depth projection",
+        "reconstructionMode": "supplied-depth-2.5d",
+        "geometryMode": "supplied-depth-2.5d-fallback",
+        "nativeInference": False,
         "metricGeometry": False,
+        "depthSemantics": "normalized-display-values-mapped-to-assumed-range",
+        "inferredUnseenGeometry": False,
+        "fallbackDisclosure": (
+            "Legacy camera-local projection from artist-supplied grayscale depth; "
+            "this is not native object reconstruction and does not infer occluded geometry."
+        ),
         "coordinateSpace": "camera-local-x-right-y-up-z-forward",
         "nearDepth": near_depth,
         "farDepth": far_depth,
@@ -1454,6 +2435,408 @@ def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     })
     artifact(manifest, geometry_dir, "directory", "projected-geometry")
     artifact(manifest, delivery, "json", "image-to-3d-manifest")
+
+
+def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    options = options_for(manifest)
+    mode = option_string(options, "reconstructionMode", "native-triposr")
+    if mode == "native-triposr":
+        execute_native_image_to_3d(manifest, output_dir)
+        return
+    if mode == "supplied-depth-2.5d":
+        execute_supplied_depth_image_to_3d(manifest, output_dir)
+        return
+    raise PluginError(
+        "request.options.reconstructionMode must be 'native-triposr' or 'supplied-depth-2.5d'",
+        2,
+    )
+
+
+def instantmesh_ordered_views(request: JsonMap) -> list[pathlib.Path]:
+    inputs = as_map(request["inputs"], "request.inputs")
+    if inputs.get("image") is not None:
+        raise PluginError(
+            "multiview-image-to-3d never generates views from one image; "
+            "provide exactly 4 or 6 paths in request.inputs.images",
+            2,
+        )
+    value = inputs.get("images")
+    if not isinstance(value, list):
+        raise PluginError(
+            "multiview-image-to-3d requires request.inputs.images as an explicitly ordered path array",
+            2,
+        )
+    images = ordered_image_inputs(request)
+    if len(images) not in {4, 6}:
+        raise PluginError(
+            "multiview-image-to-3d requires exactly 4 or 6 ordered user-supplied views; no views are generated",
+            2,
+        )
+    return images
+
+
+def validated_instantmesh_cameras(
+    value: object,
+    view_count: int,
+    context: str,
+    exit_code: int = 1,
+) -> list[list[object]]:
+    if not isinstance(value, list):
+        raise PluginError(f"{context} must be a JSON array", exit_code)
+    if len(value) != view_count:
+        raise PluginError(f"{context} must contain exactly {view_count} cameras", exit_code)
+    cameras: list[list[object]] = []
+    for camera_index, raw_camera in enumerate(value):
+        if not isinstance(raw_camera, list):
+            raise PluginError(f"{context} camera {camera_index} must be a JSON array", exit_code)
+        if len(raw_camera) != 16:
+            raise PluginError(f"{context} camera {camera_index} must contain 16 values", exit_code)
+        if not all(
+            isinstance(item, (int, float))
+            and not isinstance(item, bool)
+            and math.isfinite(float(item))
+            for item in raw_camera
+        ):
+            raise PluginError(f"{context} camera {camera_index} must contain only finite numbers", exit_code)
+        cameras.append(raw_camera)
+    return cameras
+
+
+def validate_instantmesh_camera_document(
+    path: pathlib.Path,
+    view_count: int,
+) -> list[list[object]]:
+    document = read_json_map(path, "InstantMesh camera document")
+    if document.get("schemaVersion") != 1:
+        raise PluginError("InstantMesh camera document schemaVersion must be 1", 2)
+    return validated_instantmesh_cameras(
+        document.get("cameras"),
+        view_count,
+        "InstantMesh camera document",
+        exit_code=2,
+    )
+
+
+def validated_instantmesh_checkpoint(run: NativeRun) -> JsonMap:
+    checkpoint = as_map(run.manifest.get("checkpoint"), "native InstantMesh checkpoint")
+    expected_strings = {
+        "modelID": INSTANTMESH_MODEL_ID,
+        "repository": INSTANTMESH_REPOSITORY,
+        "revision": INSTANTMESH_REVISION,
+        "sourceRepository": INSTANTMESH_REPOSITORY,
+        "sourceRevision": INSTANTMESH_SOURCE_REVISION,
+        "license": INSTANTMESH_LICENSE,
+        "format": "verified-converted-safetensors",
+    }
+    for key, expected in expected_strings.items():
+        if checkpoint.get(key) != expected:
+            raise PluginError(f"native InstantMesh checkpoint has unexpected {key}")
+    if checkpoint.get("weightsByteCount") != INSTANTMESH_WEIGHTS_BYTE_COUNT:
+        raise PluginError("native InstantMesh checkpoint has an unexpected converted byte count")
+    expected_hashes = {
+        "weightsSHA256": INSTANTMESH_WEIGHTS_SHA256,
+        "sourceSHA256": INSTANTMESH_SOURCE_SHA256,
+        "configurationSHA256": INSTANTMESH_CONFIGURATION_SHA256,
+        "sourceManifestSHA256": INSTANTMESH_SOURCE_MANIFEST_SHA256,
+    }
+    for key, expected in expected_hashes.items():
+        if validated_sha256(checkpoint.get(key), f"native InstantMesh checkpoint {key}") != f"sha256:{expected}":
+            raise PluginError(f"native InstantMesh checkpoint has unexpected {key}")
+    if checkpoint.get("viewGenerationIncluded") is not False:
+        raise PluginError("native InstantMesh checkpoint must exclude view generation")
+    return checkpoint
+
+
+def execute_multiview_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
+    options = options_for(manifest)
+    for key in (
+        "generateViews",
+        "viewGeneration",
+        "zero123PlusPlus",
+        "runtimePython",
+        "useFlexiCubes",
+    ):
+        if key in options:
+            raise PluginError(
+                f"request.options.{key} is outside the reconstruction-only InstantMesh workflow",
+                2,
+            )
+    images = instantmesh_ordered_views(request)
+
+    resolution_value = options.get("resolution", 128)
+    if isinstance(resolution_value, bool) or not isinstance(resolution_value, int):
+        raise PluginError("request.options.resolution must be an integer from 2 through 256", 2)
+    resolution = resolution_value
+    if not 2 <= resolution <= 256:
+        raise PluginError("request.options.resolution must be from 2 through 256", 2)
+    no_vertex_colors_value = options.get("noVertexColors", False)
+    if not isinstance(no_vertex_colors_value, bool):
+        raise PluginError("request.options.noVertexColors must be a boolean", 2)
+    no_vertex_colors = no_vertex_colors_value
+    model_value = options.get("model")
+    if model_value is not None and (not isinstance(model_value, str) or not model_value):
+        raise PluginError("request.options.model must be a managed model id or converted package path", 2)
+
+    camera_path: pathlib.Path | None = None
+    requested_cameras: list[list[object]] | None = None
+    camera_value = inputs.get("cameras")
+    if camera_value is not None:
+        if not isinstance(camera_value, str) or not camera_value:
+            raise PluginError("request.inputs.cameras must be a local camera JSON path", 2)
+        camera_path = input_path(request, "cameras")
+        requested_cameras = validate_instantmesh_camera_document(camera_path, len(images))
+
+    native_output = output_dir / "native-instantmesh"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "image",
+        "reconstruct-3d-multiview",
+    ]
+    for image in images:
+        argv.extend(["--view", str(image)])
+    argv.extend(["--output", str(native_output), "--resolution", str(resolution)])
+    if isinstance(model_value, str):
+        argv.extend(["--model", model_value])
+    if camera_path is not None:
+        argv.extend(["--cameras", str(camera_path)])
+    if no_vertex_colors:
+        argv.append("--no-vertex-colors")
+    argv.append("--json")
+
+    payload = run_json_process(argv, "mere.run image reconstruct-3d-multiview")
+    run = load_native_run(payload, native_output, "mere.run image reconstruct-3d-multiview")
+    if validated_sha256(
+        payload.get("manifestSHA256"), "native InstantMesh result manifestSHA256"
+    ) != sha256(run.manifest_path):
+        raise PluginError("native InstantMesh run manifest checksum mismatch")
+    if run.manifest.get("schemaVersion") != 1:
+        raise PluginError("native InstantMesh run manifest has an unsupported schemaVersion")
+    reported_output = run.manifest.get("outputDirectory")
+    if not isinstance(reported_output, str) or pathlib.Path(reported_output).resolve() != native_output.resolve():
+        raise PluginError("native InstantMesh run manifest outputDirectory is not confined to the native run")
+
+    checkpoint = validated_instantmesh_checkpoint(run)
+    payload_hashes = {
+        "checkpointSHA256": checkpoint.get("weightsSHA256"),
+        "sourceCheckpointSHA256": checkpoint.get("sourceSHA256"),
+        "sourceManifestSHA256": checkpoint.get("sourceManifestSHA256"),
+    }
+    if payload.get("modelID") != checkpoint.get("modelID"):
+        raise PluginError("native InstantMesh result and run manifest modelID disagree")
+    if payload.get("checkpointFormat") != checkpoint.get("format"):
+        raise PluginError("native InstantMesh result and run manifest checkpoint format disagree")
+    for payload_key, expected in payload_hashes.items():
+        if validated_sha256(payload.get(payload_key), f"native InstantMesh result {payload_key}") != validated_sha256(
+            expected, f"native InstantMesh checkpoint {payload_key}"
+        ):
+            raise PluginError(f"native InstantMesh result and run manifest disagree on {payload_key}")
+
+    native_input = as_map(run.manifest.get("input"), "native InstantMesh input")
+    if native_input.get("viewCount") != len(images) or payload.get("viewCount") != len(images):
+        raise PluginError("native InstantMesh view count does not match the ordered request")
+    if native_input.get("userSuppliedViews") is not True or payload.get("userSuppliedViews") is not True:
+        raise PluginError("native InstantMesh must identify every view as user supplied")
+    ordered_views = as_list(native_input.get("orderedViews"), "native InstantMesh ordered views")
+    if len(ordered_views) != len(images):
+        raise PluginError("native InstantMesh run manifest has the wrong ordered view count")
+    payload_dimensions = as_list(payload.get("sourceDimensions"), "native InstantMesh source dimensions")
+    if len(payload_dimensions) != len(images):
+        raise PluginError("native InstantMesh result has the wrong source-dimension count")
+    for index, source in enumerate(images):
+        item = as_map(ordered_views[index], f"native InstantMesh ordered view {index}")
+        dimensions = as_map(payload_dimensions[index], f"native InstantMesh source dimensions {index}")
+        if item.get("index") != index or item.get("path") != str(source):
+            raise PluginError("native InstantMesh changed the requested view order")
+        for key in ("sourceWidth", "sourceHeight", "preparedWidth", "preparedHeight"):
+            value = item.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise PluginError(f"native InstantMesh ordered view {index} has invalid {key}")
+        if dimensions.get("width") != item.get("sourceWidth") or dimensions.get("height") != item.get(
+            "sourceHeight"
+        ):
+            raise PluginError(f"native InstantMesh source dimensions disagree for view {index}")
+
+    native_cameras = validated_instantmesh_cameras(
+        native_input.get("cameras"),
+        len(images),
+        "native InstantMesh input cameras",
+    )
+    if requested_cameras is not None and native_cameras != requested_cameras:
+        raise PluginError("native InstantMesh cameras do not exactly match the supplied camera document")
+
+    expected_official_rig = camera_path is None
+    expected_camera_rig = (
+        "official-deterministic-conditioning-rig" if expected_official_rig else "supplied-c2w-intrinsics"
+    )
+    if native_input.get("cameraConditioning") != expected_camera_rig:
+        raise PluginError("native InstantMesh camera rig does not match the request")
+    if payload.get("usedOfficialCameraRig") is not expected_official_rig:
+        raise PluginError("native InstantMesh result and request disagree on camera rig")
+
+    boundary = as_map(run.manifest.get("boundary"), "native InstantMesh boundary")
+    exclusion_fields = (
+        "viewGenerationIncluded",
+        "zero123PlusPlusIncluded",
+        "runtimePython",
+        "proprietaryFlexiCubesIncluded",
+    )
+    for field in exclusion_fields:
+        if boundary.get(field) is not False or payload.get(field) is not False:
+            raise PluginError(f"native InstantMesh reconstruction boundary must report {field}=false")
+    if payload.get("topologyMatchesUpstreamFlexiCubes") is not False:
+        raise PluginError("native InstantMesh must not claim topology parity with proprietary FlexiCubes")
+
+    extraction = as_map(run.manifest.get("extraction"), "native InstantMesh extraction")
+    expected_extraction = {
+        "resolution": resolution,
+        "includesVertexColors": not no_vertex_colors,
+        "algorithm": INSTANTMESH_EXTRACTION_ALGORITHM,
+        "topologyCompatibility": INSTANTMESH_TOPOLOGY_COMPATIBILITY,
+    }
+    for key, expected in expected_extraction.items():
+        if extraction.get(key) != expected:
+            raise PluginError(f"native InstantMesh extraction has unexpected {key}")
+    upstream_empty_field_repair = extraction.get("upstreamEmptyFieldRepairApplied")
+    if not isinstance(upstream_empty_field_repair, bool):
+        raise PluginError(
+            "native InstantMesh extraction upstreamEmptyFieldRepairApplied must be a boolean"
+        )
+    payload_upstream_empty_field_repair = payload.get("upstreamEmptyFieldRepairApplied")
+    if not isinstance(payload_upstream_empty_field_repair, bool):
+        raise PluginError(
+            "native InstantMesh result upstreamEmptyFieldRepairApplied must be a boolean"
+        )
+    if payload_upstream_empty_field_repair is not upstream_empty_field_repair:
+        raise PluginError(
+            "native InstantMesh result and extraction disagree on upstreamEmptyFieldRepairApplied"
+        )
+    for payload_key, expected in (
+        ("extractionResolution", resolution),
+        ("includesVertexColors", not no_vertex_colors),
+        ("meshExtractionAlgorithm", INSTANTMESH_EXTRACTION_ALGORITHM),
+    ):
+        if payload.get(payload_key) != expected:
+            raise PluginError(f"native InstantMesh result has unexpected {payload_key}")
+
+    mesh = as_map(run.manifest.get("mesh"), "native InstantMesh mesh")
+    if mesh.get("coordinateSystem") != "model-x-right-y-up-z-forward":
+        raise PluginError("native InstantMesh mesh reported an unexpected coordinate system")
+    if mesh.get("units") != "normalized-object-space":
+        raise PluginError("native InstantMesh mesh must report normalized object-space units")
+    if mesh.get("inferredUnseenGeometry") is not True:
+        raise PluginError("native InstantMesh mesh must disclose inferred unseen geometry")
+    for count_key in ("vertexCount", "triangleCount"):
+        count = mesh.get(count_key)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise PluginError(f"native InstantMesh mesh has invalid {count_key}")
+    for key in ("coordinateSystem", "units", "inferredUnseenGeometry", "vertexCount", "triangleCount", "bounds"):
+        if payload.get(key) != mesh.get(key):
+            raise PluginError(f"native InstantMesh result and run manifest disagree on {key}")
+
+    required = {
+        "obj": one_native_artifact(run, "obj", "native InstantMesh"),
+        "ply": one_native_artifact(run, "ply", "native InstantMesh"),
+        "glb": one_native_artifact(run, "glb", "native InstantMesh"),
+        "mesh-manifest": one_native_artifact(run, "mesh-manifest", "native InstantMesh"),
+    }
+    manifest_artifacts = as_list(run.manifest.get("artifacts"), "native InstantMesh run artifacts")
+    payload_artifacts = as_list(payload.get("artifacts"), "native InstantMesh result artifacts")
+    if native_artifact_contract(manifest_artifacts, "native InstantMesh run manifest") != native_artifact_contract(
+        payload_artifacts, "native InstantMesh result"
+    ):
+        raise PluginError("native InstantMesh result and run manifest artifact contracts disagree")
+
+    mesh_manifest_value = payload.get("meshManifestPath")
+    if not isinstance(mesh_manifest_value, str) or not mesh_manifest_value:
+        raise PluginError("native InstantMesh result is missing meshManifestPath")
+    mesh_manifest_path = confined_path(native_output, mesh_manifest_value, "native InstantMesh mesh manifest")
+    if mesh_manifest_path != required["mesh-manifest"]:
+        raise PluginError("native InstantMesh result points to a different mesh manifest artifact")
+    if validated_sha256(
+        payload.get("meshManifestSHA256"), "native InstantMesh result meshManifestSHA256"
+    ) != sha256(mesh_manifest_path):
+        raise PluginError("native InstantMesh mesh manifest checksum mismatch")
+    mesh_document = read_json_map(mesh_manifest_path, "native InstantMesh mesh manifest")
+    if mesh_document.get("schemaVersion") != 1:
+        raise PluginError("native InstantMesh mesh manifest has an unsupported schemaVersion")
+    if mesh_document.get("outputDirectory") != str(native_output.resolve()):
+        raise PluginError("native InstantMesh mesh manifest outputDirectory is not confined to the native run")
+    if mesh_document.get("inputPaths") != [str(path) for path in images]:
+        raise PluginError("native InstantMesh mesh manifest changed the requested view order")
+    for key in ("coordinateSystem", "units", "inferredUnseenGeometry", "vertexCount", "triangleCount", "bounds"):
+        if mesh_document.get(key) != mesh.get(key):
+            raise PluginError(f"native InstantMesh run and mesh manifests disagree on {key}")
+    mesh_model = as_map(mesh_document.get("model"), "native InstantMesh mesh model")
+    expected_mesh_model = {
+        "modelID": checkpoint.get("modelID"),
+        "upstreamRepository": checkpoint.get("repository"),
+        "upstreamRevision": checkpoint.get("revision"),
+        "license": checkpoint.get("license"),
+        "weightsSHA256": checkpoint.get("weightsSHA256"),
+        "inferenceBackend": "mere.run-native-mlx",
+    }
+    for key, expected in expected_mesh_model.items():
+        if mesh_model.get(key) != expected:
+            raise PluginError(f"native InstantMesh mesh manifest has unexpected model {key}")
+    mesh_artifacts = native_artifact_contract(
+        as_list(mesh_document.get("artifacts"), "native InstantMesh mesh artifacts"),
+        "native InstantMesh mesh manifest",
+    )
+    run_mesh_artifacts = {
+        key: value
+        for key, value in native_artifact_contract(
+            manifest_artifacts, "native InstantMesh run manifest"
+        ).items()
+        if key[0] in {"obj", "ply", "glb"}
+    }
+    if mesh_artifacts != run_mesh_artifacts:
+        raise PluginError("native InstantMesh run and mesh manifest artifact contracts disagree")
+
+    delivery = output_dir / "multiview-image-to-3d.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-multiview-image-to-3d.v1",
+        "orderedViews": [str(path) for path in images],
+        "reconstructionMode": "native-instantmesh-reconstruction-only",
+        "geometryMode": "native-multiview-object-reconstruction",
+        "nativeInference": True,
+        "runtimePython": False,
+        "modelID": checkpoint.get("modelID"),
+        "checkpoint": checkpoint,
+        "nativeManifest": str(run.manifest_path),
+        "nativeManifestSha256": sha256(run.manifest_path),
+        "meshManifest": str(mesh_manifest_path),
+        "meshManifestSha256": sha256(mesh_manifest_path),
+        "nativeOutputDirectory": str(native_output.resolve()),
+        "viewCount": len(images),
+        "userSuppliedViews": True,
+        "viewGenerationIncluded": False,
+        "zero123PlusPlusIncluded": False,
+        "proprietaryFlexiCubesIncluded": False,
+        "cameraRig": expected_camera_rig,
+        "usedOfficialCameraRig": expected_official_rig,
+        "suppliedCameraDocument": str(camera_path) if camera_path else None,
+        "suppliedCameraDocumentSha256": sha256(camera_path) if camera_path else None,
+        "upstreamEmptyFieldRepairApplied": upstream_empty_field_repair,
+        "coordinateSystem": mesh.get("coordinateSystem"),
+        "units": mesh.get("units"),
+        "metricGeometry": False,
+        "inferredUnseenGeometry": True,
+        "topologyMatchesUpstreamFlexiCubes": False,
+        "extraction": extraction,
+        "mesh": mesh,
+        "assets": {
+            kind: {"path": str(path), "sha256": sha256(path)}
+            for kind, path in required.items() if kind != "mesh-manifest"
+        },
+        "nativeArtifacts": run.artifact_records,
+    })
+    artifact(manifest, native_output, "directory", "native-instantmesh-reconstruction")
+    artifact(manifest, run.manifest_path, "json", "native-instantmesh-run-manifest")
+    artifact(manifest, mesh_manifest_path, "json", "native-instantmesh-mesh-manifest")
+    for kind in ("obj", "ply", "glb"):
+        artifact(manifest, required[kind], "mesh", f"native-instantmesh-{kind}")
+    artifact(manifest, delivery, "json", "multiview-image-to-3d-handoff")
 
 
 Executor = Callable[[JsonMap, pathlib.Path], None]
@@ -1473,7 +2856,10 @@ EXECUTORS: dict[str, Executor] = {
     "restore": execute_restore,
     "depth-normal": execute_depth_normal,
     "relight": execute_relight,
+    "video-depth": execute_video_depth,
+    "multiview-geometry": execute_multiview_geometry,
     "image-to-3d": execute_image_to_3d,
+    "multiview-image-to-3d": execute_multiview_image_to_3d,
 }
 
 

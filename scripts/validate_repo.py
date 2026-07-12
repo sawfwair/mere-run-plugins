@@ -258,7 +258,10 @@ def validate_plugin_manifests() -> None:
             "set-extension", "restore",
             "depth-normal",
             "relight",
+            "video-depth",
+            "multiview-geometry",
             "image-to-3d",
+            "multiview-image-to-3d",
         },
     )
     workflow_tools = [

@@ -122,11 +122,13 @@ state.
 
 ## VFX Tools Plugin
 
-`mere-vfx-tools` turns native `mere.run` segmentation, tracking, pose, optical-flow, image
-generation, and start/end-frame video generation into durable shot workflows.
-It delivers roto mattes and alpha video, matte refinement, track exports,
-chroma keying, shot QC, generative in-betweens, turntables, and character
-reference sheets without adding a second inference runtime.
+`mere-vfx-tools` turns native `mere.run` segmentation, tracking, pose,
+optical-flow, depth, geometry, image generation, and start/end-frame video
+generation into durable shot workflows. It delivers roto mattes and alpha
+video, track exports, QC, motion passes, generative shot helpers, native
+single- and multi-view geometry handoffs, verified TripoSR OBJ/PLY/GLB meshes,
+and reconstruction-only InstantMesh meshes from four or six artist-supplied
+views without adding a second inference runtime or generating unlicensed views.
 
 ```bash
 pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools"
