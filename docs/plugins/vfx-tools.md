@@ -12,8 +12,8 @@ loading and inference remain in core `mere.run`.
 - `matte-refine` processes an existing matte sequence without model inference.
 - `track-export` writes generic JSON, CSV, After Effects JSON, and Blender JSON.
 - `key` performs deterministic chroma keying and despill on stills or sequences.
-- `shot-qc` detects corrupt frames, dimension changes, luminance jumps, and
-  alpha-coverage chatter.
+- `shot-qc` accepts a supplied video or frame sequence and detects corrupt
+  frames, dimension changes, luminance jumps, and alpha-coverage chatter.
 - `inbetween` calls native start/end-image `mere.run video generate`.
 - `turntable` anchors native video generation to a source image and creates a
   canonical-view contact sheet.
