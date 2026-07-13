@@ -120,6 +120,21 @@ These tools call existing `mere.run` surfaces such as `vision ocr`,
 The plugin layer owns planning, artifact hashes, resumability, and local cleanup
 state.
 
+## VFX Tools Plugin
+
+`mere-vfx-tools` turns native `mere.run` segmentation, tracking, pose,
+optical-flow, depth, geometry, image generation, and start/end-frame video
+generation into durable shot workflows. It delivers roto mattes and alpha
+video, track exports, QC, motion passes, generative shot helpers, native
+single- and multi-view geometry handoffs, verified TripoSR OBJ/PLY/GLB meshes,
+and reconstruction-only InstantMesh meshes from four or six artist-supplied
+views without adding a second inference runtime or generating unlicensed views.
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools"
+mere-vfx-tools roto --request-json ./roto.json --output-dir ./shot010
+```
+
 ## Animatic Tools Plugin
 
 `mere-animatic-tools` contains local production helpers for relay-connected
@@ -271,6 +286,7 @@ packages/mere-workflow-tools/ local document, media, dataset, transcript, image,
 packages/mere-animatic-tools/ local Animatic production helpers
 packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
 packages/mere-perform/     realtime performance and stage UI plugin
+packages/mere-vfx-tools/   local shot-oriented VFX production plugin
 scripts/check.sh           repo gate
 scripts/validate_repo.py   schema/manifest/recipe smoke validation
 SECURITY.md                private vulnerability reporting policy
