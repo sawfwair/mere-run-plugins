@@ -1,12 +1,16 @@
 # plugins.mere.run
 
-The product site for the official `mere.run` companion plugin catalog.
+The public catalog and product site for official `mere.run` companion plugins.
+It deliberately follows the same static Cloudflare Worker shape and visual
+system as `mere-run-site`.
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
+pnpm check
+pnpm deploy
 ```
 
-The page is sourced from the live plugin catalog in the repository. Update the
-site copy when plugin names, capabilities, or installation commands change, and
-run `npm test` before publishing.
+`pnpm prepare:catalog` copies the repository catalog into the public site and
+its agent-readable well-known path. Keep plugin copy and commands grounded in
+the root catalog and plugin documentation.

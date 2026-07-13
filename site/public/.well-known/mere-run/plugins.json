@@ -1,0 +1,267 @@
+{
+  "contractVersion": "mere.run/plugin-catalog.v1",
+  "updatedAt": "2026-07-06T00:00:00Z",
+  "defaultChannel": "main",
+  "plugins": [
+    {
+      "id": "mere-runpod",
+      "name": "RunPod Runner",
+      "description": "Run canonical mere.run recipes on user-owned ephemeral RunPod pods, fetch artifacts, and terminate by default.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-runpod",
+      "subdirectory": "packages/mere-runpod",
+      "entrypoint": "mere-runpod",
+      "capabilities": [
+        "remote-runner",
+        "runpod",
+        "train-lora",
+        "artifact-fetch",
+        "cleanup"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
+        }
+      }
+    },
+    {
+      "id": "mere-image-tools",
+      "name": "Image Tools",
+      "description": "Run local image-production tools such as subject knockout, mask export, and future dataset prep helpers.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-image-tools",
+      "subdirectory": "packages/mere-image-tools",
+      "entrypoint": "mere-image-tools",
+      "capabilities": [
+        "image-tools",
+        "knockout",
+        "segmentation",
+        "alpha-mask",
+        "sam31"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-animatic-tools",
+      "name": "Animatic Tools",
+      "description": "Run local Animatic production tools for character knockouts, reference packs, continuity checks, shot kits, voice kits, style locks, and delivery prep.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-animatic-tools",
+      "subdirectory": "packages/mere-animatic-tools",
+      "entrypoint": "mere-animatic-tools",
+      "capabilities": [
+        "animatic",
+        "character-knockout",
+        "reference-pack",
+        "continuity-check",
+        "shot-kit",
+        "storyboard-repair",
+        "edit-doctor",
+        "actor-voice-kit",
+        "location-plates",
+        "style-lock",
+        "delivery-prep"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-animatic-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-shotgrid-tools",
+      "name": "ShotGrid Tools",
+      "description": "Publish local mere.run artifacts to ShotGrid review Versions and pull task-backed production jobs.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-shotgrid-tools",
+      "subdirectory": "packages/mere-shotgrid-tools",
+      "entrypoint": "mere-shotgrid-tools",
+      "capabilities": [
+        "production-tracking",
+        "shotgrid",
+        "flow-production-tracking",
+        "version-publish",
+        "review-upload",
+        "note-create",
+        "playlist-link",
+        "task-status",
+        "task-query",
+        "jsonl-jobs"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-perform",
+      "name": "Perform",
+      "description": "Run local realtime Magenta Heart performances with mere.run music realtime, MIDI mappings, stage UI export, event logs, and WAV capture.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-perform",
+      "subdirectory": "packages/mere-perform",
+      "entrypoint": "mere-perform",
+      "capabilities": [
+        "performance",
+        "realtime-audio",
+        "magenta-rt2",
+        "midi",
+        "stage-ui",
+        "prompt-blending",
+        "artifact-capture",
+        "local-runner"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform"
+        }
+      }
+    },
+    {
+      "id": "mere-doc-tools",
+      "name": "Document Tools",
+      "description": "OCR local documents and remove PII with native mere.run models.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-doc-tools",
+      "capabilities": [
+        "documents",
+        "ocr",
+        "pii-redaction",
+        "privacy"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-media-scrub",
+      "name": "Media Scrub",
+      "description": "Batch OCR media frames and redact extracted sensitive text locally.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-media-scrub",
+      "capabilities": [
+        "media",
+        "ocr",
+        "pii-redaction",
+        "privacy"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-dataset-tools",
+      "name": "Dataset Tools",
+      "description": "Prepare LoRA datasets with mere.run captions, OCR sidecars, and contact sheets.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-dataset-tools",
+      "capabilities": [
+        "dataset",
+        "captioning",
+        "ocr",
+        "lora"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-transcript-tools",
+      "name": "Transcript Tools",
+      "description": "Transcribe local audio and optionally remove PII with mere.run.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-transcript-tools",
+      "capabilities": [
+        "speech",
+        "transcription",
+        "pii-redaction",
+        "privacy"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-image-compose",
+      "name": "Image Compose",
+      "description": "Record and run local mere.run image generation compositions with refs and LoRAs.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-image-compose",
+      "capabilities": [
+        "image",
+        "generation",
+        "reference-image",
+        "lora"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-batch-runner",
+      "name": "Batch Runner",
+      "description": "Run resumable local JSONL batches of explicit mere.run commands.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-workflow-tools",
+      "subdirectory": "packages/mere-workflow-tools",
+      "entrypoint": "mere-batch-runner",
+      "capabilities": [
+        "batch",
+        "automation",
+        "local-runner"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+        }
+      }
+    }
+  ]
+}
