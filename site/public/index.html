@@ -456,6 +456,71 @@
       .plugin-card { padding-left: 75px; }
       .plugin-card::before { width: 53px; }
     }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+    section.hero.hero-sheet {
+      display: block;
+      min-height: 0;
+      padding: 30px 0 42px;
+    }
+    .blueprint-hero {
+      position: relative;
+      margin: 0;
+      border: 1px solid #bec2e7;
+      background: #f3f2fb;
+      box-shadow: 12px 12px 0 rgba(64,80,200,.13);
+    }
+    .blueprint-hero::before,
+    .blueprint-hero::after {
+      content: '';
+      position: absolute;
+      z-index: 2;
+      width: 22px;
+      height: 22px;
+      border-color: var(--accent);
+      pointer-events: none;
+    }
+    .blueprint-hero::before { top: -7px; left: -7px; border-top: 1px solid; border-left: 1px solid; }
+    .blueprint-hero::after { right: -7px; bottom: -7px; border-right: 1px solid; border-bottom: 1px solid; }
+    .blueprint-hero img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1200/630;
+      object-fit: cover;
+    }
+    .hero-underbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 22px;
+      align-items: center;
+      margin-top: 30px;
+      padding-top: 22px;
+      border-top: 1px solid var(--border);
+    }
+    .hero-sheet .hero-cta { margin: 0; }
+    .hero-sheet .platform-line { margin: 0; }
+    .hero-sheet .hero-note { max-width: 350px; }
+    @media (max-width: 760px) {
+      .hero-underbar { grid-template-columns: 1fr; }
+      .hero-sheet .platform-line { width: 100%; }
+    }
+    @media (max-width: 640px) {
+      section.hero.hero-sheet { padding: 20px 0 34px; }
+      .blueprint-hero { box-shadow: 7px 7px 0 rgba(64,80,200,.13); }
+      .hero-underbar { margin-top: 22px; padding-top: 18px; }
+      .hero-sheet .hero-note { margin: 4px 0 0; }
+    }
   </style>
 </head>
 <body>
@@ -477,37 +542,22 @@
     </header>
 
     <main>
-      <section class="hero">
-        <div>
-          <h1 class="headline">
-            <span>The extension</span>
-            <span>bay for</span>
-            <span class="accent">local AI.</span>
-          </h1>
-          <p class="subtext">Plug production workflows into mere.run.
-VFX, realtime performance, review, privacy,
-automation, and user-owned GPU training.</p>
+      <section class="hero hero-sheet">
+        <h1 class="sr-only">The extension bay for local AI.</h1>
+        <figure class="blueprint-hero">
+          <img src="/og.png" alt="mere. Plugins — the extension bay for local AI, showing VFX, Perform, RunPod, and Privacy modules connected to a mere.run core." />
+        </figure>
+        <div class="hero-underbar">
           <div class="hero-cta">
-            <a class="btn lg" href="#plugins">Browse plugins</a>
+            <a class="btn lg" href="#plugins">Browse modules</a>
             <a class="btn lg ghost" href="https://github.com/sawfwair/mere-run-plugins/blob/main/docs/plugins/contract.md" target="_blank" rel="noopener">Plugin contract</a>
             <span class="hero-note">Open source under MIT · user-controlled at every boundary</span>
           </div>
           <div class="platform-line" aria-label="Plugin principles">
-            <span class="ready">12 official plugins</span>
+            <span class="ready">12 official modules</span>
             <span class="ready">one local runtime</span>
-            <span class="ready">durable run.json</span>
             <span class="ready">cleanup by default</span>
           </div>
-        </div>
-        <div class="hero-art" role="img" aria-label="A modular extension bay showing plugin workflows connected to the mere.run local runtime.">
-          <div class="bay-label">extension bay // 12 modules online</div>
-          <div class="bay-line l1"></div><div class="bay-line l2"></div><div class="bay-line l3"></div><div class="bay-line l4"></div>
-          <div class="bay-core">mere<span>.run</span></div>
-          <div class="bay-module m1"><b>mere-perform</b><span>realtime · MIDI · stage</span></div>
-          <div class="bay-module m2"><b>mere-runpod</b><span>train · fetch · cleanup</span></div>
-          <div class="bay-module m3"><b>mere-vfx-tools</b><span>roto · depth · geometry</span></div>
-          <div class="bay-module m4"><b>mere-doc-tools</b><span>OCR · redact · private</span></div>
-          <span class="credit"><span class="accent">catalog</span> mere.run/plugin-catalog.v1</span>
         </div>
       </section>
     </main>
