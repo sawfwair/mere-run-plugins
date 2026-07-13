@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>mere.run plugins — Production workflows for local AI</title>
+  <title>mere.run plugins — Plug local AI into production</title>
   <meta name="description" content="Official companion plugins for mere.run: VFX, realtime performance, production tracking, private document workflows, automation, and user-owned GPU training." />
   <meta name="theme-color" content="#4050c8" />
-  <meta property="og:title" content="mere.run plugins — Production workflows for local AI" />
+  <meta property="og:title" content="mere.run plugins — Plug local AI into production" />
   <meta property="og:description" content="Twelve official companion plugins. One local-first runtime." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://plugins.mere.run" />
@@ -15,7 +15,7 @@
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="mere.run plugins — production workflows for local AI, with a real mere.perform stage output." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="mere.run plugins — Production workflows for local AI" />
+  <meta name="twitter:title" content="mere.run plugins — Plug local AI into production" />
   <meta name="twitter:description" content="Twelve official companion plugins. One local-first runtime." />
   <meta name="twitter:image" content="https://plugins.mere.run/og.png" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='6' y='46' font-family='Caveat,cursive' font-size='44' fill='%231C1B18'%3Emere%3C/text%3E%3Ctext x='52' y='46' font-family='Caveat,cursive' font-size='44' fill='%231B6B4A'%3E.%3C/text%3E%3C/svg%3E" />
@@ -521,6 +521,158 @@
       .hero-underbar { margin-top: 22px; padding-top: 18px; }
       .hero-sheet .hero-note { margin: 4px 0 0; }
     }
+
+    .hero-blueprint {
+      position: relative;
+      min-height: 620px;
+      display: grid;
+      grid-template-columns: 62px minmax(360px,.92fr) minmax(500px,1.08fr);
+      overflow: hidden;
+      border: 1px solid #b9bee8;
+      background:
+        radial-gradient(circle at 1px 1px, rgba(64,80,200,.10) 1px, transparent 1.4px) 0 0 / 16px 16px,
+        #f4f4fc;
+      box-shadow: 12px 12px 0 rgba(64,80,200,.13);
+    }
+    .bp-cross {
+      position: absolute;
+      z-index: 5;
+      width: 25px;
+      height: 25px;
+      pointer-events: none;
+    }
+    .bp-cross::before,
+    .bp-cross::after { content: ''; position: absolute; background: var(--accent); opacity: .7; }
+    .bp-cross::before { top: 12px; left: 0; width: 25px; height: 1px; }
+    .bp-cross::after { top: 0; left: 12px; width: 1px; height: 25px; }
+    .bp-cross.tl { top: 15px; left: 14px; }
+    .bp-cross.br { right: 14px; bottom: 14px; }
+    .bp-rail {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: 64px 1fr 72px;
+      border-right: 1px solid #aeb4e1;
+      color: var(--accent);
+    }
+    .bp-rail > span { display: grid; place-items: center; border-bottom: 1px solid #aeb4e1; font: 10px/1 var(--mono); }
+    .bp-rail > span:last-child { border-top: 1px solid #aeb4e1; border-bottom: 0; }
+    .bp-rail strong { display: grid; place-items: center; font: 500 10px/1 var(--mono); letter-spacing: 2px; writing-mode: vertical-rl; transform: rotate(180deg); }
+    .bp-copy {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 58px 38px 48px 54px;
+    }
+    .bp-brand { display: flex; align-items: baseline; gap: 18px; margin-bottom: 56px; }
+    .bp-brand .logo { font-size: 34px; }
+    .bp-brand .label { color: var(--accent); font: 500 13px/1 var(--mono); letter-spacing: 5px; }
+    .bp-copy h1 {
+      max-width: 610px;
+      margin: 0;
+      color: #111226;
+      font: 400 clamp(64px,6.2vw,96px)/.9 var(--serif);
+      letter-spacing: -.025em;
+    }
+    .bp-copy h1 em { display: block; color: var(--accent); font-weight: 400; }
+    .bp-lede { max-width: 52ch; margin: 30px 0 0; color: var(--ink-base); font-size: 15px; line-height: 1.65; }
+    .bp-proof { display: flex; align-items: center; gap: 14px; margin-top: auto; padding-top: 30px; color: var(--accent); font: 11px/1.4 var(--mono); }
+    .bp-proof::before { content: ''; width: 78px; height: 2px; background: var(--accent); }
+    .bp-map { position: relative; min-height: 620px; }
+    .bp-map::before {
+      content: '';
+      position: absolute;
+      inset: 42px 34px;
+      border: 1px solid rgba(64,80,200,.13);
+      background: rgba(255,255,255,.18);
+    }
+    .bp-processor {
+      position: absolute;
+      z-index: 4;
+      top: 48%;
+      left: 51%;
+      width: 236px;
+      height: 152px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--accent);
+      background: #f7f7ff;
+      color: var(--ink-strong);
+      font: italic 400 38px/1 var(--serif);
+      box-shadow: inset 0 0 0 7px #f7f7ff, inset 0 0 0 8px rgba(64,80,200,.22), 7px 7px 0 rgba(64,80,200,.10);
+      transform: translate(-50%,-50%);
+      clip-path: polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);
+    }
+    .bp-processor::after { content: 'LOCAL CORE'; position: absolute; right: 18px; bottom: 14px; color: var(--accent); font: 8px/1 var(--mono); letter-spacing: 1.2px; }
+    .bp-module {
+      position: absolute;
+      z-index: 4;
+      width: 142px;
+      min-height: 82px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      border: 1.5px solid var(--accent);
+      background: #f7f7ff;
+      color: var(--accent);
+      font: 500 12px/1.2 var(--mono);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      box-shadow: 4px 4px 0 rgba(64,80,200,.08);
+      clip-path: polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px);
+    }
+    .bp-module::after { content: ''; position: absolute; right: 8px; bottom: 7px; width: 4px; height: 4px; border-radius: 50%; background: var(--warm); box-shadow: -9px 0 0 var(--accent); }
+    .bp-module.vfx { top: 58px; left: 50%; transform: translateX(-50%); }
+    .bp-module.perform { top: 43%; left: 35px; transform: translateY(-50%); }
+    .bp-module.runpod { top: 43%; right: 32px; transform: translateY(-50%); }
+    .bp-module.privacy { bottom: 44px; left: 50%; transform: translateX(-50%); }
+    .bp-wire { position: absolute; z-index: 2; background: var(--accent); opacity: .75; }
+    .bp-wire.v { top: 140px; left: 51%; width: 2px; height: 300px; }
+    .bp-wire.h { top: 43%; right: 102px; left: 106px; height: 2px; }
+    .bp-wire.v::before,
+    .bp-wire.v::after,
+    .bp-wire.h::before,
+    .bp-wire.h::after { content: ''; position: absolute; width: 8px; height: 8px; border: 1px solid var(--warm); border-radius: 50%; background: #f4f4fc; }
+    .bp-wire.v::before { top: 0; left: -4px; }
+    .bp-wire.v::after { bottom: 0; left: -4px; }
+    .bp-wire.h::before { top: -4px; left: 0; }
+    .bp-wire.h::after { top: -4px; right: 0; }
+    .bp-stage {
+      position: absolute;
+      z-index: 5;
+      right: 28px;
+      bottom: 24px;
+      width: 170px;
+      padding: 5px;
+      border: 1px solid var(--accent);
+      background: #f7f7ff;
+      box-shadow: 4px 4px 0 rgba(64,80,200,.12);
+    }
+    .bp-stage img { display: block; width: 100%; height: auto; }
+    .bp-stage span { display: block; padding: 5px 3px 1px; color: var(--accent); font: 8px/1.2 var(--mono); letter-spacing: .7px; text-transform: uppercase; }
+    @media (max-width: 1050px) {
+      .hero-blueprint { grid-template-columns: 56px 1fr; }
+      .bp-copy { min-height: 520px; }
+      .bp-map { grid-column: 2; min-height: 560px; border-top: 1px solid #b9bee8; }
+      .bp-wire.v { height: 265px; }
+    }
+    @media (max-width: 640px) {
+      .hero-blueprint { grid-template-columns: 1fr; box-shadow: 7px 7px 0 rgba(64,80,200,.13); }
+      .bp-rail { display: none; }
+      .bp-copy { min-height: 470px; padding: 42px 24px 34px; }
+      .bp-brand { margin-bottom: 40px; }
+      .bp-copy h1 { font-size: clamp(58px,18vw,78px); }
+      .bp-map { grid-column: 1; min-height: 490px; }
+      .bp-processor { width: 178px; height: 118px; font-size: 29px; }
+      .bp-module { width: 105px; min-height: 64px; padding: 8px; font-size: 9px; }
+      .bp-module.perform { left: 16px; }
+      .bp-module.runpod { right: 14px; }
+      .bp-wire.h { right: 70px; left: 70px; }
+      .bp-wire.v { top: 116px; height: 244px; }
+      .bp-stage { right: 12px; bottom: 12px; width: 130px; }
+    }
   </style>
 </head>
 <body>
@@ -543,13 +695,25 @@
 
     <main>
       <section class="hero hero-sheet">
-        <h1 class="sr-only">The extension bay for local AI.</h1>
-        <figure class="blueprint-hero">
-          <img src="/og.png" alt="mere. Plugins — the extension bay for local AI, showing VFX, Perform, RunPod, and Privacy modules connected to a mere.run core." />
-        </figure>
+        <div class="hero-blueprint">
+          <span class="bp-cross tl" aria-hidden="true"></span><span class="bp-cross br" aria-hidden="true"></span>
+          <div class="bp-rail" aria-hidden="true"><span>+</span><strong>MERE PLUGINS</strong><span>v1.0</span></div>
+          <div class="bp-copy">
+            <div class="bp-brand"><span class="logo"><span>mere</span><span class="dot">.</span></span><span class="label">PLUGINS</span></div>
+            <h1>Plug local AI <em>into production.</em></h1>
+            <p class="bp-lede">Official plugins add the workflow around the model—planning, orchestration, artifacts, review, remote compute, and cleanup—without moving inference out of <code>mere.run</code>.</p>
+            <div class="bp-proof">12 official plugins · one local-first runtime</div>
+          </div>
+          <div class="bp-map" aria-label="VFX, Perform, RunPod, and Privacy plugins connected to the mere.run local core">
+            <div class="bp-wire v" aria-hidden="true"></div><div class="bp-wire h" aria-hidden="true"></div>
+            <div class="bp-processor">mere.run</div>
+            <div class="bp-module vfx">VFX</div><div class="bp-module perform">Perform</div><div class="bp-module runpod">RunPod</div><div class="bp-module privacy">Privacy</div>
+            <div class="bp-stage"><img src="/showcase/perform-stage.jpg" alt="Real mere.perform stage output" /><span>live artifact · perform</span></div>
+          </div>
+        </div>
         <div class="hero-underbar">
           <div class="hero-cta">
-            <a class="btn lg" href="#plugins">Browse modules</a>
+            <a class="btn lg" href="#plugins">Browse plugins</a>
             <a class="btn lg ghost" href="https://github.com/sawfwair/mere-run-plugins/blob/main/docs/plugins/contract.md" target="_blank" rel="noopener">Plugin contract</a>
             <span class="hero-note">Open source under MIT · user-controlled at every boundary</span>
           </div>

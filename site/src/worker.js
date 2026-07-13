@@ -1,14 +1,14 @@
 const CONTENT_SIGNAL = "ai-train=no, search=yes, ai-input=yes";
 
 const HOME_MARKDOWN = `---
-title: mere.run plugins — Production workflows for local AI
+title: mere.run plugins — Plug local AI into production
 description: Official companion plugins for mere.run. VFX, realtime performance, production tracking, private document workflows, automation, and user-owned GPU training.
 image: https://plugins.mere.run/og.png
 ---
 
 # mere.run plugins
 
-Production workflows for local AI.
+Plug local AI into production.
 
 Official companion executables extend the work around the local \`mere.run\`
 runtime without moving canonical model behavior into a hosted service.
