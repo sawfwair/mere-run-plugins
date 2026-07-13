@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>mere.run plugins — Production workflows for local AI</title>
   <meta name="description" content="Official companion plugins for mere.run: VFX, realtime performance, production tracking, private document workflows, automation, and user-owned GPU training." />
-  <meta name="theme-color" content="#f5f1e8" />
+  <meta name="theme-color" content="#4050c8" />
   <meta property="og:title" content="mere.run plugins — Production workflows for local AI" />
   <meta property="og:description" content="Twelve official companion plugins. One local-first runtime." />
   <meta property="og:type" content="website" />
@@ -186,6 +186,276 @@
       html { scroll-behavior: auto; }
       *,*::before,*::after { transition-duration: .01ms !important; }
     }
+
+    /* Plugins identity: Mere family typography, modular extension-bay system. */
+    :root {
+      --canvas: #f3f2fb;
+      --panel: #ecebf8;
+      --surface: #fbfaff;
+      --ink-strong: #17182b;
+      --ink-base: #31344f;
+      --ink-soft: #666985;
+      --ink-muted: #8588a2;
+      --border: #d8d8ea;
+      --border-light: #e3e2f1;
+      --accent: #4050c8;
+      --accent-deep: #2d3aa8;
+      --accent-soft: #e1e4ff;
+      --warm: #e05ba8;
+      --terminal-prompt: #9ba8ff;
+    }
+    body {
+      background:
+        radial-gradient(circle at 1px 1px, rgba(64,80,200,.08) 1px, transparent 1.5px) 0 0 / 24px 24px,
+        var(--canvas);
+    }
+    .shell { max-width: 1280px; }
+    header.site {
+      position: sticky;
+      z-index: 40;
+      top: 0;
+      height: 68px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(243,242,251,.9);
+      backdrop-filter: blur(14px);
+    }
+    .brand-lockup { gap: 9px; }
+    .brand-label {
+      padding: 5px 8px;
+      border: 1px solid rgba(64,80,200,.28);
+      background: var(--accent-soft);
+      color: var(--accent);
+      letter-spacing: 1.1px;
+    }
+    nav .source-link { border-color: var(--accent); }
+    .btn { position: relative; border-radius: 4px; }
+    .btn::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      right: -5px;
+      width: 8px;
+      height: 12px;
+      border: 1px solid currentColor;
+      border-left: 0;
+      background: inherit;
+      transform: translateY(-50%);
+    }
+    .btn.ghost::after { background: var(--canvas); }
+    section.hero {
+      grid-template-columns: minmax(0,1.05fr) minmax(520px,.95fr);
+      min-height: 710px;
+      padding: 76px 0 92px;
+    }
+    h1.headline {
+      max-width: 690px;
+      color: var(--ink-strong);
+      font-size: clamp(58px,7.6vw,104px);
+      line-height: .88;
+      letter-spacing: -.025em;
+    }
+    h1.headline .accent { color: var(--accent); }
+    .subtext { max-width: 620px; color: var(--ink-base); }
+    .platform-line {
+      width: fit-content;
+      padding: 10px 13px;
+      border: 1px solid var(--border);
+      background: rgba(251,250,255,.72);
+    }
+    .hero-art {
+      aspect-ratio: auto;
+      min-height: 565px;
+      overflow: visible;
+      border: 1px solid #bfc2e0;
+      border-radius: 7px;
+      background: #e6e7f5;
+      box-shadow: 18px 18px 0 rgba(64,80,200,.12);
+    }
+    .hero-art::before {
+      content: '';
+      position: absolute;
+      inset: 16px;
+      z-index: 0;
+      border: 1px solid rgba(64,80,200,.2);
+      background:
+        linear-gradient(rgba(64,80,200,.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(64,80,200,.07) 1px, transparent 1px),
+        #f7f7ff;
+      background-size: 32px 32px;
+    }
+    .hero-art::after { display: none; }
+    .bay-label {
+      position: absolute;
+      z-index: 4;
+      top: 28px;
+      left: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--accent);
+      font: 10px/1 var(--mono);
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+    }
+    .bay-label::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #36a570; box-shadow: 0 0 0 4px rgba(54,165,112,.13); }
+    .bay-core {
+      position: absolute;
+      z-index: 3;
+      top: 50%;
+      left: 50%;
+      width: 154px;
+      height: 154px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--ink-strong);
+      border-radius: 50%;
+      background: var(--ink-strong);
+      color: #fff;
+      font: 500 16px/1 var(--mono);
+      box-shadow: 0 0 0 10px #f7f7ff, 0 0 0 11px rgba(64,80,200,.3);
+      transform: translate(-50%,-50%);
+    }
+    .bay-core span { color: #aeb6ff; }
+    .bay-line { position: absolute; z-index: 1; top: 50%; left: 50%; height: 2px; background: var(--accent); transform-origin: left center; opacity: .6; }
+    .bay-line::after { content: ''; position: absolute; top: -4px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: var(--warm); }
+    .bay-line.l1 { width: 39%; transform: rotate(-34deg); }
+    .bay-line.l2 { width: 41%; transform: rotate(34deg); }
+    .bay-line.l3 { width: 40%; transform: rotate(146deg); }
+    .bay-line.l4 { width: 40%; transform: rotate(214deg); }
+    .bay-module {
+      position: absolute;
+      z-index: 3;
+      width: 142px;
+      padding: 13px 14px;
+      border: 1px solid #bfc2e0;
+      border-left: 5px solid var(--accent);
+      border-radius: 3px;
+      background: #fbfaff;
+      box-shadow: 5px 5px 0 rgba(23,24,43,.07);
+    }
+    .bay-module b { display: block; margin-bottom: 6px; font: 500 11px/1.2 var(--mono); }
+    .bay-module span { color: var(--ink-muted); font: 9px/1.3 var(--mono); text-transform: uppercase; }
+    .bay-module.m1 { top: 19%; right: 5%; }
+    .bay-module.m2 { right: 4%; bottom: 18%; border-left-color: var(--warm); }
+    .bay-module.m3 { bottom: 17%; left: 4%; border-left-color: #36a570; }
+    .bay-module.m4 { top: 18%; left: 5%; border-left-color: #6c77d9; }
+    .hero-art .credit {
+      right: 28px;
+      bottom: 27px;
+      left: auto;
+      border-radius: 3px;
+      background: var(--ink-strong);
+      color: #c8cae0;
+    }
+
+    section.paths {
+      padding: 0;
+      border-block: 1px solid #252842;
+      background: var(--ink-strong);
+      color: #f6f5ff;
+    }
+    section.paths .section-head { display: none; }
+    .path-grid { grid-template-columns: repeat(3,1fr); gap: 0; }
+    .path-card,
+    .path-card.featured {
+      min-height: 320px;
+      padding: 34px;
+      border: 0;
+      border-right: 1px solid #353853;
+      border-radius: 0;
+      background: transparent;
+      color: #f6f5ff;
+    }
+    .path-card:last-child { border-right: 0; }
+    .path-kicker,
+    .featured .path-kicker { color: #aeb6ff; }
+    .path-card h3 { font-size: 34px; }
+    .path-card p,
+    .featured p { color: #afb1c5; }
+    .path-card .path-link,
+    .featured .path-link { color: #d5d9ff; }
+
+    section.catalog {
+      padding: 108px 0;
+      background: rgba(243,242,251,.86);
+    }
+    .catalog-head { grid-template-columns: 1fr 1fr; padding-bottom: 28px; border-bottom: 2px solid var(--ink-strong); }
+    .plugin-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; counter-reset: plugin-module; }
+    .plugin-card {
+      counter-increment: plugin-module;
+      min-height: 305px;
+      padding: 24px 24px 20px 92px;
+      overflow: hidden;
+      border: 1px solid #cbccdf;
+      border-radius: 4px;
+      background: rgba(251,250,255,.9);
+      box-shadow: none;
+    }
+    .plugin-card::before {
+      content: 'MODULE ' counter(plugin-module, decimal-leading-zero);
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 66px;
+      display: grid;
+      place-items: center;
+      border-right: 1px solid #cbccdf;
+      background: #e5e6f5;
+      color: var(--accent);
+      font: 500 13px/1 var(--mono);
+      writing-mode: vertical-rl;
+      letter-spacing: 1.4px;
+    }
+    .plugin-card { position: relative; }
+    .plugin-card:hover { border-color: var(--accent); box-shadow: 6px 6px 0 rgba(64,80,200,.13); transform: translate(-2px,-2px); }
+    .plugin-card h3 { margin-top: 25px; font-size: 34px; }
+    .plugin-meta { color: var(--accent); }
+    .plugin-tags span { border-color: #d0d2ea; background: #f0f0fb; }
+    .command { border-radius: 2px; background: #ececf8; }
+    .copy { border-radius: 2px; }
+
+    section.showcase {
+      padding: 108px 0;
+      border-color: #22253e;
+      background: #151629;
+    }
+    section.showcase::before { background: linear-gradient(125deg,rgba(64,80,200,.2),transparent 48%),radial-gradient(60% 50% at 100% 100%,rgba(224,91,168,.14),transparent 60%); }
+    .showcase-tag { color: #aeb6ff; }
+    .showcase-title .accent { color: #ff8bd0; }
+    .proof-grid { grid-template-columns: 1.45fr .75fr; }
+    .proof-card { border-radius: 5px; border-color: #393c5a; background: #202238; }
+    .proof-copy .tag { color: #aeb6ff; }
+    .proof-copy .dark-command { border-radius: 2px; background: #111225; }
+    .proof-copy .dark-command span { color: #ff8bd0; }
+
+    section.contract { padding: 108px 0; background: #e9e9f6; }
+    .terminal { border-radius: 5px; }
+    section.final { padding: 96px 0; border-top: 1px solid #2a2d49; background: var(--ink-strong); color: #f6f5ff; }
+    .final p { color: #b4b6c9; }
+    .final .btn.ghost { border-color: #50536f; color: #fff; }
+    .final .btn.ghost::after { background: var(--ink-strong); }
+    footer.site { border-color: #cfd0e2; }
+
+    @media (max-width: 960px) {
+      section.hero { grid-template-columns: 1fr; }
+      .hero-art { min-height: 540px; }
+      .path-grid { grid-template-columns: 1fr; }
+      .path-card { border-right: 0; border-bottom: 1px solid #353853; }
+      .path-card:last-child { border-bottom: 0; }
+      .proof-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .plugin-grid { grid-template-columns: 1fr; }
+      .catalog-head { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .hero-art { min-height: 470px; box-shadow: 10px 10px 0 rgba(64,80,200,.12); }
+      .bay-core { width: 112px; height: 112px; font-size: 12px; }
+      .bay-module { width: 112px; padding: 10px; }
+      .bay-module b { font-size: 9.5px; }
+      .bay-module span { font-size: 8px; }
+      .plugin-card { padding-left: 75px; }
+      .plugin-card::before { width: 53px; }
+    }
   </style>
 </head>
 <body>
@@ -210,13 +480,13 @@
       <section class="hero">
         <div>
           <h1 class="headline">
-            <span>Production</span>
-            <span>workflows.</span>
-            <span class="accent">Locally.</span>
+            <span>The extension</span>
+            <span>bay for</span>
+            <span class="accent">local AI.</span>
           </h1>
-          <p class="subtext">Official companion plugins for mere.run.
-VFX, realtime music, production tracking,
-private workflows, automation, and GPU training.</p>
+          <p class="subtext">Plug production workflows into mere.run.
+VFX, realtime performance, review, privacy,
+automation, and user-owned GPU training.</p>
           <div class="hero-cta">
             <a class="btn lg" href="#plugins">Browse plugins</a>
             <a class="btn lg ghost" href="https://github.com/sawfwair/mere-run-plugins/blob/main/docs/plugins/contract.md" target="_blank" rel="noopener">Plugin contract</a>
@@ -229,8 +499,15 @@ private workflows, automation, and GPU training.</p>
             <span class="ready">cleanup by default</span>
           </div>
         </div>
-        <div class="hero-art" role="img" aria-label="The real mere.perform Magenta Heart stage with prompt anchors and a playable keyboard.">
-          <span class="credit"><span class="accent">$</span> mere-perform perform · Magenta Heart · MIDI stage UI</span>
+        <div class="hero-art" role="img" aria-label="A modular extension bay showing plugin workflows connected to the mere.run local runtime.">
+          <div class="bay-label">extension bay // 12 modules online</div>
+          <div class="bay-line l1"></div><div class="bay-line l2"></div><div class="bay-line l3"></div><div class="bay-line l4"></div>
+          <div class="bay-core">mere<span>.run</span></div>
+          <div class="bay-module m1"><b>mere-perform</b><span>realtime · MIDI · stage</span></div>
+          <div class="bay-module m2"><b>mere-runpod</b><span>train · fetch · cleanup</span></div>
+          <div class="bay-module m3"><b>mere-vfx-tools</b><span>roto · depth · geometry</span></div>
+          <div class="bay-module m4"><b>mere-doc-tools</b><span>OCR · redact · private</span></div>
+          <span class="credit"><span class="accent">catalog</span> mere.run/plugin-catalog.v1</span>
         </div>
       </section>
     </main>
@@ -275,8 +552,8 @@ private workflows, automation, and GPU training.</p>
     <div class="shell">
       <div class="catalog-head">
         <div class="section-head">
-          <div class="section-tag">The official catalog</div>
-          <h2 class="section-title">Install only what the workflow needs.</h2>
+          <div class="section-tag">Module index · 12 official plugins</div>
+          <h2 class="section-title">Wire in only what the job needs.</h2>
         </div>
         <p class="catalog-note">Every card below maps to the repository’s live catalog. Inspect the <a href="/catalog/plugins.v1.json">machine-readable source</a> or install through the public <code>mere.run plugin</code> surface.</p>
       </div>
