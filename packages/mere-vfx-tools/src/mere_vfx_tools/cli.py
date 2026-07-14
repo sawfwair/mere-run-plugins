@@ -2443,13 +2443,161 @@ def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     if mode == "native-triposr":
         execute_native_image_to_3d(manifest, output_dir)
         return
+    if mode == "native-trellis2":
+        execute_native_image_to_3d_trellis2(manifest, output_dir)
+        return
     if mode == "supplied-depth-2.5d":
         execute_supplied_depth_image_to_3d(manifest, output_dir)
         return
     raise PluginError(
-        "request.options.reconstructionMode must be 'native-triposr' or 'supplied-depth-2.5d'",
+        "request.options.reconstructionMode must be 'native-triposr', 'native-trellis2', or 'supplied-depth-2.5d'",
         2,
     )
+
+
+def execute_native_image_to_3d_trellis2(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
+    options = options_for(manifest)
+    if inputs.get("depthImages") is not None or inputs.get("video") is not None or inputs.get("frames") is not None:
+        raise PluginError("native TRELLIS.2 reconstructs exactly one still image", 2)
+    source = single_image_to_3d_source(request)
+    seed = option_int(options, "seed", 42)
+    max_tokens = option_int(options, "maxTokens", 2097152)
+    already_framed = option_bool(options, "alreadyFramed", False)
+    if seed < 0:
+        raise PluginError("request.options.seed must be a non-negative integer", 2)
+    if max_tokens < 1:
+        raise PluginError("request.options.maxTokens must be a positive integer", 2)
+
+    native_output = output_dir / "native-trellis2"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "image", "reconstruct-3d-trellis2", str(source),
+        "--output", str(native_output),
+        "--seed", str(seed),
+        "--max-tokens", str(max_tokens),
+    ]
+    model = option_string(options, "model")
+    if model:
+        argv.extend(["--model", model])
+    if already_framed:
+        argv.append("--already-framed")
+    argv.append("--json")
+
+    payload = run_json_process(argv, "mere.run image reconstruct-3d-trellis2")
+    run = load_native_run(payload, native_output, "mere.run image reconstruct-3d-trellis2")
+    native = run.manifest
+    if native.get("schemaVersion") != 1:
+        raise PluginError("native TRELLIS.2 run manifest has an unsupported schemaVersion")
+    reported_output = native.get("outputDirectory")
+    if not isinstance(reported_output, str) or pathlib.Path(reported_output).resolve() != native_output.resolve():
+        raise PluginError("native TRELLIS.2 manifest outputDirectory does not match the confined output directory")
+    if not model and native.get("modelID") != "image-3d-trellis2-4b":
+        raise PluginError("native reconstruction did not report the audited image-3d-trellis2-4b model")
+    if not model and native.get("repository") != "microsoft/TRELLIS.2-4B":
+        raise PluginError("native TRELLIS.2 manifest has unexpected provenance")
+    if native.get("license") != "MIT":
+        raise PluginError("native TRELLIS.2 manifest did not report its MIT license")
+    if native.get("inferenceBackend") != "mere.run-native-mlx":
+        raise PluginError("native TRELLIS.2 manifest does not identify the native MLX backend")
+    if not isinstance(native.get("revision"), str) or not native.get("revision"):
+        raise PluginError("native TRELLIS.2 manifest is missing its pinned revision")
+    for key in ("modelID", "repository", "revision", "schemaVersion", "status"):
+        if key in payload and key in {"modelID", "repository", "revision"} and payload.get(key) != native.get(key):
+            raise PluginError(f"native TRELLIS.2 result and manifest disagree on {key}")
+
+    components = as_list(native.get("checkpointComponents"), "native TRELLIS.2 checkpointComponents")
+    if not components:
+        raise PluginError("native TRELLIS.2 manifest lists no checkpoint components")
+    for index, value in enumerate(components):
+        component = as_map(value, f"native TRELLIS.2 checkpoint component {index}")
+        for field in ("name", "relativePath", "repository", "revision", "license"):
+            if not isinstance(component.get(field), str) or not component.get(field):
+                raise PluginError(f"native TRELLIS.2 checkpoint component {index} is missing {field}")
+        validated_sha256(component.get("sha256"), f"native TRELLIS.2 checkpoint component {index} sha256")
+        byte_count = component.get("byteCount")
+        if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count < 1:
+            raise PluginError(f"native TRELLIS.2 checkpoint component {index} has invalid byteCount")
+
+    native_input = as_map(native.get("input"), "native TRELLIS.2 input")
+    if native_input.get("path") != str(source):
+        raise PluginError("native TRELLIS.2 manifest input path does not match the requested image")
+    if validated_sha256(native_input.get("sha256"), "native TRELLIS.2 input sha256") != sha256(source):
+        raise PluginError("native TRELLIS.2 manifest input checksum does not match the requested image")
+
+    generation = as_map(native.get("generation"), "native TRELLIS.2 generation")
+    if generation.get("seed") != seed:
+        raise PluginError("native TRELLIS.2 generation seed does not match the request")
+    if generation.get("maximumSparseTokens") != max_tokens:
+        raise PluginError("native TRELLIS.2 sparse-token limit does not match the request")
+    if "seed" in payload and payload.get("seed") != seed:
+        raise PluginError("native TRELLIS.2 result seed does not match the request")
+
+    mesh = as_map(native.get("mesh"), "native TRELLIS.2 mesh")
+    if mesh.get("coordinateSystem") != "model-x-right-y-up-z-forward":
+        raise PluginError("native TRELLIS.2 mesh reported an unexpected coordinate system")
+    if mesh.get("units") != "normalized-object-space":
+        raise PluginError("native TRELLIS.2 mesh must report normalized object-space units")
+    if mesh.get("inferredUnseenGeometry") is not True:
+        raise PluginError("native TRELLIS.2 mesh must disclose inferred unseen geometry")
+    for count_key in ("vertexCount", "triangleCount", "pbrVoxelCount"):
+        count = mesh.get(count_key)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise PluginError(f"native TRELLIS.2 mesh has invalid {count_key}")
+
+    required = {
+        "obj": one_native_artifact(run, "obj", "native TRELLIS.2"),
+        "ply": one_native_artifact(run, "ply", "native TRELLIS.2"),
+        "glb": one_native_artifact(run, "glb", "native TRELLIS.2"),
+        "pbr-voxels": one_native_artifact(run, "pbr-voxels", "native TRELLIS.2"),
+        "mesh-manifest": one_native_artifact(run, "mesh-manifest", "native TRELLIS.2"),
+    }
+    if "pbrVoxelSHA256" in payload and validated_sha256(
+        payload.get("pbrVoxelSHA256"), "native TRELLIS.2 result pbrVoxelSHA256"
+    ) != sha256(required["pbr-voxels"]):
+        raise PluginError("native TRELLIS.2 result and pbr-voxels artifact checksum disagree")
+
+    delivery = output_dir / "image-to-3d.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-image-to-3d.v2",
+        "source": str(source),
+        "reconstructionMode": "native-trellis2",
+        "geometryMode": "native-single-image-object-reconstruction",
+        "nativeInference": True,
+        "modelID": native.get("modelID"),
+        "repository": native.get("repository"),
+        "revision": native.get("revision"),
+        "license": native.get("license"),
+        "checkpointComponents": components,
+        "nativeManifest": str(run.manifest_path),
+        "nativeManifestSha256": sha256(run.manifest_path),
+        "nativeOutputDirectory": str(native_output.resolve()),
+        "coordinateSystem": mesh.get("coordinateSystem"),
+        "units": mesh.get("units"),
+        "metricGeometry": False,
+        "inferredUnseenGeometry": True,
+        "generation": generation,
+        "mesh": mesh,
+        "pbrRepresentation": generation.get("pbrRepresentation"),
+        "assets": {
+            kind: {"path": str(path), "sha256": sha256(path)}
+            for kind, path in required.items() if kind != "mesh-manifest"
+        },
+        "nativeArtifacts": run.artifact_records,
+    })
+    artifact(manifest, native_output, "directory", "native-trellis2-reconstruction")
+    artifact(manifest, run.manifest_path, "json", "native-trellis2-run-manifest")
+    for kind in ("obj", "ply", "glb"):
+        artifact(manifest, required[kind], "mesh", f"native-trellis2-{kind}")
+    artifact(manifest, required["pbr-voxels"], "file", "native-trellis2-pbr-voxels")
+    artifact(manifest, delivery, "json", "image-to-3d-handoff")
+    manifest["vfx"] = {
+        "reconstructionMode": "native-trellis2",
+        "vertexCount": mesh.get("vertexCount"),
+        "triangleCount": mesh.get("triangleCount"),
+        "pbrVoxelCount": mesh.get("pbrVoxelCount"),
+        "seed": seed,
+    }
 
 
 def instantmesh_ordered_views(request: JsonMap) -> list[pathlib.Path]:

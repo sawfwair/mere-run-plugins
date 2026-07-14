@@ -100,6 +100,21 @@ loading and inference remain in core `mere.run`.
   with `options.reconstructionMode: "supplied-depth-2.5d"`. That fallback is
   labeled non-native, non-metric, camera-local 2.5D geometry and never claims to
   reconstruct an occluded back side.
+- `options.reconstructionMode: "native-trellis2"` routes the same single-image
+  request through `mere.run image reconstruct-3d-trellis2` (native MLX
+  TRELLIS.2, 512-resolution O-Voxel). The plugin confines the native run,
+  re-hashes the requested image against the manifest's recorded input identity,
+  requires the pinned `microsoft/TRELLIS.2-4B` provenance with an MIT top-level
+  license and per-component checkpoint records (each with repository, revision,
+  license, and SHA-256), checks the requested `seed` and `maxTokens` against the
+  recorded generation parameters, and verifies OBJ, PLY, GLB, and `pbrvox`
+  artifact checksums and byte counts. The handoff labels the result
+  normalized-object-space geometry with inferred unseen surfaces and records the
+  `vertex-rgba-plus-sparse-pbrvox` PBR representation: the GLB carries baked
+  vertex colors while the sparse `.pbrvox` sidecar retains the full
+  albedo/roughness/metallic fields.
+  Request example:
+  `{"inputs":{"image":"./object.png"},"options":{"reconstructionMode":"native-trellis2","seed":42}}`
 - `multiview-image-to-3d` is the reconstruction-only InstantMesh path. It
   requires an explicitly ordered array of exactly four or six user-supplied
   object views and calls `mere.run image reconstruct-3d-multiview`; it never

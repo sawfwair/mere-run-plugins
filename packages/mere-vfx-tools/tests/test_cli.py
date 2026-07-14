@@ -855,6 +855,41 @@ class MereVFXToolsTests(unittest.TestCase):
             self.assertTrue(pathlib.Path(delivery["nativeManifest"]).is_file())
             self.assertTrue(pathlib.Path(delivery["meshManifest"]).is_file())
 
+    def test_image_to_3d_trellis2_mode_validates_options_before_native_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source = root / "source.png"
+            write_image(source)
+            for label, options, expected in (
+                ("seed", {"reconstructionMode": "native-trellis2", "seed": -1}, "options.seed"),
+                ("tokens", {"reconstructionMode": "native-trellis2", "maxTokens": 0}, "options.maxTokens"),
+            ):
+                request = root / f"geometry-{label}.json"
+                write_request(request, {"image": str(source)}, options)
+                code, payload, stderr = self.invoke([
+                    "image-to-3d", "--request-json", str(request),
+                    "--output-dir", str(root / f"out-{label}"),
+                    "--run-id", f"trellis2-{label}", "--mere-run-command", "missing-mere-run",
+                    "--ffmpeg-command", "missing-ffmpeg",
+                ])
+                self.assertEqual(code, 2, stderr)
+                self.assertIn(expected, stderr)
+
+    def test_image_to_3d_rejects_unknown_reconstruction_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source = root / "source.png"
+            write_image(source)
+            request = root / "geometry.json"
+            write_request(request, {"image": str(source)}, {"reconstructionMode": "native-unknown"})
+            code, payload, stderr = self.invoke([
+                "image-to-3d", "--request-json", str(request), "--output-dir", str(root / "out"),
+                "--run-id", "mode-unknown", "--mere-run-command", "missing-mere-run",
+                "--ffmpeg-command", "missing-ffmpeg",
+            ])
+            self.assertEqual(code, 2, stderr)
+            self.assertIn("native-trellis2", stderr)
+
     def test_image_to_3d_supplied_depth_fallback_is_explicit_and_honest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
