@@ -81,6 +81,40 @@ class MereAnimaticToolsTests(unittest.TestCase):
                 self.assertGreater(len(payload["artifacts"]["items"]), 0, name)
                 self.assertTrue((root / name / "run.json").is_file())
 
+    def test_download_assets_accepts_local_paths_in_url_field(self) -> None:
+        # Regression: the documented request shape allows local file paths in the
+        # `url` field, but urlopen() rejected them so the assets were skipped.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            local = root / "frame.png"
+            write_png(local)
+            fetched = root / "plate.png"
+            write_png(fetched)
+            request = {
+                "inputs": {
+                    "assets": [
+                        {"name": "bare-path-in-url", "url": str(local)},
+                        str(local),
+                        {"name": "path-key", "path": str(local)},
+                        {"name": "file-url", "url": fetched.as_uri()},
+                        {"name": "missing-path", "url": str(root / "nope.png")},
+                        {"name": "bad-url", "url": (root / "gone.png").as_uri()},
+                        {"name": "no-source"},
+                    ]
+                }
+            }
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                downloaded = cli.download_assets(request, root / "out")
+            resolved = local.resolve()
+            self.assertEqual(downloaded[:3], [resolved, resolved, resolved])
+            self.assertEqual(len(downloaded), 4)
+            copied = downloaded[3]
+            self.assertEqual(copied.parent, root / "out" / "inputs")
+            self.assertEqual(copied.read_bytes(), fetched.read_bytes())
+            self.assertIn("Skipping missing asset file", stderr.getvalue())
+            self.assertIn("Skipping asset download", stderr.getvalue())
+
     def test_cleanup_is_local_noop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
