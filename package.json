@@ -1,0 +1,17 @@
+{
+  "name": "mere-run-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "docs:coverage": "node scripts/check-docs-coverage.mjs"
+  },
+  "devDependencies": {
+    "@mere/docs-theme": "github:sawfwair/mere-docs#main&path:/packages/docs-theme",
+    "vitepress": "1.6.4"
+  }
+}

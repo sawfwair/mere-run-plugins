@@ -1,0 +1,37 @@
+:root {
+  --plugins-grid: color-mix(in oklch, var(--mere-line) 45%, transparent);
+  --plugins-copper: #b84617;
+}
+
+.VPHome {
+  background-image:
+    linear-gradient(var(--plugins-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--plugins-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.VPHero .name,
+.VPHero .text {
+  max-width: 900px;
+}
+
+.VPHero .name {
+  letter-spacing: -0.035em;
+}
+
+.VPFeature {
+  border-top: 3px solid color-mix(in oklch, var(--mere-accent) 74%, transparent);
+}
+
+.VPFeature .title,
+.vp-doc h2 {
+  letter-spacing: -0.018em;
+}
+
+.vp-doc table code {
+  white-space: nowrap;
+}
+
+.dark {
+  --plugins-grid: color-mix(in oklch, var(--mere-line) 32%, transparent);
+}
