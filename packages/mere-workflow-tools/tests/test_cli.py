@@ -52,7 +52,24 @@ def write_fake_mere_run(path: pathlib.Path) -> None:
         "elif argv[:2] == ['vision', 'caption']:\n"
         "    out_dir = pathlib.Path(value('--output-dir'))\n"
         "    out_dir.mkdir(parents=True, exist_ok=True)\n"
-        "    images = [pathlib.Path(item) for item in argv if pathlib.Path(item).suffix.lower() in {'.png','.jpg','.jpeg','.webp','.bmp','.tif','.tiff'}]\n"
+        # Mirror mere.run's ArgumentParser semantics: --focus is greedy up to the
+        # next option, so bare arguments after it never reach the positional list.
+        "    positional = []\n"
+        "    greedy = False\n"
+        "    skip_value = False\n"
+        "    for item in argv[2:]:\n"
+        "        if skip_value:\n"
+        "            skip_value = False\n"
+        "        elif item.split('=', 1)[0] == '--focus':\n"
+        "            greedy = True\n"
+        "        elif item.startswith('--'):\n"
+        "            greedy = False\n"
+        "            skip_value = '=' not in item\n"
+        "        elif not greedy:\n"
+        "            positional.append(item)\n"
+        "    images = [pathlib.Path(item) for item in positional if pathlib.Path(item).suffix.lower() in {'.png','.jpg','.jpeg','.webp','.bmp','.tif','.tiff'}]\n"
+        "    if not images:\n"
+        "        raise SystemExit('Provide at least one image path.')\n"
         "    trigger = value('--trigger-token', '')\n"
         "    for image in images:\n"
         "        prefix = (trigger + ', ') if trigger else ''\n"
@@ -115,6 +132,10 @@ class MereWorkflowToolsTests(unittest.TestCase):
                         str(root / "dataset-out"),
                         "--trigger-token",
                         "TESTSTYLE",
+                        "--focus",
+                        "card border",
+                        "--focus",
+                        "printed title",
                         "--ocr",
                     ],
                 ),
@@ -144,6 +165,49 @@ class MereWorkflowToolsTests(unittest.TestCase):
                 self.assertEqual(payload["status"], "succeeded", kind)
                 self.assertGreater(len(payload["artifacts"]["files"]), 0, kind)
                 self.assertEqual(payload["cleanup"]["default"], "none", kind)
+
+    def test_dataset_caption_step_keeps_image_paths_before_focus(self) -> None:
+        # Regression: --focus is variadic in mere.run (up to next option), so any
+        # image path emitted after it is swallowed and captioning exits 64.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            media = root / "media"
+            media.mkdir()
+            write_png(media / "a.png")
+            write_png(media / "b.png")
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main_for("dataset", [
+                    "plan",
+                    "--input",
+                    str(media),
+                    "--output-dir",
+                    str(root / "out"),
+                    "--trigger-token",
+                    "TESTSTYLE",
+                    "--focus",
+                    "card border",
+                    "--focus",
+                    "printed title",
+                    "--mere-run-command",
+                    "missing-mere-run",
+                    "--run-id",
+                    "unit-focus",
+                ])
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads(stdout.getvalue())
+            caption_step = next(step for step in manifest["steps"] if step["name"] == "caption")
+            argv = caption_step["argv"]
+            focus_indexes = [index for index, item in enumerate(argv) if item.startswith("--focus")]
+            self.assertEqual(
+                [argv[index] for index in focus_indexes],
+                ["--focus=card border", "--focus=printed title"],
+            )
+            image_indexes = [index for index, item in enumerate(argv) if item.endswith(".png")]
+            self.assertEqual(len(image_indexes), 2)
+            self.assertLess(max(image_indexes), min(focus_indexes))
+            # Nothing may trail the focus flags, or the greedy parser would eat it.
+            self.assertTrue(all(item.startswith("--focus=") for item in argv[min(focus_indexes):]))
 
     def test_plan_does_not_require_mere_run_command_to_exist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

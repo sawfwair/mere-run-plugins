@@ -413,9 +413,10 @@ def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
         caption_argv.extend(["--prompt", args.prompt])
     if args.trigger_token:
         caption_argv.extend(["--trigger-token", args.trigger_token])
-    for focus in args.focus:
-        caption_argv.extend(["--focus", focus])
     caption_argv.extend(str(path) for path in inputs)
+    # mere.run parses --focus greedily (up to the next option), swallowing any bare
+    # argument after it, so focus terms must stay last; `=` keeps dash-led terms intact.
+    caption_argv.extend(f"--focus={focus}" for focus in args.focus)
     add_step(manifest, "caption", caption_argv, {"captionDirectory": str(captions_dir)})
     if args.ocr:
         add_step(
