@@ -308,6 +308,25 @@ class MereVFXToolsTests(unittest.TestCase):
             self.assertGreaterEqual(len(report["issues"]), 1)
             self.assertEqual(payload["status"], "succeeded")
 
+    def test_shot_qc_accepts_a_video_asset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            video = root / "shot.mov"
+            video.write_bytes(b"video")
+            request = root / "qc-video.json"
+            ffmpeg = root / "ffmpeg.py"
+            write_fake_ffmpeg(ffmpeg)
+            write_request(request, {"video": str(video)})
+            code, payload, _ = self.invoke([
+                "shot-qc", "--request-json", str(request), "--output-dir", str(root / "qc-video"),
+                "--run-id", "qc-video-test", "--mere-run-command", "fake",
+                "--ffmpeg-command", f"{sys.executable} {ffmpeg}",
+            ])
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["status"], "succeeded")
+            report = json.loads((root / "qc-video" / "shot-qc.json").read_text())
+            self.assertEqual(report["frameCount"], 2)
+
     def test_track_export_writes_all_handoffs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)

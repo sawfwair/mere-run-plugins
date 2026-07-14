@@ -876,9 +876,7 @@ def execute_key(manifest: JsonMap, output_dir: pathlib.Path) -> None:
 
 
 def execute_shot_qc(manifest: JsonMap, output_dir: pathlib.Path) -> None:
-    request = as_map(manifest["request"], "request")
-    source = input_path(request, "frames")
-    files = image_files(source)
+    files, _source = sequence_source_frames(manifest, output_dir, "qc-source-frames")
     report_frames: list[JsonMap] = []
     issues: list[JsonMap] = []
     previous_luma: float | None = None

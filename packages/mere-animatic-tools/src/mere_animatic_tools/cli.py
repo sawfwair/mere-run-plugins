@@ -276,17 +276,27 @@ def extension_from_url(url: str, default: str = ".png") -> str:
     return default
 
 
-def download_assets(request: JsonMap, output_dir: pathlib.Path) -> list[pathlib.Path]:  # pragma: no cover
+def download_assets(request: JsonMap, output_dir: pathlib.Path) -> list[pathlib.Path]:
     downloaded: list[pathlib.Path] = []
     asset_dir = output_dir / "inputs"
     for index, asset in enumerate(normalize_assets(request), start=1):
         url = asset.get("url")
         path_value = asset.get("path")
         name = safe_stem(str(asset.get("name") or f"asset-{index}"))
+        if (
+            not (isinstance(path_value, str) and path_value)
+            and isinstance(url, str)
+            and url
+            and not urllib.parse.urlparse(url).scheme
+        ):
+            # The request contract lets `url` carry a local file path too.
+            path_value = url
         if isinstance(path_value, str) and path_value:
             path = pathlib.Path(path_value).expanduser().resolve()
             if path.is_file():
                 downloaded.append(path)
+            else:
+                eprint(f"Skipping missing asset file {path_value}")
             continue
         if not isinstance(url, str) or not url:
             continue

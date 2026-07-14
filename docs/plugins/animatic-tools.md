@@ -54,9 +54,10 @@ tool jobs:
 }
 ```
 
-Assets may be URLs or local file paths. Animatic sends signed asset URLs when a
-project asset is selected. The plugin downloads those inputs into its output
-directory and records them in `run.json`.
+Assets may be URLs or local file paths: the `url` field accepts either, and an
+explicit `path` field also works for local files. Animatic sends signed asset
+URLs when a project asset is selected. The plugin downloads URL inputs into its
+output directory, uses local files in place, and records them in `run.json`.
 
 ## Outputs
 
