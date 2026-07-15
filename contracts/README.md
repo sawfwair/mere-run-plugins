@@ -11,6 +11,18 @@ companion plugins.
 - `run-manifest.v1.schema.json`: durable execution record written before remote
   resources are created.
 - `artifact-bundle.v1.schema.json`: fetched result bundle inventory.
+- `graph-node-provider.v1.schema.json`: versioned node catalog exposed by a
+  graph-capable companion plugin.
+- `graph-node-invocation.v1.schema.json`: confined node request written by the
+  core graph runner.
+- `graph-node-preflight.v1.schema.json`: structured readiness and requirement
+  report returned by a provider.
+- `graph-node-event.v1.schema.json`: streamed progress, preview, artifact,
+  diagnostic, metric, heartbeat, and result records.
 
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.
+
+Graph providers implement fixed `graph catalog`, `graph preflight`, and
+`graph execute` commands. The contracts never supply an arbitrary executable or
+argument vector for the core runtime to trust.

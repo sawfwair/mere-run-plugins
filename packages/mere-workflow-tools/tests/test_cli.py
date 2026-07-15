@@ -10,7 +10,7 @@ from io import StringIO
 
 from PIL import Image
 
-from mere_workflow_tools import cli
+from mere_workflow_tools import cli, graph_provider
 
 
 def write_png(path: pathlib.Path, color: tuple[int, int, int] = (120, 140, 220)) -> None:
@@ -96,6 +96,128 @@ class MereWorkflowToolsTests(unittest.TestCase):
             names = {command["name"] for command in manifest["commands"]}
             self.assertTrue({"manifest", "doctor", "plan", "run", "resume", "cleanup", spec.one_shot}.issubset(names))
             self.assertEqual(manifest["security"]["cleanupDefault"], "none")
+            if spec.kind == "dataset":
+                self.assertIn("graph", names)
+                self.assertIn("graph-node-provider-v1", manifest["capabilities"])
+                self.assertEqual(
+                    manifest["graphProvider"]["contractVersion"],
+                    graph_provider.CONTRACT_VERSION,
+                )
+
+    def test_dataset_graph_catalog_exposes_rich_typed_node(self) -> None:
+        stdout = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(StringIO()):
+            exit_code = cli.main_for("dataset", ["graph", "catalog", "--json"])
+        self.assertEqual(exit_code, 0)
+        catalog = json.loads(stdout.getvalue())
+        self.assertEqual(catalog["contract_version"], graph_provider.CONTRACT_VERSION)
+        self.assertEqual(catalog["provider_id"], "mere-dataset-tools")
+        node = catalog["nodes"][0]
+        self.assertEqual(node["kind"], "dataset.prepare")
+        self.assertTrue(node["traits"]["cacheable"])
+        self.assertEqual(
+            {output["name"]: output["type"] for output in node["outputs"]},
+            {
+                "dataset": "asset_directory",
+                "manifest": "asset",
+                "contact_sheet": "asset",
+                "stats": "json",
+            },
+        )
+
+    def test_dataset_graph_preflight_and_execute_stream_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            write_png(source / "b.png", (20, 40, 80))
+            write_png(source / "a.png", (80, 40, 20))
+            (source / "a.txt").write_text("first caption\n")
+            (source / "b.txt").write_text("second caption\n")
+            node_run = root / "node"
+            invocation = {
+                "contract_version": graph_provider.INVOCATION_VERSION,
+                "job_id": "11111111-2222-3333-4444-555555555555",
+                "node_id": "prepare-data",
+                "kind": "dataset.prepare",
+                "arguments": {
+                    "data": str(source),
+                    "trigger_token": "STYLE",
+                    "contact_sheet": True,
+                },
+                "outputs": {
+                    "dataset": {"type": "asset_directory", "path": "artifacts/dataset"},
+                    "manifest": {"type": "asset", "path": "artifacts/dataset-manifest.json"},
+                    "contact_sheet": {
+                        "type": "asset",
+                        "path": "artifacts/contact-sheet.jpg",
+                        "optional": True,
+                    },
+                    "stats": {"type": "json"},
+                },
+            }
+            request = root / "invocation.json"
+            request.write_text(json.dumps(invocation))
+
+            preflight_stdout = StringIO()
+            with redirect_stdout(preflight_stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main_for(
+                    "dataset",
+                    ["graph", "preflight", "--request", str(request), "--run-dir", str(node_run), "--json"],
+                )
+            self.assertEqual(exit_code, 0)
+            preflight = json.loads(preflight_stdout.getvalue())
+            self.assertEqual(preflight["status"], "ok")
+            self.assertEqual(preflight["requirements"]["model_ids"], [])
+
+            execute_stdout = StringIO()
+            with redirect_stdout(execute_stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main_for(
+                    "dataset",
+                    [
+                        "graph",
+                        "execute",
+                        "--request",
+                        str(request),
+                        "--run-dir",
+                        str(node_run),
+                        "--json-stream",
+                    ],
+                )
+            self.assertEqual(exit_code, 0)
+            events = [json.loads(line) for line in execute_stdout.getvalue().splitlines()]
+            self.assertEqual([event["sequence"] for event in events], list(range(len(events))))
+            self.assertEqual(events[-1]["type"], "node_result")
+            self.assertEqual(events[-1]["outputs"]["stats"]["pair_count"], 2)
+            self.assertEqual(events[-1]["outputs"]["dataset"], "artifacts/dataset")
+            self.assertTrue((node_run / "artifacts/dataset/a.png").is_file())
+            self.assertEqual((node_run / "artifacts/dataset/a.txt").read_text(), "STYLE, first caption\n")
+            self.assertTrue((node_run / "artifacts/dataset-manifest.json").is_file())
+            self.assertTrue((node_run / "artifacts/contact-sheet.jpg").is_file())
+
+    def test_dataset_graph_preflight_blocks_missing_caption_and_path_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            write_png(source / "frame.png")
+            invocation = {
+                "contract_version": graph_provider.INVOCATION_VERSION,
+                "job_id": "11111111-2222-3333-4444-555555555555",
+                "node_id": "prepare-data",
+                "kind": "dataset.prepare",
+                "arguments": {"data": str(source)},
+                "outputs": {
+                    "dataset": {"type": "asset_directory", "path": "../escape"},
+                    "manifest": {"type": "asset", "path": "artifacts/manifest.json"},
+                    "contact_sheet": {"type": "asset", "optional": True},
+                    "stats": {"type": "json"},
+                },
+            }
+            preflight = graph_provider.graph_preflight(invocation, root / "node")
+            self.assertEqual(preflight["status"], "blocked")
+            identifiers = {item["id"] for item in preflight["diagnostics"]}
+            self.assertEqual(identifiers, {"dataset_caption_missing", "output_invalid"})
 
     def test_all_workflows_execute_with_fake_mere_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
