@@ -160,6 +160,7 @@ def plugin_env() -> dict[str, str]:
     package_paths = [
         ROOT / "packages" / "mere-runpod" / "src",
         ROOT / "packages" / "mere-image-tools" / "src",
+        ROOT / "packages" / "mere-face-tools" / "src",
         ROOT / "packages" / "mere-workflow-tools" / "src",
         ROOT / "packages" / "mere-animatic-tools" / "src",
         ROOT / "packages" / "mere-shotgrid-tools" / "src",
@@ -213,6 +214,11 @@ def validate_plugin_manifests() -> None:
         "mere_image_tools",
         "mere-image-tools",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup", "knockout"},
+    )
+    validate_plugin_manifest(
+        "mere_face_tools",
+        "mere-face-tools",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "index", "search"},
     )
     validate_plugin_manifest(
         "mere_animatic_tools",
@@ -385,6 +391,50 @@ def validate_image_tools_plan() -> None:
             fail("image-tools cleanup default should be none")
         if not (root / "subject.run.json").is_file():
             fail("image-tools plan should write default run manifest")
+
+
+def validate_face_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        photos = root / "photos"
+        photos.mkdir()
+        (photos / "face.jpg").write_bytes(b"not-a-real-image-but-plan-only")
+        database = root / "faces.sqlite3"
+        output = root / "face-index"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_face_tools",
+                "plan",
+                "--photos",
+                str(photos),
+                "--database",
+                str(database),
+                "--output-dir",
+                str(output),
+                "--run-id",
+                "validate-face-index",
+                "--mere-run-command",
+                "fake-mere-run",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(pathlib.Path("mere-face-tools plan"), contract_schema("run-manifest.v1.schema.json"), manifest)
+        if manifest["status"] != "planned":
+            fail("face-tools plan manifest should have status planned")
+        if manifest["tool"]["backend"] != "mere.run/vision-face-batch":
+            fail("face-tools plan should call mere.run vision face batch")
+        if manifest["dataset"]["pairCount"] != 1:
+            fail("face-tools plan should count supported photos")
+        if not (output / "run.json").is_file():
+            fail("face-tools plan should write run.json")
 
 
 def validate_workflow_tools_plans() -> None:
@@ -712,6 +762,7 @@ def main() -> int:
     validate_graph_provider()
     validate_runpod_plan()
     validate_image_tools_plan()
+    validate_face_tools_plan()
     validate_workflow_tools_plans()
     validate_animatic_tools_plan()
     validate_shotgrid_tools_plan()

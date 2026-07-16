@@ -101,6 +101,29 @@ vision-segment-sam31`. Set `MERE_IMAGE_TOOLS_MERE_RUN` or pass
 `--mere-run-command` when you need to target a source checkout or non-standard
 binary path.
 
+## Face Tools Plugin
+
+`mere-face-tools` composes the native `mere.run vision face` detector and
+embedder into a resumable SQLite photo index and reference-face search. The
+plugin owns library traversal, change detection, ranking, and review artifacts;
+core `mere.run` owns model download and inference.
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-face-tools"
+mere.run model pull vision-face-buffalo-l
+mere-face-tools index \
+  --photos /Volumes/Photos \
+  --database ./faces.sqlite3 \
+  --output-dir ./face-index
+mere-face-tools search \
+  --database ./faces.sqlite3 \
+  --reference ./scott.jpg \
+  --output-dir ./searches/scott
+```
+
+Search writes ranked JSON and CSV, a contact sheet, and symlink-only review
+folders. It never changes or copies the source photo library.
+
 ## Workflow Tools
 
 `mere-workflow-tools` installs six focused companion commands that turn common
@@ -282,6 +305,7 @@ recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
 packages/mere-image-tools/ local image-production plugin
+packages/mere-face-tools/  local face-library indexing and search plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
 packages/mere-animatic-tools/ local Animatic production helpers
 packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge

@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-07-11T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -46,6 +46,31 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-face-tools",
+      "name": "Face Tools",
+      "description": "Index local photo libraries and search similar faces with the native mere.run face-analysis runtime.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-face-tools",
+      "subdirectory": "packages/mere-face-tools",
+      "entrypoint": "mere-face-tools",
+      "capabilities": [
+        "face-analysis",
+        "face-index",
+        "face-search",
+        "identity-embedding",
+        "photo-library",
+        "review-export",
+        "sqlite"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-face-tools"
         }
       }
     },
