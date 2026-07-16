@@ -41,3 +41,16 @@ Every command supports:
 <tool> resume ./run.json
 <tool> cleanup ./run.json
 ```
+
+`mere-dataset-tools` is also a portable graph-node provider. The fixed protocol
+keeps execution out of the core process:
+
+```bash
+mere-dataset-tools graph catalog --json
+mere-dataset-tools graph preflight --request invocation.json --run-dir ./node --json
+mere-dataset-tools graph execute --request invocation.json --run-dir ./node --json-stream
+```
+
+Its first node, `dataset.prepare`, verifies image-caption pairs and emits a
+training-ready directory, content-addressed manifest, optional contact sheet,
+and structured statistics.

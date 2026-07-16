@@ -280,6 +280,29 @@ def validate_plugin_manifests() -> None:
         )
 
 
+def validate_graph_provider() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "mere_workflow_tools.dataset_cli", "graph", "catalog", "--json"],
+        cwd=ROOT,
+        env=plugin_env(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    catalog = as_map(json.loads(result.stdout), "mere-dataset-tools graph catalog")
+    validate_schema(
+        pathlib.Path("mere-dataset-tools graph catalog"),
+        contract_schema("graph-node-provider.v1.schema.json"),
+        catalog,
+    )
+    if catalog["provider_id"] != "mere-dataset-tools":
+        fail("dataset graph provider reported the wrong provider id")
+    nodes = as_list(catalog["nodes"], "dataset graph nodes")
+    if len(nodes) != 1 or as_map(nodes[0], "dataset graph node")["kind"] != "dataset.prepare":
+        fail("dataset graph provider must expose dataset.prepare")
+
+
 def validate_runpod_plan() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
@@ -686,6 +709,7 @@ def main() -> int:
     validate_recipes()
     validate_eval_recipes()
     validate_plugin_manifests()
+    validate_graph_provider()
     validate_runpod_plan()
     validate_image_tools_plan()
     validate_workflow_tools_plans()
