@@ -1,43 +1,44 @@
 from __future__ import annotations
 
-import datetime as dt
 import hashlib
 import json
 import os
 import pathlib
 import shutil
 import time
-from typing import Callable, cast
+from typing import cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-JsonMap = dict[str, object]
-EventWriter = Callable[[JsonMap], None]
+from .graph_sdk import (
+    EVENT_CONTRACT_VERSION,
+    INVOCATION_CONTRACT_VERSION,
+    PREFLIGHT_CONTRACT_VERSION,
+    PROVIDER_CONTRACT_VERSION,
+    EventWriter,
+    GraphEventStream,
+    GraphProviderError,
+    JsonMap,
+    as_map,
+    confined_path,
+    diagnostic,
+    relative_path,
+    validate_catalog,
+)
+from .graph_sdk import (
+    load_invocation as load_graph_invocation,
+)
 
-CONTRACT_VERSION = "mere.run/plugin-graph-provider.v1"
-INVOCATION_VERSION = "mere.run/plugin-graph-invocation.v1"
-PREFLIGHT_VERSION = "mere.run/plugin-graph-preflight.v1"
-EVENT_VERSION = "mere.run/plugin-graph-event.v1"
+CONTRACT_VERSION = PROVIDER_CONTRACT_VERSION
+INVOCATION_VERSION = INVOCATION_CONTRACT_VERSION
+PREFLIGHT_VERSION = PREFLIGHT_CONTRACT_VERSION
+EVENT_VERSION = EVENT_CONTRACT_VERSION
 NODE_KIND = "dataset.prepare"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 
 
-class GraphProviderError(RuntimeError):
-    pass
-
-
-def now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def as_map(value: object, label: str) -> JsonMap:
-    if isinstance(value, dict):
-        return cast(JsonMap, value)
-    raise GraphProviderError(f"{label} must be an object")
-
-
 def graph_catalog(provider_id: str, provider_version: str) -> JsonMap:
-    return {
+    catalog: JsonMap = {
         "contract_version": CONTRACT_VERSION,
         "provider_id": provider_id,
         "provider_version": provider_version,
@@ -126,20 +127,12 @@ def graph_catalog(provider_id: str, provider_version: str) -> JsonMap:
             }
         ],
     }
+    validate_catalog(catalog)
+    return catalog
 
 
 def load_invocation(path: pathlib.Path) -> JsonMap:
-    try:
-        invocation = as_map(json.loads(path.read_text()), "invocation")
-    except json.JSONDecodeError as exc:
-        raise GraphProviderError(f"invalid invocation JSON: {exc}") from None
-    if invocation.get("contract_version") != INVOCATION_VERSION:
-        raise GraphProviderError(f"unsupported invocation contract: {invocation.get('contract_version')}")
-    if invocation.get("kind") != NODE_KIND:
-        raise GraphProviderError(f"unsupported graph node kind: {invocation.get('kind')}")
-    as_map(invocation.get("arguments"), "arguments")
-    as_map(invocation.get("outputs"), "outputs")
-    return invocation
+    return load_graph_invocation(path, {NODE_KIND})
 
 
 def graph_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap:
@@ -196,6 +189,7 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
         raise GraphProviderError(" ".join(messages))
 
     started = time.monotonic()
+    events = GraphEventStream(write_event)
     arguments = as_map(invocation["arguments"], "arguments")
     source = pathlib.Path(cast(str, arguments["data"])).resolve()
     images = dataset_images(source, arguments)
@@ -233,19 +227,16 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
                 "caption_sha256": file_sha256(copied_caption),
             }
         )
-        write_event(
-            event(
-                index - 1,
-                "progress",
-                message=f"Prepared {image.name}",
-                progress={
-                    "phase": "prepare",
-                    "current": index,
-                    "total": len(images),
-                    "fraction": index / len(images),
-                    "unit": "images",
-                },
-            )
+        events.emit(
+            "progress",
+            message=f"Prepared {image.name}",
+            progress={
+                "phase": "prepare",
+                "current": index,
+                "total": len(images),
+                "fraction": index / len(images),
+                "unit": "images",
+            },
         )
 
     stats: JsonMap = {
@@ -261,44 +252,36 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-    sequence = len(images)
-    write_event(event(sequence, "artifact_ready", artifact=artifact_value("dataset", dataset, run_directory, "application/vnd.mere.dataset")))
-    sequence += 1
-    write_event(event(sequence, "artifact_ready", artifact=artifact_value("manifest", manifest_path, run_directory, "application/json")))
-    sequence += 1
+    events.emit(
+        "artifact_ready",
+        artifact=artifact_value("dataset", dataset, run_directory, "application/vnd.mere.dataset"),
+    )
+    events.emit(
+        "artifact_ready",
+        artifact=artifact_value("manifest", manifest_path, run_directory, "application/json"),
+    )
 
     contact_sheet_output: object = None
     if bool(arguments.get("contact_sheet", True)) and contact_sheet_path is not None:
         make_contact_sheet([dataset / image.name for image in images], contact_sheet_path)
         contact_sheet_output = relative_path(contact_sheet_path, run_directory)
-        write_event(
-            event(
-                sequence,
-                "preview_ready",
-                artifact=artifact_value("contact_sheet", contact_sheet_path, run_directory, "image/jpeg"),
-            )
+        events.emit(
+            "preview_ready",
+            artifact=artifact_value("contact_sheet", contact_sheet_path, run_directory, "image/jpeg"),
         )
-        sequence += 1
 
-    write_event(
-        event(
-            sequence,
-            "metric",
-            metric={"name": "duration", "value": time.monotonic() - started, "unit": "seconds"},
-        )
+    events.emit(
+        "metric",
+        metric={"name": "duration", "value": time.monotonic() - started, "unit": "seconds"},
     )
-    sequence += 1
-    write_event(
-        event(
-            sequence,
-            "node_result",
-            outputs={
-                "dataset": relative_path(dataset, run_directory),
-                "manifest": relative_path(manifest_path, run_directory),
-                "contact_sheet": contact_sheet_output,
-                "stats": stats,
-            },
-        )
+    events.emit(
+        "node_result",
+        outputs={
+            "dataset": relative_path(dataset, run_directory),
+            "manifest": relative_path(manifest_path, run_directory),
+            "contact_sheet": contact_sheet_output,
+            "stats": stats,
+        },
     )
 
 
@@ -339,21 +322,6 @@ def output_locations(invocation: JsonMap, run_directory: pathlib.Path) -> dict[s
             raise GraphProviderError(f"outputs.{name}.path must be a string")
         locations[name] = confined_path(run_directory, raw_path)
     return locations
-
-
-def confined_path(root: pathlib.Path, relative: str) -> pathlib.Path:
-    raw = pathlib.PurePosixPath(relative)
-    if raw.is_absolute() or not raw.parts or any(part in {"", ".", ".."} for part in raw.parts):
-        raise GraphProviderError(f"output path is not confined: {relative}")
-    resolved_root = root.resolve()
-    candidate = (resolved_root / pathlib.Path(*raw.parts)).resolve()
-    if candidate != resolved_root and resolved_root not in candidate.parents:
-        raise GraphProviderError(f"output path escapes the run directory: {relative}")
-    return candidate
-
-
-def relative_path(path: pathlib.Path, root: pathlib.Path) -> str:
-    return path.resolve().relative_to(root.resolve()).as_posix()
 
 
 def make_empty_directory(path: pathlib.Path) -> None:
@@ -403,20 +371,5 @@ def make_contact_sheet(images: list[pathlib.Path], output: pathlib.Path) -> None
     sheet.save(output, format="JPEG", quality=90)
 
 
-def diagnostic(identifier: str, severity: str, title: str, message: str) -> JsonMap:
-    return {"id": identifier, "severity": severity, "title": title, "message": message}
-
-
 def artifact_value(name: str, path: pathlib.Path, root: pathlib.Path, content_type: str) -> JsonMap:
     return {"name": name, "path": relative_path(path, root), "content_type": content_type}
-
-
-def event(sequence: int, event_type: str, **values: object) -> JsonMap:
-    payload: JsonMap = {
-        "contract_version": EVENT_VERSION,
-        "sequence": sequence,
-        "created_at": now_iso(),
-        "type": event_type,
-    }
-    payload.update(values)
-    return payload

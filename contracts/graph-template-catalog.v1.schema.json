@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/graph-template-catalog.v1.schema.json",
+  "title": "mere.run Graph Template Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "templates"],
+  "properties": {
+    "contract_version": {"const": "mere.run/graph-template-catalog.v1"},
+    "templates": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/template"}
+    }
+  },
+  "$defs": {
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description", "path", "tags"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]+\\.json$"},
+        "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

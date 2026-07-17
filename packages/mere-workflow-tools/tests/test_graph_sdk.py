@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+import contextlib
+import io
+import json
+import pathlib
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+from mere_workflow_tools import cli, comfy_bridge, graph_conformance, graph_provider, graph_sdk
+
+
+class GraphSDKTests(unittest.TestCase):
+    def test_catalog_and_event_stream_conformance(self) -> None:
+        catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
+        graph_sdk.validate_catalog(catalog)
+        events: list[graph_sdk.JsonMap] = []
+        stream = graph_sdk.GraphEventStream(events.append)
+
+        stream.emit("progress", progress={"current": 1, "total": 1})
+        stream.emit("node_result", outputs={"dataset": "artifacts/dataset"})
+
+        self.assertEqual([item["sequence"] for item in events], [0, 1])
+        self.assertEqual(events[0]["contract_version"], graph_sdk.EVENT_CONTRACT_VERSION)
+        with self.assertRaisesRegex(graph_sdk.GraphProviderError, "final provider event"):
+            stream.emit("metric", metric={"name": "late", "value": 1})
+
+    def test_catalog_rejects_duplicate_node_kinds_and_invalid_traits(self) -> None:
+        catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
+        catalog["nodes"] = [catalog["nodes"][0], catalog["nodes"][0]]
+        with self.assertRaisesRegex(graph_sdk.GraphProviderError, "duplicate graph node kind"):
+            graph_sdk.validate_catalog(catalog)
+
+        catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
+        catalog["nodes"][0]["traits"]["cacheable"] = "yes"
+        with self.assertRaisesRegex(graph_sdk.GraphProviderError, "cacheable must be a boolean"):
+            graph_sdk.validate_catalog(catalog)
+
+    def test_invocation_and_path_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            request = root / "request.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "contract_version": graph_sdk.INVOCATION_CONTRACT_VERSION,
+                        "kind": "dataset.prepare",
+                        "arguments": {},
+                        "outputs": {},
+                    }
+                )
+            )
+            invocation = graph_sdk.load_invocation(request, {"dataset.prepare"})
+
+            self.assertEqual(invocation["kind"], "dataset.prepare")
+            self.assertEqual(
+                graph_sdk.confined_path(root, "artifacts/output.json"),
+                (root / "artifacts/output.json").resolve(),
+            )
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "not confined"):
+                graph_sdk.confined_path(root, "../escape")
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "escapes"):
+                graph_sdk.relative_path(root.parent, root)
+
+    def test_conformance_cli_validates_catalog_file(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            catalog = root / "catalog.json"
+            catalog.write_text(json.dumps(graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")))
+            stdout = io.StringIO()
+            with mock.patch.object(sys, "argv", ["mere-graph-conformance", "--catalog", str(catalog), "--json"]):
+                with contextlib.redirect_stdout(stdout):
+                    exit_code = graph_conformance.main()
+
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["node_kinds"], ["dataset.prepare"])
+
+    def test_conformance_cli_reports_invalid_provider_output(self) -> None:
+        completed = mock.Mock(returncode=0, stdout="not-json", stderr="")
+        stderr = io.StringIO()
+        with mock.patch("mere_workflow_tools.graph_conformance.subprocess.run", return_value=completed):
+            with mock.patch.object(sys, "argv", ["mere-graph-conformance", "--provider", "fixture"]):
+                with contextlib.redirect_stderr(stderr):
+                    exit_code = graph_conformance.main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("invalid catalog JSON", stderr.getvalue())
+
+    def test_comfy_api_prompt_imports_as_native_image_graph(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            workflow = root / "portrait-workflow.json"
+            graph = root / "graph.json"
+            inputs = root / "inputs.json"
+            workflow.write_text(json.dumps(comfy_api_prompt()))
+            stdout = io.StringIO()
+
+            with contextlib.redirect_stdout(stdout):
+                exit_code = cli.main_for(
+                    "dataset",
+                    [
+                        "graph",
+                        "comfy",
+                        "import",
+                        str(workflow),
+                        "--model",
+                        "image-krea2-turbo",
+                        "--output",
+                        str(graph),
+                        "--inputs-output",
+                        str(inputs),
+                        "--json",
+                    ],
+                )
+
+            result = json.loads(stdout.getvalue())
+            graph_value = json.loads(graph.read_text())
+            input_value = json.loads(inputs.read_text())
+            arguments = graph_value["nodes"][0]["arguments"]
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(result["status"], "imported")
+            self.assertEqual(graph_value["kind"], "mere.run/workflow-graph")
+            self.assertEqual(graph_value["name"], "portrait-workflow")
+            self.assertEqual(arguments["model"], "image-krea2-turbo")
+            self.assertEqual(arguments["width"], 1024)
+            self.assertEqual(arguments["cfg_scale"], 4.5)
+            self.assertEqual(input_value["prompt"], "cinematic portrait")
+            self.assertEqual(graph_value["metadata"]["comfy_checkpoint"], "flux.safetensors")
+            self.assertEqual(len(result["report"]["warnings"]), 2)
+
+    def test_comfy_ui_workflow_is_inspectable_but_not_importable(self) -> None:
+        report = comfy_bridge.inspect_workflow(
+            {
+                "version": 0.4,
+                "nodes": [
+                    {"id": 1, "type": "KSampler"},
+                    {"id": 2, "type": "CustomMagicNode"},
+                ],
+                "links": [],
+            }
+        )
+
+        self.assertEqual(report["format"], "ui")
+        self.assertFalse(report["importable"])
+        self.assertEqual(report["unsupported_class_types"], ["CustomMagicNode"])
+        with self.assertRaisesRegex(comfy_bridge.ComfyBridgeError, "API prompt format"):
+            comfy_bridge.import_workflow(
+                {"version": 0.4, "nodes": [{"id": 1, "type": "KSampler"}]},
+                model_id="image-krea2-turbo",
+                source_name="fixture.json",
+                asset_root=None,
+            )
+
+    def test_native_graph_templates_are_listed_and_exported(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            output = pathlib.Path(raw_root) / "workflow.json"
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = cli.main_for(
+                    "dataset",
+                    [
+                        "graph",
+                        "templates",
+                        "export",
+                        "lora-train-sample",
+                        "--output",
+                        str(output),
+                        "--json",
+                    ],
+                )
+
+            result = json.loads(stdout.getvalue())
+            graph = json.loads(output.read_text())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(result["status"], "exported")
+            self.assertEqual(graph["metadata"]["template_id"], "lora-train-sample")
+            self.assertEqual(graph["nodes"][0]["provider"], "mere-dataset-tools")
+
+
+def comfy_api_prompt() -> graph_sdk.JsonMap:
+    return {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "flux.safetensors"}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "cinematic portrait", "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry", "clip": ["1", 1]}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 768, "batch_size": 1}},
+        "5": {
+            "class_type": "KSampler",
+            "inputs": {
+                "model": ["1", 0],
+                "positive": ["2", 0],
+                "negative": ["3", 0],
+                "latent_image": ["4", 0],
+                "seed": 42,
+                "steps": 20,
+                "cfg": 4.5,
+                "sampler_name": "euler",
+                "scheduler": "normal",
+                "denoise": 1.0,
+            },
+        },
+        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "ComfyUI"}},
+    }
+
+
+if __name__ == "__main__":
+    unittest.main()

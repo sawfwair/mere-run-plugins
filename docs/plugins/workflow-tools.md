@@ -1,6 +1,7 @@
 # Workflow Tools
 
-`mere-workflow-tools` is a shared package that installs six companion commands:
+`mere-workflow-tools` is a shared package that installs six companion commands
+and one graph-provider conformance tool:
 
 - `mere-doc-tools`
 - `mere-media-scrub`
@@ -8,6 +9,7 @@
 - `mere-transcript-tools`
 - `mere-image-compose`
 - `mere-batch-runner`
+- `mere-graph-conformance`
 
 Each command follows the same plugin fashion:
 
@@ -89,6 +91,43 @@ entries tell the runner which artifacts to hash after execution:
 ```json
 {"argv":["text","anonymize","--output","./redacted.txt"],"outputs":{"redacted":"./redacted.txt"}}
 ```
+
+## Portable Graphs
+
+`mere-dataset-tools` exposes `dataset.prepare` through the fixed graph-provider
+protocol. The package SDK centralizes confined invocation decoding, diagnostic
+records, ordered event streams, and catalog conformance:
+
+```bash
+mere-graph-conformance --provider mere-dataset-tools --json
+mere-dataset-tools graph templates list --json
+mere-dataset-tools graph templates export lora-train-sample \
+  --output ./workflow.json --json
+```
+
+The native template catalog includes dataset-to-LoRA-to-sample and
+image-to-video workflows. The canonical graph and run schemas are mirrored in
+`contracts/` and validated with every repository gate.
+
+## ComfyUI Bridge
+
+The bridge is an importer, not a second runtime. It inspects ComfyUI UI or API
+JSON and imports a supported API prompt subset into a native graph:
+
+```bash
+mere-dataset-tools graph comfy inspect ./comfy-workflow.json --json
+mere-dataset-tools graph comfy import ./comfy-api.json \
+  --model image-krea2-turbo \
+  --output ./workflow.json \
+  --inputs-output ./inputs.json \
+  --json
+```
+
+Checkpoint, CLIP text, KSampler, latent-image, optional image input, optional
+LoRA, VAE decode, and save nodes are recognized. Custom nodes and UI-only
+exports remain inspectable but block import with explicit diagnostics. ComfyUI
+sampler and scheduler choices are reported as omitted warnings when the native
+node contract has no equivalent.
 
 ## Why These Are Plugins
 

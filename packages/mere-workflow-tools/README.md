@@ -54,3 +54,16 @@ mere-dataset-tools graph execute --request invocation.json --run-dir ./node --js
 Its first node, `dataset.prepare`, verifies image-caption pairs and emits a
 training-ready directory, content-addressed manifest, optional contact sheet,
 and structured statistics.
+
+The package also includes reusable provider helpers, a conformance command,
+native graph templates, and a conservative ComfyUI API importer:
+
+```bash
+mere-graph-conformance --provider mere-dataset-tools --json
+mere-dataset-tools graph templates list --json
+mere-dataset-tools graph comfy inspect ./workflow.json --json
+```
+
+ComfyUI compatibility stops at import. Imported requests become ordinary
+`mere.run/workflow-graph` documents and use the same local, SSH, or Relay
+execution contract as graphs authored elsewhere.

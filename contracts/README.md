@@ -19,6 +19,11 @@ companion plugins.
   report returned by a provider.
 - `graph-node-event.v1.schema.json`: streamed progress, preview, artifact,
   diagnostic, metric, heartbeat, and result records.
+- `workflow-graph.v1.schema.json`: mirrored portable graph contract consumed
+  unchanged by local, SSH, and Relay workers.
+- `graph-run.v1.schema.json`: mirrored run manifest emitted by every executor.
+- `graph-template-catalog.v1.schema.json`: discoverable reusable graph templates
+  shipped by this companion repository.
 
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.

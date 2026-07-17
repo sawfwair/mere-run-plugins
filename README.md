@@ -131,7 +131,9 @@ folders. It never changes or copies the source photo library.
 ## Workflow Tools
 
 `mere-workflow-tools` installs six focused companion commands that turn common
-local inference workflows into repeatable manifests:
+local inference workflows into repeatable manifests, plus graph-provider
+conformance, reusable native graph templates, and conservative ComfyUI API
+import:
 
 ```bash
 mere-doc-tools process --input ./scan.png --output-dir ./doc-out
@@ -140,6 +142,9 @@ mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigge
 mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
 mere-image-compose generate --prompt "a product render" --output-dir ./image-out
 mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
+mere-graph-conformance --provider mere-dataset-tools --json
+mere-dataset-tools graph templates list --json
+mere-dataset-tools graph comfy inspect ./comfy-workflow.json --json
 ```
 
 These tools call existing `mere.run` surfaces such as `vision ocr`,

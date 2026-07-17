@@ -124,6 +124,42 @@ def validate_eval_recipes() -> None:
             fail(f"{path}: public eval recipe must not contain workstation paths")
 
 
+def validate_graph_templates() -> None:
+    root = ROOT / "graph-templates"
+    catalog_path = root / "catalog.v1.json"
+    catalog = load_json(catalog_path)
+    validate_schema(catalog_path, contract_schema("graph-template-catalog.v1.schema.json"), catalog)
+    graph_schema = contract_schema("workflow-graph.v1.schema.json")
+    seen: set[str] = set()
+    for raw_template in as_list(catalog["templates"], f"{catalog_path}: templates"):
+        template = as_map(raw_template, f"{catalog_path}: template")
+        template_id = str(template["id"])
+        if template_id in seen:
+            fail(f"{catalog_path}: duplicate graph template id {template_id}")
+        seen.add(template_id)
+        relative = pathlib.PurePosixPath(str(template["path"]))
+        if relative.is_absolute() or ".." in relative.parts:
+            fail(f"{catalog_path}: unconfined graph template path {relative}")
+        graph_path = root / pathlib.Path(*relative.parts)
+        graph = load_json(graph_path)
+        validate_schema(graph_path, graph_schema, graph)
+        packaged_path = (
+            ROOT
+            / "packages/mere-workflow-tools/src/mere_workflow_tools/templates"
+            / pathlib.Path(*relative.parts)
+        )
+        if load_json(packaged_path) != graph:
+            fail(f"{packaged_path}: packaged graph template does not match {graph_path}")
+        metadata = as_map(graph.get("metadata", {}), f"{graph_path}: metadata")
+        if metadata.get("template_id") != template_id:
+            fail(f"{graph_path}: metadata.template_id must match {template_id}")
+    if not seen:
+        fail(f"{catalog_path}: graph template catalog is empty")
+    packaged_catalog = ROOT / "packages/mere-workflow-tools/src/mere_workflow_tools/templates/catalog.v1.json"
+    if load_json(packaged_catalog) != catalog:
+        fail(f"{packaged_catalog}: packaged graph template catalog does not match {catalog_path}")
+
+
 def validate_catalog() -> None:
     path = ROOT / "catalog" / "plugins.v1.json"
     catalog = load_json(path)
@@ -758,6 +794,7 @@ def main() -> int:
     validate_catalog()
     validate_recipes()
     validate_eval_recipes()
+    validate_graph_templates()
     validate_plugin_manifests()
     validate_graph_provider()
     validate_runpod_plan()

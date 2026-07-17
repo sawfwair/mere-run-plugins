@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "lora-train-sample",
+  "inputs": {
+    "data": {
+      "type": "asset_directory",
+      "required": true
+    },
+    "prompt": {
+      "type": "string",
+      "default": "A cinematic portrait in the trained style"
+    }
+  },
+  "nodes": [
+    {
+      "id": "prepare-data",
+      "kind": "dataset.prepare",
+      "provider": "mere-dataset-tools",
+      "arguments": {
+        "data": {"$ref": "inputs.data"},
+        "contact_sheet": true
+      },
+      "execution": {
+        "max_attempts": 2,
+        "timeout_seconds": 1800,
+        "cache": "auto"
+      }
+    },
+    {
+      "id": "train",
+      "kind": "image.train-lora",
+      "arguments": {
+        "data": {"$ref": "nodes.prepare-data.outputs.dataset"},
+        "sample_prompt": {"$ref": "inputs.prompt"},
+        "training_steps": 500,
+        "seed": 17
+      },
+      "execution": {
+        "max_attempts": 2,
+        "timeout_seconds": 86400,
+        "cache": "auto"
+      }
+    },
+    {
+      "id": "sample",
+      "kind": "image.generate",
+      "arguments": {
+        "prompt": {"$ref": "inputs.prompt"},
+        "lora": {"$ref": "nodes.train.outputs.adapter"},
+        "seed": 17
+      },
+      "execution": {
+        "max_attempts": 2,
+        "timeout_seconds": 3600,
+        "cache": "auto"
+      }
+    }
+  ],
+  "outputs": {
+    "adapter": {"$ref": "nodes.train.outputs.adapter"},
+    "contact-sheet": {"$ref": "nodes.prepare-data.outputs.contact_sheet"},
+    "dataset-manifest": {"$ref": "nodes.prepare-data.outputs.manifest"},
+    "sample": {"$ref": "nodes.sample.outputs.image"},
+    "stats": {"$ref": "nodes.prepare-data.outputs.stats"}
+  },
+  "metadata": {
+    "template_id": "lora-train-sample"
+  }
+}
