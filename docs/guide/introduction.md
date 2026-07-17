@@ -23,13 +23,13 @@ model runtime or turn the core CLI into a hosted service.
 
 ## The product surface
 
-The catalog currently contains 12 official commands across five outcomes:
+The catalog currently contains 13 official commands across five outcomes:
 
 | Outcome | Plugins |
 | --- | --- |
 | Create | VFX Tools, Image Tools, Image Compose |
 | Perform | Perform |
-| Produce | Animatic Tools, ShotGrid Tools, Dataset Tools |
+| Produce | Face Tools, Animatic Tools, ShotGrid Tools, Dataset Tools |
 | Protect | Document Tools, Media Scrub, Transcript Tools |
 | Scale | RunPod Runner, Batch Runner |
 

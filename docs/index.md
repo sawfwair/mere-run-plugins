@@ -10,7 +10,7 @@ hero:
       text: Install your first plugin
       link: /guide/getting-started
     - theme: alt
-      text: Browse all 12 plugins
+      text: Browse all 13 plugins
       link: /plugins/
     - theme: alt
       text: Read the contract

@@ -83,6 +83,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'All plugins', link: '/plugins/' },
+            { text: 'Face Tools', link: '/plugins/face-tools' },
             { text: 'VFX Tools', link: '/plugins/vfx-tools' },
             { text: 'Perform', link: '/plugins/perform' },
             { text: 'Image Tools', link: '/plugins/image-tools' },

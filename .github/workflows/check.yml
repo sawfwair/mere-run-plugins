@@ -34,8 +34,8 @@ jobs:
         uses: pnpm/action-setup@v6
         with:
           version: 10.8.1
-      # actions/setup-node@v6
-      - uses: actions/setup-node@31a5752891175d08828eb5f8608b0e3dd0b180f9
+      # actions/setup-node@v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "22"
           cache: pnpm

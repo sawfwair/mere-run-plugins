@@ -1,10 +1,11 @@
 # Official plugins
 
-The live catalog contains 12 official companion executables. Every one exposes
+The live catalog contains 13 official companion executables. Every one exposes
 the common lifecycle and writes a durable run manifest.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
+| [Face Tools](/plugins/face-tools) | `mere-face-tools` | Photo-library indexing and reference-face search | Local |
 | [VFX Tools](/plugins/vfx-tools) | `mere-vfx-tools` | Shot-oriented VFX and verified 3D handoffs | Local |
 | [Perform](/plugins/perform) | `mere-perform` | Realtime Magenta Heart performance | Local |
 | [Image Tools](/plugins/image-tools) | `mere-image-tools` | Subject knockout and matte cleanup | Local |
