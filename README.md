@@ -143,6 +143,8 @@ mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript
 mere-image-compose generate --prompt "a product render" --output-dir ./image-out
 mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
 mere-graph-conformance --provider mere-dataset-tools --json
+mere-graph-compile ./program.json --output ./workflow.json --report-output ./compile.json --json
+mere-graph-studio --workspace ./production
 mere-dataset-tools graph templates list --json
 mere-dataset-tools graph comfy inspect ./comfy-workflow.json --json
 ```

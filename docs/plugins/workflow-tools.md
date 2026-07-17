@@ -1,7 +1,7 @@
 # Workflow Tools
 
-`mere-workflow-tools` is a shared package that installs six companion commands
-and one graph-provider conformance tool:
+`mere-workflow-tools` is a shared package that installs six companion commands,
+graph contract tooling, and an optional local authoring app:
 
 - `mere-doc-tools`
 - `mere-media-scrub`
@@ -10,6 +10,8 @@ and one graph-provider conformance tool:
 - `mere-image-compose`
 - `mere-batch-runner`
 - `mere-graph-conformance`
+- `mere-graph-compile`
+- `mere-graph-studio`
 
 Each command follows the same plugin fashion:
 
@@ -108,6 +110,48 @@ mere-dataset-tools graph templates export lora-train-sample \
 The native template catalog includes dataset-to-LoRA-to-sample and
 image-to-video workflows. The canonical graph and run schemas are mirrored in
 `contracts/` and validated with every repository gate.
+
+## Reusable Composition
+
+Compile higher-order authoring documents into an ordinary portable graph:
+
+```bash
+mere-graph-compile ./program.json \
+  --variables-json ./production-values.json \
+  --output ./workflow.json \
+  --report-output ./compile.json \
+  --json
+```
+
+Workflow programs support inline or confined imported modules, compile-time
+conditions, and deterministic maps of up to 1,000 instances. Mapped outputs use
+an explicit zero-based instance index. Compilation resolves every module and
+branch, rewrites references, detects ID collisions, and records source and graph
+fingerprints. The resulting `mere.run/workflow-graph` is what local, SSH, and
+Relay executors consume; no higher-order behavior enters the worker protocol.
+
+## Graph Studio
+
+Launch the optional loopback-only app in a project workspace:
+
+```bash
+mere-graph-studio --workspace ./production
+```
+
+Studio discovers nodes from the live `mere.run graph catalog --json` response.
+Its canvas, typed inspector, graph inputs and outputs, reference selectors,
+secret-name bindings, JSON editor, diagnostics, and run monitor all operate on
+the public contracts. Save writes three separate files:
+
+```text
+name.workflow.json
+name.inputs.json
+name.studio.json
+```
+
+The sidecar contains only node positions and viewport state. It never changes
+execution semantics. Studio invokes the public validate, preflight, local run,
+SSH submit, and Relay submit surfaces and stores no relay credentials itself.
 
 ## ComfyUI Bridge
 

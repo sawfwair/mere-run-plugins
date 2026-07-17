@@ -16,7 +16,7 @@ from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-from . import __version__, comfy_bridge, graph_provider, graph_templates
+from . import __version__, comfy_bridge, graph_compiler, graph_provider, graph_templates
 from .graph_sdk import GraphProviderError
 
 DEFAULT_MERE_RUN = "mere.run"
@@ -811,6 +811,14 @@ def command_graph_template_export(_spec: ToolSpec, args: argparse.Namespace) -> 
         raise PluginError(str(exc), 2) from None
 
 
+def command_graph_compile(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        print_json(graph_compiler.run(args))
+        return 0
+    except (GraphProviderError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
 def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
     parser.add_argument("--output-dir", required=True, type=pathlib.Path)
     parser.add_argument("--manifest", type=pathlib.Path)
@@ -929,6 +937,17 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         graph_execute.add_argument("--run-dir", required=True, type=pathlib.Path, dest="graph_run_dir")
         graph_execute.add_argument("--json-stream", action="store_true")
         graph_execute.set_defaults(func=command_graph_execute)
+
+        graph_compile = graph_sub.add_parser(
+            "compile",
+            help="Compile reusable modules, maps, and branches into a portable graph.",
+        )
+        graph_compile.add_argument("source", type=pathlib.Path)
+        graph_compile.add_argument("--output", required=True, type=pathlib.Path)
+        graph_compile.add_argument("--report-output", type=pathlib.Path)
+        graph_compile.add_argument("--variables-json", type=pathlib.Path)
+        graph_compile.add_argument("--json", action="store_true")
+        graph_compile.set_defaults(func=command_graph_compile)
 
         comfy = graph_sub.add_parser("comfy", help="Inspect or import ComfyUI workflows.")
         comfy_sub = comfy.add_subparsers(dest="comfy_command", required=True)

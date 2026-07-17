@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mere Graph Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <div><strong>Mere Graph Studio</strong><span id="project-label">Untitled workflow</span></div>
+      </div>
+      <div class="command-bar" role="toolbar" aria-label="Workflow commands">
+        <button class="icon-button" data-action="new" title="New workflow" aria-label="New workflow">＋</button>
+        <button class="icon-button" data-action="open" title="Open workflow" aria-label="Open workflow">⌘</button>
+        <button class="icon-button" data-action="save" title="Save workflow" aria-label="Save workflow">↓</button>
+        <span class="toolbar-divider"></span>
+        <button class="command-button" data-action="validate"><span aria-hidden="true">✓</span>Validate</button>
+        <button class="command-button" data-action="preflight"><span aria-hidden="true">◇</span>Preflight</button>
+        <select id="executor-select" aria-label="Executor"><option value="local">Local</option></select>
+        <button class="command-button primary" data-action="run"><span aria-hidden="true">▶</span>Run</button>
+      </div>
+      <div class="health" id="health"><span></span><b>Connecting</b></div>
+    </header>
+
+    <aside class="library-panel">
+      <div class="panel-tabs" role="tablist">
+        <button class="active" data-library-tab="nodes">Nodes</button>
+        <button data-library-tab="inputs">Inputs</button>
+      </div>
+      <div id="node-library" class="library-view">
+        <label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search catalog" aria-label="Search node catalog"></label>
+        <div id="catalog-list"></div>
+      </div>
+      <div id="input-library" class="library-view hidden">
+        <div class="panel-heading"><strong>Graph inputs</strong><button class="icon-button small" data-action="add-input" title="Add input" aria-label="Add input">＋</button></div>
+        <div id="input-list"></div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="viewbar">
+        <div class="segmented" role="tablist">
+          <button class="active" data-view="canvas">Canvas</button>
+          <button data-view="json">Graph JSON</button>
+          <button data-view="runs">Runs</button>
+        </div>
+        <div class="canvas-tools" id="canvas-tools">
+          <button class="icon-button small" data-action="fit" title="Fit graph" aria-label="Fit graph">⊙</button>
+          <button class="icon-button small" data-action="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+          <span id="zoom-label">100%</span>
+          <button class="icon-button small" data-action="zoom-in" title="Zoom in" aria-label="Zoom in">＋</button>
+        </div>
+      </div>
+      <section id="canvas-view" class="content-view canvas-view">
+        <svg id="edge-layer" aria-hidden="true"></svg>
+        <div id="node-layer"></div>
+        <button id="empty-add" class="empty-add hidden" data-action="focus-catalog">＋ Add a node</button>
+      </section>
+      <section id="json-view" class="content-view json-view hidden">
+        <div class="editor-heading"><strong>Executable graph</strong><button class="command-button" data-action="apply-json">Apply JSON</button></div>
+        <textarea id="graph-json" spellcheck="false" aria-label="Workflow graph JSON"></textarea>
+      </section>
+      <section id="runs-view" class="content-view runs-view hidden">
+        <div id="run-list" class="run-list"></div>
+        <div id="run-detail" class="run-detail"><div class="empty-state">No run selected</div></div>
+      </section>
+    </main>
+
+    <aside class="inspector-panel">
+      <div class="panel-heading"><strong>Inspector</strong><span id="selection-kind">Graph</span></div>
+      <div id="inspector"></div>
+    </aside>
+
+    <section id="result-drawer" class="result-drawer collapsed">
+      <button class="drawer-handle" data-action="toggle-drawer" aria-label="Toggle results"><span id="drawer-state-dot"></span><strong id="drawer-title">Ready</strong><span id="drawer-count"></span><b>⌃</b></button>
+      <div class="drawer-content">
+        <div id="diagnostics"></div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="save-dialog">
+    <form method="dialog" class="dialog-body">
+      <div class="dialog-heading"><strong>Save workflow</strong><button value="cancel" class="icon-button small" aria-label="Close">×</button></div>
+      <label>Project path<input id="save-path" value="workflows/untitled"></label>
+      <div class="dialog-actions"><button value="cancel" class="command-button">Cancel</button><button id="confirm-save" value="default" class="command-button primary">Save</button></div>
+    </form>
+  </dialog>
+  <dialog id="open-dialog">
+    <div class="dialog-body wide">
+      <div class="dialog-heading"><strong>Open workflow</strong><button class="icon-button small" data-action="close-open" aria-label="Close">×</button></div>
+      <div id="project-list" class="project-list"></div>
+    </div>
+  </dialog>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

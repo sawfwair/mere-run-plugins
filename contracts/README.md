@@ -24,9 +24,19 @@ companion plugins.
 - `graph-run.v1.schema.json`: mirrored run manifest emitted by every executor.
 - `graph-template-catalog.v1.schema.json`: discoverable reusable graph templates
   shipped by this companion repository.
+- `workflow-program.v1.schema.json`: declarative reusable composition, static
+  map, branch, and parallel-policy source compiled to an ordinary graph.
+- `workflow-module.v1.schema.json`: confined import format for reusable graph
+  modules.
+- `workflow-editor-sidecar.v1.schema.json`: canvas-only positions and viewport
+  state stored separately from executable graphs.
 
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.
+
+Canonical cross-runtime examples live under `fixtures/`. The graph fixtures are
+copied byte-for-byte into the Swift runtime and Relay/Node test suites so Python,
+Swift, TypeScript, and Rust continuously agree on the same public JSON shape.
 
 Graph providers implement fixed `graph catalog`, `graph preflight`, and
 `graph execute` commands. The contracts never supply an arbitrary executable or

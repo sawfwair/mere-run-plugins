@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/workflow-program.v1.schema.json",
+  "title": "mere.run Workflow Program v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "name", "inputs", "steps", "outputs"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "mere.run/workflow-program"},
+    "name": {"type": "string", "minLength": 1},
+    "inputs": {"type": "object"},
+    "variables": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}},
+    "imports": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"}
+    },
+    "modules": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"$ref": "#/$defs/module"}
+    },
+    "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}},
+    "outputs": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"$ref": "#/$defs/reference"}
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"max_parallel_nodes": {"type": "integer", "minimum": 1, "maximum": 32}}
+    },
+    "metadata": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "node_kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}(\\.[a-z][a-z0-9-]{0,63})+$"},
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$ref"],
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "pattern": "^(inputs\\.[a-z][a-z0-9-]{0,63}|nodes\\.[a-z][a-z0-9-]{0,63}\\.outputs\\.[a-z][a-z0-9_]{0,63}|steps\\.[a-z][a-z0-9-]{0,63}(\\.[0-9]+)?\\.outputs\\.[a-z][a-z0-9_]{0,63})$"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": {"enum": ["$var", "$param", "$item"]},
+      "additionalProperties": {"$ref": "#/$defs/id"}
+    },
+    "value": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"type": "array", "items": {"$ref": "#/$defs/value"}},
+        {"$ref": "#/$defs/reference"},
+        {"$ref": "#/$defs/binding"},
+        {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}}
+      ]
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "arguments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"$ref": "#/$defs/node_kind"},
+        "provider": {"type": "string", "pattern": "^(mere\\.run|mere-[a-z0-9-]+)$"},
+        "arguments": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}},
+        "depends_on": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "execution": {"type": "object"}
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameters", "nodes", "outputs"],
+      "properties": {
+        "parameters": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}},
+        "outputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/reference"}}
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "module", "arguments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "module": {"$ref": "#/$defs/id"},
+        "arguments": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}},
+        "when": {"$ref": "#/$defs/value"},
+        "map": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item", "values"],
+          "properties": {
+            "item": {"$ref": "#/$defs/id"},
+            "values": {"$ref": "#/$defs/value"}
+          }
+        }
+      }
+    }
+  }
+}

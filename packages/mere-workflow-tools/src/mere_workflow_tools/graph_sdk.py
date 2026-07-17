@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import pathlib
 import re
-from typing import Callable, cast
+from collections.abc import Callable, Mapping
+from typing import cast
 
 JsonMap = dict[str, object]
 EventWriter = Callable[[JsonMap], None]
@@ -17,6 +19,7 @@ EVENT_CONTRACT_VERSION = "mere.run/plugin-graph-event.v1"
 PROVIDER_ID_PATTERN = re.compile(r"^mere-[a-z0-9-]+$")
 NODE_KIND_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,63}(\.[a-z][a-z0-9-]{0,63})+$")
 SEMVER_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[.-][A-Za-z0-9.-]+)?$")
+SECRET_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 PORT_TYPES = {
     "string",
     "integer",
@@ -60,9 +63,35 @@ def load_invocation(path: pathlib.Path, supported_kinds: set[str]) -> JsonMap:
     kind = invocation.get("kind")
     if not isinstance(kind, str) or kind not in supported_kinds:
         raise GraphProviderError(f"unsupported graph node kind: {kind}")
-    as_map(invocation.get("arguments"), "arguments")
+    arguments = as_map(invocation.get("arguments"), "arguments")
+    invocation["arguments"] = as_map(resolve_secret_references(arguments), "arguments")
     as_map(invocation.get("outputs"), "outputs")
     return invocation
+
+
+def secret_environment_key(name: str) -> str:
+    if SECRET_NAME_PATTERN.fullmatch(name) is None:
+        raise GraphProviderError(f"invalid secret name: {name}")
+    return f"MERERUN_SECRET_{name.upper().replace('-', '_')}"
+
+
+def resolve_secret_references(value: object, environment: Mapping[str, str] | None = None) -> object:
+    active_environment = os.environ if environment is None else environment
+    if isinstance(value, list):
+        return [resolve_secret_references(item, active_environment) for item in value]
+    if not isinstance(value, dict):
+        return value
+    mapped = cast(JsonMap, value)
+    if set(mapped) == {"$secret"}:
+        name = mapped["$secret"]
+        if not isinstance(name, str):
+            raise GraphProviderError("secret reference name must be a string")
+        key = secret_environment_key(name)
+        resolved = active_environment.get(key)
+        if not resolved:
+            raise GraphProviderError(f"configured secret is unavailable: {name}")
+        return resolved
+    return {key: resolve_secret_references(item, active_environment) for key, item in mapped.items()}
 
 
 def confined_path(root: pathlib.Path, relative: str) -> pathlib.Path:
@@ -144,6 +173,18 @@ def validate_catalog(catalog: JsonMap) -> None:
         requirements = as_map(node.get("requirements"), f"{kind}.requirements")
         as_list(requirements.get("model_ids"), f"{kind}.requirements.model_ids")
         as_list(requirements.get("accelerator_backends"), f"{kind}.requirements.accelerator_backends")
+        for field in [
+            "minimum_accelerator_memory_bytes",
+            "minimum_system_memory_bytes",
+            "minimum_disk_bytes",
+            "minimum_cpu_cores",
+        ]:
+            value = requirements.get(field)
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
+                raise GraphProviderError(f"{kind}.requirements.{field} must be a positive integer or null")
+        network_access = requirements.get("network_access")
+        if network_access is not None and not isinstance(network_access, bool):
+            raise GraphProviderError(f"{kind}.requirements.network_access must be a boolean or null")
         traits = as_map(node.get("traits"), f"{kind}.traits")
         for trait in ["deterministic", "cacheable", "supports_progress", "supports_previews"]:
             if not isinstance(traits.get(trait), bool):
@@ -169,3 +210,8 @@ def validate_ports(raw_ports: list[object], label: str, required_flag: str) -> N
             raise GraphProviderError(f"{label}.{name} has unsupported type: {port_type}")
         if not isinstance(port.get(required_flag), bool):
             raise GraphProviderError(f"{label}.{name}.{required_flag} must be a boolean")
+        secret = port.get("secret")
+        if secret is not None and not isinstance(secret, bool):
+            raise GraphProviderError(f"{label}.{name}.secret must be a boolean")
+        if secret is True and port_type != "string":
+            raise GraphProviderError(f"{label}.{name} secret ports must use type string")

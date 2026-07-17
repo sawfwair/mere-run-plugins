@@ -6,13 +6,37 @@ import json
 import pathlib
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
-from mere_workflow_tools import cli, comfy_bridge, graph_conformance, graph_provider, graph_sdk
+from mere_workflow_tools import (
+    cli,
+    comfy_bridge,
+    graph_compiler,
+    graph_conformance,
+    graph_provider,
+    graph_sdk,
+    graph_studio,
+)
 
 
 class GraphSDKTests(unittest.TestCase):
+    def test_canonical_parallel_graph_fixture_is_portable(self) -> None:
+        fixture = (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "contracts"
+            / "fixtures"
+            / "graph-v1"
+            / "parallel-image-video.workflow.json"
+        )
+        graph = json.loads(fixture.read_text())
+
+        self.assertEqual(graph["kind"], "mere.run/workflow-graph")
+        self.assertEqual(graph["execution"]["max_parallel_nodes"], 2)
+        self.assertEqual([node["id"] for node in graph["nodes"]], ["image-a", "image-b", "video"])
+        self.assertEqual(graph["nodes"][2]["depends_on"], ["image-a", "image-b"])
+
     def test_catalog_and_event_stream_conformance(self) -> None:
         catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
         graph_sdk.validate_catalog(catalog)
@@ -63,6 +87,40 @@ class GraphSDKTests(unittest.TestCase):
                 graph_sdk.confined_path(root, "../escape")
             with self.assertRaisesRegex(graph_sdk.GraphProviderError, "escapes"):
                 graph_sdk.relative_path(root.parent, root)
+
+    def test_invocation_resolves_named_secret_only_in_provider_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            request = pathlib.Path(raw_root) / "request.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "contract_version": graph_sdk.INVOCATION_CONTRACT_VERSION,
+                        "kind": "private.publish",
+                        "arguments": {"token": {"$secret": "api-token"}},
+                        "outputs": {},
+                    }
+                )
+            )
+            with mock.patch.dict("os.environ", {"MERERUN_SECRET_API_TOKEN": "value-never-persisted"}, clear=False):
+                invocation = graph_sdk.load_invocation(request, {"private.publish"})
+
+            self.assertEqual(invocation["arguments"]["token"], "value-never-persisted")
+            self.assertNotIn("value-never-persisted", request.read_text())
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "configured secret is unavailable"):
+                graph_sdk.resolve_secret_references({"$secret": "missing"}, {})
+
+    def test_catalog_validates_secret_and_resource_contracts(self) -> None:
+        catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
+        requirements = catalog["nodes"][0]["requirements"]
+        requirements["minimum_system_memory_bytes"] = 4096
+        requirements["minimum_disk_bytes"] = 8192
+        requirements["minimum_cpu_cores"] = 2
+        requirements["network_access"] = False
+        graph_sdk.validate_catalog(catalog)
+
+        requirements["minimum_cpu_cores"] = 0
+        with self.assertRaisesRegex(graph_sdk.GraphProviderError, "positive integer"):
+            graph_sdk.validate_catalog(catalog)
 
     def test_conformance_cli_validates_catalog_file(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
@@ -179,6 +237,264 @@ class GraphSDKTests(unittest.TestCase):
             self.assertEqual(result["status"], "exported")
             self.assertEqual(graph["metadata"]["template_id"], "lora-train-sample")
             self.assertEqual(graph["nodes"][0]["provider"], "mere-dataset-tools")
+
+    def test_workflow_compiler_expands_modules_map_branch_and_parallel_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            source = root / "program.json"
+            source.write_text(json.dumps(workflow_program()))
+
+            graph, report = graph_compiler.compile_file(source)
+            repeated, repeated_report = graph_compiler.compile_file(source)
+
+            self.assertEqual(graph, repeated)
+            self.assertEqual(report["graph_sha256"], repeated_report["graph_sha256"])
+            self.assertEqual(graph["execution"], {"max_parallel_nodes": 2})
+            self.assertEqual(
+                [node["id"] for node in graph["nodes"]],
+                ["batch-000-image", "batch-001-image", "finish-video"],
+            )
+            self.assertEqual(
+                graph["nodes"][2]["arguments"]["image"],
+                {"$ref": "nodes.batch-001-image.outputs.image"},
+            )
+            self.assertEqual(graph["outputs"]["video"], {"$ref": "nodes.finish-video.outputs.video"})
+            self.assertFalse(report["steps"][1]["included"])
+            self.assertEqual(report["node_count"], 3)
+
+    def test_workflow_compiler_supports_confined_imports_and_variable_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            modules = root / "modules"
+            modules.mkdir()
+            (modules / "sample.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": graph_compiler.MODULE_KIND,
+                        "parameters": ["prompt"],
+                        "nodes": [
+                            {
+                                "id": "image",
+                                "kind": "image.generate",
+                                "arguments": {"prompt": {"$param": "prompt"}},
+                            }
+                        ],
+                        "outputs": {"image": {"$ref": "nodes.image.outputs.image"}},
+                    }
+                )
+            )
+            program = workflow_program()
+            program["modules"] = {}
+            program["imports"] = {"sample": "modules/sample.json"}
+            program["variables"] = {"prompts": ["original"], "mode": "preview"}
+            program["steps"] = [
+                {
+                    "id": "one",
+                    "module": "sample",
+                    "arguments": {"prompt": {"$var": "selected"}},
+                }
+            ]
+            program["outputs"] = {"image": {"$ref": "steps.one.outputs.image"}}
+            source = root / "program.json"
+            source.write_text(json.dumps(program))
+
+            graph, _report = graph_compiler.compile_file(source, {"selected": "override"})
+
+            self.assertEqual(graph["nodes"][0]["arguments"]["prompt"], "override")
+            program["imports"] = {"sample": "../escape.json"}
+            source.write_text(json.dumps(program))
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "not confined"):
+                graph_compiler.compile_file(source, {"selected": "override"})
+
+    def test_workflow_compiler_rejects_ambiguous_mapped_output(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            source = pathlib.Path(raw_root) / "program.json"
+            program = workflow_program()
+            program["outputs"] = {"image": {"$ref": "steps.batch.outputs.image"}}
+            source.write_text(json.dumps(program))
+
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "requires an instance index"):
+                graph_compiler.compile_file(source)
+
+    def test_dataset_graph_compile_command_writes_graph_and_report(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            source = root / "program.json"
+            output = root / "workflow.json"
+            report = root / "compile.json"
+            source.write_text(json.dumps(workflow_program()))
+            stdout = io.StringIO()
+
+            with contextlib.redirect_stdout(stdout):
+                exit_code = cli.main_for(
+                    "dataset",
+                    [
+                        "graph",
+                        "compile",
+                        str(source),
+                        "--output",
+                        str(output),
+                        "--report-output",
+                        str(report),
+                        "--json",
+                    ],
+                )
+
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(result["status"], "compiled")
+            self.assertEqual(json.loads(output.read_text())["kind"], graph_compiler.GRAPH_KIND)
+            self.assertEqual(json.loads(report.read_text())["contract_version"], graph_compiler.REPORT_CONTRACT_VERSION)
+
+    def test_graph_studio_round_trips_graph_inputs_and_separate_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            service = graph_studio.GraphStudioService(root, "/fixture/mere.run", lambda _command: graph_studio.CommandResult(0, "{}", ""))
+            graph = {"schema_version": 1, "kind": "mere.run/workflow-graph", "name": "fixture", "inputs": {}, "nodes": [], "outputs": {}}
+            sidecar = graph_studio.default_sidecar()
+            sidecar["nodes"] = {"image": {"x": 12, "y": 34}}
+
+            saved = service.save_project({
+                "path": "workflows/shot.v1",
+                "graph": graph,
+                "inputs": {"prompt": "fixture"},
+                "sidecar": sidecar,
+            })
+            loaded = service.load_project("workflows/shot.v1")
+
+            self.assertEqual(saved["status"], "saved")
+            self.assertEqual(loaded["graph"], graph)
+            self.assertEqual(loaded["inputs"], {"prompt": "fixture"})
+            self.assertEqual(loaded["sidecar"], sidecar)
+            self.assertTrue((root / "workflows/shot.v1.workflow.json").is_file())
+            self.assertTrue((root / "workflows/shot.v1.studio.json").is_file())
+            self.assertNotIn("viewport", json.dumps(loaded["graph"]))
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "invalid project path"):
+                service.save_project({"path": "../escape", "graph": graph})
+
+    def test_graph_studio_invokes_only_public_catalog_and_preflight_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            commands: list[list[str]] = []
+
+            def run(command: list[str]) -> graph_studio.CommandResult:
+                commands.append(command)
+                return graph_studio.CommandResult(0, json.dumps({"status": "ok"}), "diagnostic")
+
+            service = graph_studio.GraphStudioService(pathlib.Path(raw_root), "/fixture/mere.run", run)
+            service.catalog()
+            result = service.check({
+                "mode": "preflight",
+                "executor": "relay:fleet",
+                "graph": {"kind": "mere.run/workflow-graph"},
+                "inputs": {},
+            })
+
+            self.assertEqual(commands[0], ["/fixture/mere.run", "graph", "catalog", "--json"])
+            self.assertEqual(commands[1][0:3], ["/fixture/mere.run", "graph", "preflight"])
+            self.assertIn("--executor", commands[1])
+            self.assertIn("relay:fleet", commands[1])
+            self.assertEqual(result["result"], {"status": "ok"})
+
+    def test_graph_studio_submits_remote_graph_and_discovers_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            executable = root / "fake-mere-run"
+            executable.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, sys\n"
+                "print(json.dumps({'result': {'remote_reference': 'relay://fleet/job-123'}, 'argv': sys.argv[1:]}))\n"
+            )
+            executable.chmod(0o755)
+            service = graph_studio.GraphStudioService(root, str(executable))
+            started = service.start_run({
+                "executor": "relay:fleet",
+                "graph": {"schema_version": 1, "kind": "mere.run/workflow-graph", "name": "fixture", "inputs": {}, "nodes": [], "outputs": {}},
+                "inputs": {},
+            })
+            deadline = time.monotonic() + 2
+            inspected = service.inspect_run(str(started["id"]))
+            while inspected["state"] in {"starting", "submitting"} and time.monotonic() < deadline:
+                time.sleep(0.01)
+                inspected = service.inspect_run(str(started["id"]))
+
+            self.assertEqual(inspected["state"], "queued")
+            self.assertEqual(inspected["remote_reference"], "relay://fleet/job-123")
+            self.assertIn("submit", inspected["result"]["argv"])
+
+    def test_graph_studio_utilities_confine_paths_and_find_remote_references(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            executable = root / "mere.run"
+            executable.write_text("fixture")
+            self.assertEqual(graph_studio.resolve_mere_run(str(executable)), str(executable))
+            self.assertEqual(
+                graph_studio.find_remote_reference({"nested": [{"reference": "ssh://gpu/job-9"}]}),
+                "ssh://gpu/job-9",
+            )
+            events = root / "events.jsonl"
+            events.write_text('{"type":"one"}\nnot-json\n{"type":"two"}\n')
+            self.assertEqual(graph_studio.read_json_lines(events, 10), [{"type": "one"}, {"type": "two"}])
+
+
+def workflow_program() -> graph_sdk.JsonMap:
+    return {
+        "schema_version": 1,
+        "kind": graph_compiler.PROGRAM_KIND,
+        "name": "mapped-generation",
+        "inputs": {},
+        "variables": {"prompts": ["first", "second"], "mode": "preview"},
+        "execution": {"max_parallel_nodes": 2},
+        "modules": {
+            "sample": {
+                "parameters": ["prompt", "seed"],
+                "nodes": [
+                    {
+                        "id": "image",
+                        "kind": "image.generate",
+                        "arguments": {"prompt": {"$param": "prompt"}, "seed": {"$param": "seed"}},
+                    }
+                ],
+                "outputs": {"image": {"$ref": "nodes.image.outputs.image"}},
+            },
+            "animate": {
+                "parameters": ["image"],
+                "nodes": [
+                    {
+                        "id": "video",
+                        "kind": "video.generate",
+                        "arguments": {
+                            "prompt": "animate",
+                            "image": {"$param": "image"},
+                            "seed": 7,
+                        },
+                    }
+                ],
+                "outputs": {"video": {"$ref": "nodes.video.outputs.video"}},
+            },
+        },
+        "steps": [
+            {
+                "id": "batch",
+                "module": "sample",
+                "map": {"item": "prompt", "values": {"$var": "prompts"}},
+                "arguments": {"prompt": {"$item": "prompt"}, "seed": 42},
+            },
+            {
+                "id": "production-only",
+                "module": "sample",
+                "when": {"equals": [{"$var": "mode"}, "production"]},
+                "arguments": {"prompt": "production", "seed": 43},
+            },
+            {
+                "id": "finish",
+                "module": "animate",
+                "arguments": {"image": {"$ref": "steps.batch.1.outputs.image"}},
+            },
+        ],
+        "outputs": {"video": {"$ref": "steps.finish.outputs.video"}},
+        "metadata": {"compiled_from": "fixture", "mode": {"$var": "mode"}},
+    }
 
 
 def comfy_api_prompt() -> graph_sdk.JsonMap:
