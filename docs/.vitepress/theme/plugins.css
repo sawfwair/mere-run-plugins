@@ -1,0 +1,46 @@
+:root {
+  --plugins-copper: #b84617;
+  --plugins-copper-hover: #913710;
+  --mere-line: var(--vp-c-divider);
+  --mere-accent: var(--plugins-copper);
+  --plugins-grid: color-mix(in oklch, var(--mere-line) 45%, transparent);
+  --vp-c-brand-1: var(--plugins-copper);
+  --vp-c-brand-2: var(--plugins-copper-hover);
+  --vp-c-brand-3: #743014;
+  --vp-c-brand-soft: color-mix(in oklch, var(--plugins-copper) 14%, transparent);
+}
+
+.VPHome {
+  background-image:
+    linear-gradient(var(--plugins-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--plugins-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.VPHero .name,
+.VPHero .text {
+  max-width: 900px;
+}
+
+.VPHero .name {
+  letter-spacing: -0.035em;
+}
+
+.VPFeature {
+  border-top: 3px solid color-mix(in oklch, var(--mere-accent) 74%, transparent);
+}
+
+.VPFeature .title,
+.vp-doc h2 {
+  letter-spacing: -0.018em;
+}
+
+.vp-doc table code {
+  white-space: nowrap;
+}
+
+.dark {
+  --plugins-copper: #f18a52;
+  --plugins-copper-hover: #ffad7d;
+  --plugins-grid: color-mix(in oklch, var(--mere-line) 32%, transparent);
+}

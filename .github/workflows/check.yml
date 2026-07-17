@@ -23,3 +23,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: ./scripts/check.sh
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.8.1
+      # actions/setup-node@v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm docs:coverage
+      - run: pnpm docs:build

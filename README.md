@@ -2,6 +2,10 @@
 
 Official companion plugins for `mere.run`.
 
+[Plugin catalog](https://plugins.mere.run/) ·
+[Documentation](https://plugins-docs.mere.run/) ·
+[Plugin contract](https://plugins-docs.mere.run/plugins/contract)
+
 The core `mere.run` CLI stays local-first. This repo contains explicit bridges
 to user-controlled outside resources: RunPod pods, SSH-accessed GPU machines,
 and future provider runners. A plugin can automate remote compute, but it must
@@ -292,15 +296,22 @@ command promises JSON or paths; stderr is for diagnostics.
 
 ```bash
 ./scripts/check.sh
+corepack pnpm install --frozen-lockfile
+corepack pnpm docs:coverage
+corepack pnpm docs:build
 ```
+
+Run the docs locally with `corepack pnpm docs:dev`. The public docs site at
+`plugins-docs.mere.run` is deployed separately from the built
+`docs/.vitepress/dist/` output; the catalog site at `plugins.mere.run` lives in
+its own repo.
 
 ## Repo Layout
 
 ```text
 contracts/                 JSON schemas for plugin, recipe, run, and artifacts
 catalog/                   live install catalog for official plugins
-docs/plugins/              plugin contract, discovery, and security notes
-docs/recipes/              captioning and LoRA recipe guidance
+docs/                      comprehensive VitePress guide, plugin, reference, and operations docs
 recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
 packages/mere-runpod/      first official provider plugin
