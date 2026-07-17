@@ -16,7 +16,7 @@ from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-from . import __version__
+from . import __version__, graph_provider
 
 DEFAULT_MERE_RUN = "mere.run"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -243,23 +243,25 @@ def image_inputs(path: pathlib.Path) -> list[pathlib.Path]:
 
 
 def plugin_manifest(spec: ToolSpec) -> JsonMap:
-    return {
+    commands = [
+        {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
+        {"name": "doctor", "description": "Check local readiness and mere.run availability.", "stdout": "json"},
+        {"name": "plan", "description": "Write a run manifest without executing mere.run.", "stdout": "json"},
+        {"name": "run", "description": "Execute a planned local workflow manifest.", "stdout": "json"},
+        {"name": "resume", "description": "Inspect a recorded workflow manifest.", "stdout": "json"},
+        {"name": "cleanup", "description": "Mark a local run as cleanup-skipped.", "stdout": "json"},
+        {"name": spec.one_shot, "description": f"Plan and run {spec.recipe_title}.", "stdout": "json"},
+    ]
+    capabilities = list(spec.capabilities)
+    manifest: JsonMap = {
         "contractVersion": "mere.run/plugin.v1",
         "name": spec.plugin_name,
         "version": __version__,
         "executable": spec.executable,
         "description": spec.description,
         "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-workflow-tools",
-        "commands": [
-            {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
-            {"name": "doctor", "description": "Check local readiness and mere.run availability.", "stdout": "json"},
-            {"name": "plan", "description": "Write a run manifest without executing mere.run.", "stdout": "json"},
-            {"name": "run", "description": "Execute a planned local workflow manifest.", "stdout": "json"},
-            {"name": "resume", "description": "Inspect a recorded workflow manifest.", "stdout": "json"},
-            {"name": "cleanup", "description": "Mark a local run as cleanup-skipped.", "stdout": "json"},
-            {"name": spec.one_shot, "description": f"Plan and run {spec.recipe_title}.", "stdout": "json"},
-        ],
-        "capabilities": spec.capabilities,
+        "commands": commands,
+        "capabilities": capabilities,
         "stdout": {
             "machineReadableByDefault": True,
             "diagnostics": "stderr",
@@ -271,6 +273,11 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             "cleanupDefault": "none",
         },
     }
+    if spec.kind == "dataset":
+        commands.append({"name": "graph", "description": "Expose portable graph nodes.", "stdout": "json"})
+        capabilities.append("graph-node-provider-v1")
+        manifest["graphProvider"] = {"contractVersion": graph_provider.CONTRACT_VERSION}
+    return manifest
 
 
 def base_manifest(spec: ToolSpec, args: argparse.Namespace, inputs: list[pathlib.Path]) -> JsonMap:
@@ -722,6 +729,34 @@ def command_cleanup(_spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
+def command_graph_catalog(spec: ToolSpec, _args: argparse.Namespace) -> int:
+    print_json(graph_provider.graph_catalog(spec.plugin_name, __version__))
+    return 0
+
+
+def command_graph_preflight(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        invocation = graph_provider.load_invocation(args.request)
+        print_json(graph_provider.graph_preflight(invocation, args.graph_run_dir))
+        return 0
+    except graph_provider.GraphProviderError as exc:
+        raise PluginError(str(exc), 2) from None
+
+
+def command_graph_execute(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        invocation = graph_provider.load_invocation(args.request)
+
+        def write_event(payload: JsonMap) -> None:
+            sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+            sys.stdout.flush()
+
+        graph_provider.graph_execute(invocation, args.graph_run_dir, write_event)
+        return 0
+    except graph_provider.GraphProviderError as exc:
+        raise PluginError(str(exc), 1) from None
+
+
 def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
     parser.add_argument("--output-dir", required=True, type=pathlib.Path)
     parser.add_argument("--manifest", type=pathlib.Path)
@@ -769,7 +804,17 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
         validate_run_id(args.run_id)
     if hasattr(args, "mere_run_command") and not args.mere_run_command:
         args.mere_run_command = os.environ.get("MERE_WORKFLOW_TOOLS_MERE_RUN") or DEFAULT_MERE_RUN
-    for name in ("input", "output_dir", "manifest", "run_manifest", "jobs", "ref_image", "lora"):
+    for name in (
+        "input",
+        "output_dir",
+        "manifest",
+        "run_manifest",
+        "jobs",
+        "ref_image",
+        "lora",
+        "request",
+        "graph_run_dir",
+    ):
         if hasattr(args, name):
             value = getattr(args, name)
             if value is not None:
@@ -806,6 +851,26 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     cleanup = sub.add_parser("cleanup", help="Mark local cleanup as skipped.")
     cleanup.add_argument("run_manifest", type=pathlib.Path)
     cleanup.set_defaults(func=command_cleanup)
+
+    if spec.kind == "dataset":
+        graph = sub.add_parser("graph", help="Expose portable graph nodes.")
+        graph_sub = graph.add_subparsers(dest="graph_command", required=True)
+
+        graph_catalog = graph_sub.add_parser("catalog", help="Print the graph node catalog.")
+        graph_catalog.add_argument("--json", action="store_true")
+        graph_catalog.set_defaults(func=command_graph_catalog)
+
+        graph_preflight = graph_sub.add_parser("preflight", help="Preflight one graph node invocation.")
+        graph_preflight.add_argument("--request", required=True, type=pathlib.Path)
+        graph_preflight.add_argument("--run-dir", required=True, type=pathlib.Path, dest="graph_run_dir")
+        graph_preflight.add_argument("--json", action="store_true")
+        graph_preflight.set_defaults(func=command_graph_preflight)
+
+        graph_execute = graph_sub.add_parser("execute", help="Execute one graph node invocation.")
+        graph_execute.add_argument("--request", required=True, type=pathlib.Path)
+        graph_execute.add_argument("--run-dir", required=True, type=pathlib.Path, dest="graph_run_dir")
+        graph_execute.add_argument("--json-stream", action="store_true")
+        graph_execute.set_defaults(func=command_graph_execute)
 
     one_shot = sub.add_parser(spec.one_shot, help=f"Plan and run {spec.recipe_title}.")
     add_common_plan_args(one_shot, spec)

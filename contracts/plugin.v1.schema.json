@@ -37,6 +37,16 @@
       "type": "string",
       "format": "uri"
     },
+    "graphProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion"],
+      "properties": {
+        "contractVersion": {
+          "const": "mere.run/plugin-graph-provider.v1"
+        }
+      }
+    },
     "commands": {
       "type": "array",
       "minItems": 5,
