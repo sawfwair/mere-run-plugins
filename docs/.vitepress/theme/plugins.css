@@ -1,6 +1,13 @@
 :root {
-  --plugins-grid: color-mix(in oklch, var(--mere-line) 45%, transparent);
   --plugins-copper: #b84617;
+  --plugins-copper-hover: #913710;
+  --mere-line: var(--vp-c-divider);
+  --mere-accent: var(--plugins-copper);
+  --plugins-grid: color-mix(in oklch, var(--mere-line) 45%, transparent);
+  --vp-c-brand-1: var(--plugins-copper);
+  --vp-c-brand-2: var(--plugins-copper-hover);
+  --vp-c-brand-3: #743014;
+  --vp-c-brand-soft: color-mix(in oklch, var(--plugins-copper) 14%, transparent);
 }
 
 .VPHome {
@@ -33,5 +40,7 @@
 }
 
 .dark {
+  --plugins-copper: #f18a52;
+  --plugins-copper-hover: #ffad7d;
   --plugins-grid: color-mix(in oklch, var(--mere-line) 32%, transparent);
 }

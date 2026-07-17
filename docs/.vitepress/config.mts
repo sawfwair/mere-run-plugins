@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitepress'
-import { mereMarkdown } from '@mere/docs-theme/markdown'
 
 export default defineConfig({
   title: 'mere.run plugins',
@@ -154,6 +153,4 @@ export default defineConfig({
       copyright: 'MIT licensed · Sawfwair',
     },
   },
-
-  markdown: mereMarkdown(),
 })

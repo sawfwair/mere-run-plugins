@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      '@mere/docs-theme':
-        specifier: github:sawfwair/mere-docs#main&path:/packages/docs-theme
-        version: git+https://git@github.com:sawfwair/mere-docs.git#3d04aaa9c8ae5594faf063b3006752932d903ac0&path:/packages/docs-theme(vitepress@1.6.4(@algolia/client-search@5.55.2)(postcss@8.5.18)(search-insights@2.17.3))(vue@3.5.39)
       vitepress:
         specifier: 1.6.4
         version: 1.6.4(@algolia/client-search@5.55.2)(postcss@8.5.18)(search-insights@2.17.3)
@@ -279,13 +276,6 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
-
-  '@mere/docs-theme@git+https://git@github.com:sawfwair/mere-docs.git#3d04aaa9c8ae5594faf063b3006752932d903ac0&path:/packages/docs-theme':
-    resolution: {commit: 3d04aaa9c8ae5594faf063b3006752932d903ac0, path: /packages/docs-theme, repo: git@github.com:sawfwair/mere-docs.git, type: git}
-    version: 0.1.0
-    peerDependencies:
-      vitepress: ^1.6.3
-      vue: ^3.5.0
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
@@ -1039,11 +1029,6 @@ snapshots:
   '@iconify/types@2.0.0': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
-
-  '@mere/docs-theme@git+https://git@github.com:sawfwair/mere-docs.git#3d04aaa9c8ae5594faf063b3006752932d903ac0&path:/packages/docs-theme(vitepress@1.6.4(@algolia/client-search@5.55.2)(postcss@8.5.18)(search-insights@2.17.3))(vue@3.5.39)':
-    dependencies:
-      vitepress: 1.6.4(@algolia/client-search@5.55.2)(postcss@8.5.18)(search-insights@2.17.3)
-      vue: 3.5.39
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     optional: true

@@ -11,7 +11,6 @@
     "docs:coverage": "node scripts/check-docs-coverage.mjs"
   },
   "devDependencies": {
-    "@mere/docs-theme": "github:sawfwair/mere-docs#main&path:/packages/docs-theme",
     "vitepress": "1.6.4"
   }
 }
