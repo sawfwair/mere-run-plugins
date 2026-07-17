@@ -113,10 +113,10 @@ class GraphStudioService:
 
     def check(self, body: JsonMap) -> JsonMap:
         mode = body.get("mode")
-        if mode not in {"validate", "preflight"}:
+        if not isinstance(mode, str) or mode not in {"validate", "preflight"}:
             raise GraphProviderError("check mode must be validate or preflight")
         graph_path, inputs_path = self._write_request(body)
-        command = [self.mere_run_command, "graph", cast(str, mode), str(graph_path), "--inputs-json", str(inputs_path)]
+        command = [self.mere_run_command, "graph", mode, str(graph_path), "--inputs-json", str(inputs_path)]
         if mode == "preflight":
             command += ["--executor", required_string(body, "executor", "local")]
         command.append("--json")
