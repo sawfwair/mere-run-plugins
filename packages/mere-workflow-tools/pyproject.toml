@@ -23,9 +23,12 @@ mere-dataset-tools = "mere_workflow_tools.dataset_cli:main"
 mere-transcript-tools = "mere_workflow_tools.transcript_cli:main"
 mere-image-compose = "mere_workflow_tools.image_compose_cli:main"
 mere-batch-runner = "mere_workflow_tools.batch_cli:main"
+mere-graph-conformance = "mere_workflow_tools.graph_conformance:main"
+mere-graph-compile = "mere_workflow_tools.graph_compiler:main"
+mere-graph-provider-init = "mere_workflow_tools.graph_provider_init:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_workflow_tools = ["py.typed"]
+mere_workflow_tools = ["py.typed", "templates/*.json"]

@@ -16,7 +16,8 @@ from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-from . import __version__, graph_provider
+from . import __version__, comfy_bridge, graph_compiler, graph_provider, graph_templates
+from .graph_sdk import GraphProviderError
 
 DEFAULT_MERE_RUN = "mere.run"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -739,7 +740,7 @@ def command_graph_preflight(_spec: ToolSpec, args: argparse.Namespace) -> int:
         invocation = graph_provider.load_invocation(args.request)
         print_json(graph_provider.graph_preflight(invocation, args.graph_run_dir))
         return 0
-    except graph_provider.GraphProviderError as exc:
+    except GraphProviderError as exc:
         raise PluginError(str(exc), 2) from None
 
 
@@ -753,8 +754,88 @@ def command_graph_execute(_spec: ToolSpec, args: argparse.Namespace) -> int:
 
         graph_provider.graph_execute(invocation, args.graph_run_dir, write_event)
         return 0
-    except graph_provider.GraphProviderError as exc:
+    except GraphProviderError as exc:
         raise PluginError(str(exc), 1) from None
+
+
+def command_comfy_inspect(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        print_json(comfy_bridge.inspect_workflow(comfy_bridge.load_workflow(args.workflow)))
+        return 0
+    except (comfy_bridge.ComfyBridgeError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
+def command_comfy_import(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        graph, inputs, report = comfy_bridge.import_workflow(
+            comfy_bridge.load_workflow(args.workflow),
+            model_id=args.model,
+            source_name=args.workflow.name,
+            asset_root=args.asset_root,
+        )
+        comfy_bridge.write_json(args.output, graph)
+        comfy_bridge.write_json(args.inputs_output, inputs)
+        print_json(
+            {
+                "contract_version": comfy_bridge.BRIDGE_CONTRACT_VERSION,
+                "status": "imported",
+                "graph": str(args.output),
+                "inputs": str(args.inputs_output),
+                "report": report,
+            }
+        )
+        return 0
+    except (comfy_bridge.ComfyBridgeError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
+def command_graph_template_list(_spec: ToolSpec, _args: argparse.Namespace) -> int:
+    print_json(graph_templates.catalog())
+    return 0
+
+
+def command_graph_template_export(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        graph_templates.export_template(args.template_id, args.output)
+        print_json(
+            {
+                "contract_version": "mere.run/graph-template-export.v1",
+                "status": "exported",
+                "template_id": args.template_id,
+                "output": str(args.output),
+            }
+        )
+        return 0
+    except (GraphProviderError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
+def command_graph_template_publish(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        graph = load_json(args.graph)
+        inputs = load_json(args.inputs_json) if args.inputs_json else {}
+        package = graph_templates.publish_template(
+            graph,
+            inputs,
+            args.output_dir,
+            args.template_id,
+            args.title,
+            args.description,
+            args.tag,
+        )
+        print_json({"status": "published", "package": package, "output_directory": str(args.output_dir)})
+        return 0
+    except (GraphProviderError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
+def command_graph_compile(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        print_json(graph_compiler.run(args))
+        return 0
+    except (GraphProviderError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
 
 
 def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
@@ -814,6 +895,10 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
         "lora",
         "request",
         "graph_run_dir",
+        "workflow",
+        "output",
+        "inputs_output",
+        "asset_root",
     ):
         if hasattr(args, name):
             value = getattr(args, name)
@@ -871,6 +956,58 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         graph_execute.add_argument("--run-dir", required=True, type=pathlib.Path, dest="graph_run_dir")
         graph_execute.add_argument("--json-stream", action="store_true")
         graph_execute.set_defaults(func=command_graph_execute)
+
+        graph_compile = graph_sub.add_parser(
+            "compile",
+            help="Compile reusable modules, maps, and branches into a portable graph.",
+        )
+        graph_compile.add_argument("source", type=pathlib.Path)
+        graph_compile.add_argument("--output", required=True, type=pathlib.Path)
+        graph_compile.add_argument("--report-output", type=pathlib.Path)
+        graph_compile.add_argument("--variables-json", type=pathlib.Path)
+        graph_compile.add_argument("--json", action="store_true")
+        graph_compile.set_defaults(func=command_graph_compile)
+
+        comfy = graph_sub.add_parser("comfy", help="Inspect or import ComfyUI workflows.")
+        comfy_sub = comfy.add_subparsers(dest="comfy_command", required=True)
+
+        comfy_inspect = comfy_sub.add_parser("inspect", help="Report ComfyUI workflow compatibility.")
+        comfy_inspect.add_argument("workflow", type=pathlib.Path)
+        comfy_inspect.add_argument("--json", action="store_true")
+        comfy_inspect.set_defaults(func=command_comfy_inspect)
+
+        comfy_import = comfy_sub.add_parser("import", help="Import a supported ComfyUI API prompt as a native graph.")
+        comfy_import.add_argument("workflow", type=pathlib.Path)
+        comfy_import.add_argument("--model", required=True, help="Managed mere.run model id replacing the Comfy checkpoint.")
+        comfy_import.add_argument("--output", required=True, type=pathlib.Path)
+        comfy_import.add_argument("--inputs-output", required=True, type=pathlib.Path)
+        comfy_import.add_argument("--asset-root", type=pathlib.Path)
+        comfy_import.add_argument("--json", action="store_true")
+        comfy_import.set_defaults(func=command_comfy_import)
+
+        templates = graph_sub.add_parser("templates", help="List or export reusable native graph templates.")
+        template_sub = templates.add_subparsers(dest="template_command", required=True)
+
+        template_list = template_sub.add_parser("list", help="List native graph templates.")
+        template_list.add_argument("--json", action="store_true")
+        template_list.set_defaults(func=command_graph_template_list)
+
+        template_export = template_sub.add_parser("export", help="Export one native graph template.")
+        template_export.add_argument("template_id")
+        template_export.add_argument("--output", required=True, type=pathlib.Path)
+        template_export.add_argument("--json", action="store_true")
+        template_export.set_defaults(func=command_graph_template_export)
+
+        template_publish = template_sub.add_parser("publish", help="Publish a confined reusable graph template package.")
+        template_publish.add_argument("--graph", required=True, type=pathlib.Path)
+        template_publish.add_argument("--inputs-json", type=pathlib.Path)
+        template_publish.add_argument("--output-dir", required=True, type=pathlib.Path)
+        template_publish.add_argument("--template-id", required=True)
+        template_publish.add_argument("--title", required=True)
+        template_publish.add_argument("--description", required=True)
+        template_publish.add_argument("--tag", action="append", default=[])
+        template_publish.add_argument("--json", action="store_true")
+        template_publish.set_defaults(func=command_graph_template_publish)
 
     one_shot = sub.add_parser(spec.one_shot, help=f"Plan and run {spec.recipe_title}.")
     add_common_plan_args(one_shot, spec)

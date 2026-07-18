@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/graph-template-package.v1.schema.json",
+  "title": "mere.run Graph Template Package v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "id", "title", "description", "tags", "graph", "inputs"],
+  "properties": {
+    "contract_version": {"const": "mere.run/graph-template-package.v1"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string", "minLength": 1},
+    "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "graph": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}\\.workflow\\.json$"},
+    "inputs": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}\\.inputs\\.json$"}
+  }
+}

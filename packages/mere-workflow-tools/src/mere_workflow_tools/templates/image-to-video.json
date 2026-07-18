@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "image-to-video",
+  "inputs": {
+    "image-prompt": {
+      "type": "string",
+      "default": "A quiet coastal road at blue hour"
+    },
+    "video-prompt": {
+      "type": "string",
+      "default": "The camera slowly moves forward as wind moves through the scene"
+    }
+  },
+  "nodes": [
+    {
+      "id": "key-image",
+      "kind": "image.generate",
+      "arguments": {
+        "prompt": {"$ref": "inputs.image-prompt"},
+        "seed": 23
+      },
+      "execution": {
+        "max_attempts": 2,
+        "timeout_seconds": 3600,
+        "cache": "auto"
+      }
+    },
+    {
+      "id": "animate",
+      "kind": "video.generate",
+      "arguments": {
+        "prompt": {"$ref": "inputs.video-prompt"},
+        "image": {"$ref": "nodes.key-image.outputs.image"},
+        "seed": 23
+      },
+      "execution": {
+        "max_attempts": 2,
+        "timeout_seconds": 7200,
+        "cache": "auto"
+      }
+    }
+  ],
+  "outputs": {
+    "image": {"$ref": "nodes.key-image.outputs.image"},
+    "video": {"$ref": "nodes.animate.outputs.video"}
+  },
+  "metadata": {
+    "template_id": "image-to-video"
+  }
+}

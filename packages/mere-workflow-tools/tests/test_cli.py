@@ -125,6 +125,43 @@ class MereWorkflowToolsTests(unittest.TestCase):
             },
         )
 
+    def test_graph_template_publish_writes_confined_portable_package(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            graph = root / "source.workflow.json"
+            inputs = root / "source.inputs.json"
+            graph.write_text(json.dumps({
+                "schema_version": 1,
+                "kind": "mere.run/workflow-graph",
+                "name": "Fixture",
+                "inputs": {"prompt": {"type": "string"}},
+                "nodes": [],
+                "outputs": {},
+            }))
+            inputs.write_text('{"prompt":"published"}')
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli.main_for("dataset", [
+                    "graph", "templates", "publish",
+                    "--graph", str(graph),
+                    "--inputs-json", str(inputs),
+                    "--output-dir", str(root / "templates"),
+                    "--template-id", "fixture-template",
+                    "--title", "Fixture template",
+                    "--description", "A deterministic fixture template.",
+                    "--tag", "fixture",
+                    "--json",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["package"]["contract_version"], "mere.run/graph-template-package.v1")
+            self.assertTrue((root / "templates/fixture-template.workflow.json").is_file())
+            self.assertEqual(
+                json.loads((root / "templates/fixture-template.inputs.json").read_text()),
+                {"prompt": "published"},
+            )
+
     def test_dataset_graph_preflight_and_execute_stream_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)

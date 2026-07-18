@@ -11,6 +11,11 @@ plugins, recipes, and downstream automation.
 | [`eval-recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/eval-recipe.v1.schema.json) | Evaluation protocol |
 | [`run-manifest.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/run-manifest.v1.schema.json) | Durable execution state |
 | [`artifact-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/artifact-bundle.v1.schema.json) | Fetched result inventory |
+| [`workflow-graph.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-graph.v1.schema.json) | Portable executable graph |
+| [`graph-node-provider.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-provider.v1.schema.json) | Typed provider node catalog |
+| [`workflow-program.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-program.v1.schema.json) | Reusable composition and static expansion source |
+| [`workflow-module.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-module.v1.schema.json) | Reusable imported graph module |
+| [`workflow-editor-sidecar.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-editor-sidecar.v1.schema.json) | Non-executable canvas state |
 
 ## Versioning
 

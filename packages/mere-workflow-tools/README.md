@@ -54,3 +54,37 @@ mere-dataset-tools graph execute --request invocation.json --run-dir ./node --js
 Its first node, `dataset.prepare`, verifies image-caption pairs and emits a
 training-ready directory, content-addressed manifest, optional contact sheet,
 and structured statistics.
+
+The package also includes reusable provider helpers, a conformance command,
+native graph templates, and a conservative ComfyUI API importer:
+
+```bash
+mere-graph-conformance --provider mere-dataset-tools --json
+mere-graph-conformance --provider ./provider --invocation ./fixture.json --run-dir ./fixture-run --execute --json
+mere-graph-provider-init ./provider --provider-id mere-example-tools --node-kind example.write
+mere-graph-compile ./program.json --output ./workflow.json --report-output ./compile.json --json
+mere-dataset-tools graph templates list --json
+mere-dataset-tools graph comfy inspect ./workflow.json --json
+```
+
+ComfyUI compatibility stops at import. Imported requests become ordinary
+`mere.run/workflow-graph` documents and use the same local, SSH, or Relay
+execution contract as graphs authored elsewhere.
+
+`mere-graph-compile` expands confined reusable module imports, compile-time
+branches, and deterministic static maps. Its output is a flat immutable
+`mere.run/workflow-graph`; executors never need to understand the richer source
+format. Set `execution.max_parallel_nodes` in the program to let independent
+expanded nodes overlap. Variable overrides are accepted from a separate JSON
+file so source programs remain reusable and compilation stays reproducible.
+
+The separate `mere-run-graph-studio` application consumes these public graph
+provider, template, compiler, and Comfy bridge commands. Keeping the visual app
+outside this package lets workflow tools remain headless and independently
+versioned.
+
+The initializer writes only into a new or empty destination. Its generated
+provider is deterministic, emits a final `node_result`, confines declared
+outputs, and includes a catalog test. Full conformance additionally validates
+preflight requirements, contiguous event sequences, declared output names,
+and on-disk artifact paths.

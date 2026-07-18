@@ -1,0 +1,26 @@
+{
+  "contract_version": "mere.run/graph-template-catalog.v1",
+  "templates": [
+    {
+      "id": "image-variants",
+      "title": "Render deterministic image variants",
+      "description": "Render two independently seeded image variants in parallel and preserve both outputs.",
+      "path": "image-variants.json",
+      "tags": ["image", "parallel", "review"]
+    },
+    {
+      "id": "lora-train-sample",
+      "title": "Prepare, train, and sample a LoRA",
+      "description": "Verify an image-caption dataset, train an image LoRA, and render a deterministic sample.",
+      "path": "lora-train-sample.json",
+      "tags": ["dataset", "image", "lora", "training"]
+    },
+    {
+      "id": "image-to-video",
+      "title": "Generate an image and animate it",
+      "description": "Generate a deterministic key image and pass it into native video generation.",
+      "path": "image-to-video.json",
+      "tags": ["image", "video"]
+    }
+  ]
+}

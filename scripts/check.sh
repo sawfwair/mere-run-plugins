@@ -263,4 +263,17 @@ for executable in [
     )
     if f'"executable": "{executable}"' not in result.stdout:
         raise SystemExit(f"installed workflow smoke did not report {executable}")
+
+conformance_cli = pathlib.Path(sys.executable).with_name("mere-graph-conformance")
+dataset_cli = pathlib.Path(sys.executable).with_name("mere-dataset-tools")
+result = subprocess.run(
+    [str(conformance_cli), "--provider", str(dataset_cli), "--json"],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"status": "passed"' not in result.stdout or '"dataset.prepare"' not in result.stdout:
+    raise SystemExit("installed graph provider conformance smoke failed")
 PY

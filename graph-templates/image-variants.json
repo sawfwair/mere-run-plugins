@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "image-variants",
+  "inputs": {
+    "prompt": {
+      "type": "string",
+      "default": "A clean editorial product photograph on a pale green set"
+    },
+    "negative-prompt": {
+      "type": "string",
+      "default": "text, watermark, distorted geometry"
+    }
+  },
+  "nodes": [
+    {
+      "id": "variant-a",
+      "kind": "image.generate",
+      "arguments": {
+        "prompt": {"$ref": "inputs.prompt"},
+        "negative_prompt": {"$ref": "inputs.negative-prompt"},
+        "seed": 41
+      },
+      "execution": {"cache": "auto", "max_attempts": 2, "timeout_seconds": 3600}
+    },
+    {
+      "id": "variant-b",
+      "kind": "image.generate",
+      "arguments": {
+        "prompt": {"$ref": "inputs.prompt"},
+        "negative_prompt": {"$ref": "inputs.negative-prompt"},
+        "seed": 42
+      },
+      "execution": {"cache": "auto", "max_attempts": 2, "timeout_seconds": 3600}
+    }
+  ],
+  "outputs": {
+    "variant-a": {"$ref": "nodes.variant-a.outputs.image"},
+    "variant-b": {"$ref": "nodes.variant-b.outputs.image"}
+  },
+  "execution": {"max_parallel_nodes": 2},
+  "metadata": {"template_id": "image-variants"}
+}
