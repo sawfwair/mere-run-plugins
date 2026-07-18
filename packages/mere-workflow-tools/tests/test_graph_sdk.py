@@ -21,19 +21,28 @@ from mere_workflow_tools import (
 
 class GraphSDKTests(unittest.TestCase):
     def test_canonical_parallel_graph_fixture_is_portable(self) -> None:
-        fixture = (
+        fixture_root = (
             pathlib.Path(__file__).resolve().parents[3]
             / "contracts"
             / "fixtures"
             / "graph-v1"
-            / "parallel-image-video.workflow.json"
         )
-        graph = json.loads(fixture.read_text())
+        compatibility = json.loads((fixture_root / "graph-compatibility.v1.json").read_text())
+        canonical = compatibility["canonical_fixture"]
+        graph = json.loads((fixture_root / canonical["graph"]).read_text())
+        inputs = json.loads((fixture_root / canonical["inputs"]).read_text())
+        assets = json.loads((fixture_root / canonical["assets"]).read_text())
 
+        self.assertEqual(compatibility["kind"], "mere.run/graph-compatibility")
         self.assertEqual(graph["kind"], "mere.run/workflow-graph")
         self.assertEqual(graph["execution"]["max_parallel_nodes"], 2)
         self.assertEqual([node["id"] for node in graph["nodes"]], ["image-a", "image-b", "video"])
         self.assertEqual(graph["nodes"][2]["depends_on"], ["image-a", "image-b"])
+        self.assertEqual(graph_compiler.canonical_digest(graph), canonical["graph_fingerprint"])
+        self.assertEqual(
+            graph_compiler.canonical_digest({"inputs": inputs, "assets": assets}),
+            canonical["input_fingerprint"],
+        )
 
     def test_catalog_and_event_stream_conformance(self) -> None:
         catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
