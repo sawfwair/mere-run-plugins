@@ -6,7 +6,6 @@ import json
 import pathlib
 import sys
 import tempfile
-import time
 import unittest
 from unittest import mock
 
@@ -17,7 +16,6 @@ from mere_workflow_tools import (
     graph_conformance,
     graph_provider,
     graph_sdk,
-    graph_studio,
 )
 
 
@@ -346,96 +344,6 @@ class GraphSDKTests(unittest.TestCase):
             self.assertEqual(result["status"], "compiled")
             self.assertEqual(json.loads(output.read_text())["kind"], graph_compiler.GRAPH_KIND)
             self.assertEqual(json.loads(report.read_text())["contract_version"], graph_compiler.REPORT_CONTRACT_VERSION)
-
-    def test_graph_studio_round_trips_graph_inputs_and_separate_sidecar(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_root:
-            root = pathlib.Path(raw_root)
-            service = graph_studio.GraphStudioService(root, "/fixture/mere.run", lambda _command: graph_studio.CommandResult(0, "{}", ""))
-            graph = {"schema_version": 1, "kind": "mere.run/workflow-graph", "name": "fixture", "inputs": {}, "nodes": [], "outputs": {}}
-            sidecar = graph_studio.default_sidecar()
-            sidecar["nodes"] = {"image": {"x": 12, "y": 34}}
-
-            saved = service.save_project({
-                "path": "workflows/shot.v1",
-                "graph": graph,
-                "inputs": {"prompt": "fixture"},
-                "sidecar": sidecar,
-            })
-            loaded = service.load_project("workflows/shot.v1")
-
-            self.assertEqual(saved["status"], "saved")
-            self.assertEqual(loaded["graph"], graph)
-            self.assertEqual(loaded["inputs"], {"prompt": "fixture"})
-            self.assertEqual(loaded["sidecar"], sidecar)
-            self.assertTrue((root / "workflows/shot.v1.workflow.json").is_file())
-            self.assertTrue((root / "workflows/shot.v1.studio.json").is_file())
-            self.assertNotIn("viewport", json.dumps(loaded["graph"]))
-            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "invalid project path"):
-                service.save_project({"path": "../escape", "graph": graph})
-
-    def test_graph_studio_invokes_only_public_catalog_and_preflight_commands(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_root:
-            commands: list[list[str]] = []
-
-            def run(command: list[str]) -> graph_studio.CommandResult:
-                commands.append(command)
-                return graph_studio.CommandResult(0, json.dumps({"status": "ok"}), "diagnostic")
-
-            service = graph_studio.GraphStudioService(pathlib.Path(raw_root), "/fixture/mere.run", run)
-            service.catalog()
-            result = service.check({
-                "mode": "preflight",
-                "executor": "relay:fleet",
-                "graph": {"kind": "mere.run/workflow-graph"},
-                "inputs": {},
-            })
-
-            self.assertEqual(commands[0], ["/fixture/mere.run", "graph", "catalog", "--json"])
-            self.assertEqual(commands[1][0:3], ["/fixture/mere.run", "graph", "preflight"])
-            self.assertIn("--executor", commands[1])
-            self.assertIn("relay:fleet", commands[1])
-            self.assertEqual(result["result"], {"status": "ok"})
-
-    def test_graph_studio_submits_remote_graph_and_discovers_reference(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_root:
-            root = pathlib.Path(raw_root)
-            executable = root / "fake-mere-run"
-            executable.write_text(
-                "#!/usr/bin/env python3\n"
-                "import json, sys\n"
-                "print(json.dumps({'result': {'remote_reference': 'relay://fleet/job-123'}, 'argv': sys.argv[1:]}))\n"
-            )
-            executable.chmod(0o755)
-            service = graph_studio.GraphStudioService(root, str(executable))
-            started = service.start_run({
-                "executor": "relay:fleet",
-                "graph": {"schema_version": 1, "kind": "mere.run/workflow-graph", "name": "fixture", "inputs": {}, "nodes": [], "outputs": {}},
-                "inputs": {},
-            })
-            deadline = time.monotonic() + 2
-            inspected = service.inspect_run(str(started["id"]))
-            while inspected["state"] in {"starting", "submitting"} and time.monotonic() < deadline:
-                time.sleep(0.01)
-                inspected = service.inspect_run(str(started["id"]))
-
-            self.assertEqual(inspected["state"], "queued")
-            self.assertEqual(inspected["remote_reference"], "relay://fleet/job-123")
-            self.assertIn("submit", inspected["result"]["argv"])
-
-    def test_graph_studio_utilities_confine_paths_and_find_remote_references(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_root:
-            root = pathlib.Path(raw_root)
-            executable = root / "mere.run"
-            executable.write_text("fixture")
-            self.assertEqual(graph_studio.resolve_mere_run(str(executable)), str(executable))
-            self.assertEqual(
-                graph_studio.find_remote_reference({"nested": [{"reference": "ssh://gpu/job-9"}]}),
-                "ssh://gpu/job-9",
-            )
-            events = root / "events.jsonl"
-            events.write_text('{"type":"one"}\nnot-json\n{"type":"two"}\n')
-            self.assertEqual(graph_studio.read_json_lines(events, 10), [{"type": "one"}, {"type": "two"}])
-
 
 def workflow_program() -> graph_sdk.JsonMap:
     return {

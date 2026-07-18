@@ -144,10 +144,13 @@ mere-image-compose generate --prompt "a product render" --output-dir ./image-out
 mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
 mere-graph-conformance --provider mere-dataset-tools --json
 mere-graph-compile ./program.json --output ./workflow.json --report-output ./compile.json --json
-mere-graph-studio --workspace ./production
 mere-dataset-tools graph templates list --json
 mere-dataset-tools graph comfy inspect ./comfy-workflow.json --json
 ```
+
+Visual authoring lives in the separate `mere-run-graph-studio` application,
+which consumes these public provider, template, compiler, and Comfy bridge
+contracts.
 
 These tools call existing `mere.run` surfaces such as `vision ocr`,
 `text anonymize`, `vision caption`, `speech transcribe`, and `image generate`.

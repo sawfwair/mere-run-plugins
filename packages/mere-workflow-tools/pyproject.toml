@@ -25,10 +25,9 @@ mere-image-compose = "mere_workflow_tools.image_compose_cli:main"
 mere-batch-runner = "mere_workflow_tools.batch_cli:main"
 mere-graph-conformance = "mere_workflow_tools.graph_conformance:main"
 mere-graph-compile = "mere_workflow_tools.graph_compiler:main"
-mere-graph-studio = "mere_workflow_tools.graph_studio:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_workflow_tools = ["py.typed", "templates/*.json", "studio/*.html", "studio/*.css", "studio/*.js"]
+mere_workflow_tools = ["py.typed", "templates/*.json"]

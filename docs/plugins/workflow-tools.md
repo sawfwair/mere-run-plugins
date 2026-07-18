@@ -1,7 +1,7 @@
 # Workflow Tools
 
-`mere-workflow-tools` is a shared package that installs six companion commands,
-graph contract tooling, and an optional local authoring app:
+`mere-workflow-tools` is a shared package that installs six companion commands
+and graph contract tooling:
 
 - `mere-doc-tools`
 - `mere-media-scrub`
@@ -11,7 +11,6 @@ graph contract tooling, and an optional local authoring app:
 - `mere-batch-runner`
 - `mere-graph-conformance`
 - `mere-graph-compile`
-- `mere-graph-studio`
 
 Each command follows the same plugin fashion:
 
@@ -132,26 +131,10 @@ Relay executors consume; no higher-order behavior enters the worker protocol.
 
 ## Graph Studio
 
-Launch the optional loopback-only app in a project workspace:
-
-```bash
-mere-graph-studio --workspace ./production
-```
-
-Studio discovers nodes from the live `mere.run graph catalog --json` response.
-Its canvas, typed inspector, graph inputs and outputs, reference selectors,
-secret-name bindings, JSON editor, diagnostics, and run monitor all operate on
-the public contracts. Save writes three separate files:
-
-```text
-name.workflow.json
-name.inputs.json
-name.studio.json
-```
-
-The sidecar contains only node positions and viewport state. It never changes
-execution semantics. Studio invokes the public validate, preflight, local run,
-SSH submit, and Relay submit surfaces and stores no relay credentials itself.
+Visual authoring is provided by the separate `mere-run-graph-studio`
+application. This package remains its provider boundary for catalog entries,
+native templates, workflow compilation, and conservative ComfyUI import. The
+Studio app invokes these public commands and does not import plugin internals.
 
 ## ComfyUI Bridge
 
