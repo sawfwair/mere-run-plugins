@@ -24,12 +24,15 @@ companion plugins.
 - `graph-run.v1.schema.json`: mirrored run manifest emitted by every executor.
 - `graph-template-catalog.v1.schema.json`: discoverable reusable graph templates
   shipped by this companion repository.
+- `graph-template-package.v1.schema.json`: confined user-published template
+  descriptor pointing at portable graph and default-input documents.
 - `workflow-program.v1.schema.json`: declarative reusable composition, static
   map, branch, and parallel-policy source compiled to an ordinary graph.
 - `workflow-module.v1.schema.json`: confined import format for reusable graph
   modules.
 - `workflow-editor-sidecar.v1.schema.json`: canvas-only node and graph-output
-  positions plus viewport state stored separately from executable graphs.
+  positions, groups, notes, saved selections, and viewport state stored
+  separately from executable graphs.
 
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.

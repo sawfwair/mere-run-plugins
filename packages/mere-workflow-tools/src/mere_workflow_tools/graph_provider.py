@@ -82,6 +82,29 @@ def graph_catalog(provider_id: str, provider_version: str) -> JsonMap:
                         "step": 1,
                         "advanced": True,
                     },
+                    {
+                        "name": "caption_policy",
+                        "type": "json",
+                        "required": False,
+                        "description": "Structured caption normalization and validation policy.",
+                        "default": {"prefix_trigger": True, "allow_empty": False},
+                        "value_schema": {
+                            "type": "object",
+                            "properties": {
+                                "prefix_trigger": {
+                                    "type": "boolean",
+                                    "title": "Prefix trigger token",
+                                    "default": True,
+                                },
+                                "allow_empty": {
+                                    "type": "boolean",
+                                    "title": "Allow empty captions",
+                                    "default": False,
+                                },
+                            },
+                            "required": ["prefix_trigger", "allow_empty"],
+                        },
+                    },
                 ],
                 "outputs": [
                     {
@@ -147,6 +170,7 @@ def graph_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap
         source = pathlib.Path(source_value)
         try:
             images = dataset_images(source, arguments)
+            policy = caption_policy(arguments)
             missing = [image.name for image in images if not image.with_suffix(".txt").is_file()]
             if missing:
                 diagnostics.append(
@@ -157,6 +181,17 @@ def graph_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap
                         f"Missing same-stem captions for: {', '.join(missing[:8])}",
                     )
                 )
+            if not policy["allow_empty"]:
+                empty = [image.name for image in images if image.with_suffix(".txt").is_file() and not image.with_suffix(".txt").read_text().strip()]
+                if empty:
+                    diagnostics.append(
+                        diagnostic(
+                            "dataset_caption_empty",
+                            "blocker",
+                            "Dataset captions are empty",
+                            f"Empty captions for: {', '.join(empty[:8])}",
+                        )
+                    )
             if not images:
                 diagnostics.append(
                     diagnostic("dataset_empty", "blocker", "Dataset has no images", f"No supported images in {source}")
@@ -191,6 +226,7 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
     started = time.monotonic()
     events = GraphEventStream(write_event)
     arguments = as_map(invocation["arguments"], "arguments")
+    policy = caption_policy(arguments)
     source = pathlib.Path(cast(str, arguments["data"])).resolve()
     images = dataset_images(source, arguments)
     locations = output_locations(invocation, run_directory)
@@ -211,7 +247,7 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
         copied_caption = dataset / caption.name
         link_or_copy(image, copied_image)
         caption_text = caption.read_text().strip()
-        if isinstance(trigger_token, str) and trigger_token.strip():
+        if policy["prefix_trigger"] and isinstance(trigger_token, str) and trigger_token.strip():
             token = trigger_token.strip()
             if not caption_text.lower().startswith(token.lower()):
                 caption_text = f"{token}, {caption_text}"
@@ -298,6 +334,22 @@ def dataset_images(source: pathlib.Path, arguments: JsonMap) -> list[pathlib.Pat
             raise GraphProviderError("maximum_images must be a positive integer")
         images = images[:maximum]
     return images
+
+
+def caption_policy(arguments: JsonMap) -> dict[str, bool]:
+    raw_policy = arguments.get("caption_policy", {"prefix_trigger": True, "allow_empty": False})
+    policy = as_map(raw_policy, "caption_policy")
+    unknown = set(policy) - {"prefix_trigger", "allow_empty"}
+    if unknown:
+        raise GraphProviderError(f"caption_policy contains unsupported fields: {sorted(unknown)}")
+    normalized = {
+        "prefix_trigger": policy.get("prefix_trigger", True),
+        "allow_empty": policy.get("allow_empty", False),
+    }
+    for name, value in normalized.items():
+        if not isinstance(value, bool):
+            raise GraphProviderError(f"caption_policy.{name} must be a boolean")
+    return cast(dict[str, bool], normalized)
 
 
 def output_locations(invocation: JsonMap, run_directory: pathlib.Path) -> dict[str, pathlib.Path]:

@@ -811,6 +811,25 @@ def command_graph_template_export(_spec: ToolSpec, args: argparse.Namespace) -> 
         raise PluginError(str(exc), 2) from None
 
 
+def command_graph_template_publish(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    try:
+        graph = load_json(args.graph)
+        inputs = load_json(args.inputs_json) if args.inputs_json else {}
+        package = graph_templates.publish_template(
+            graph,
+            inputs,
+            args.output_dir,
+            args.template_id,
+            args.title,
+            args.description,
+            args.tag,
+        )
+        print_json({"status": "published", "package": package, "output_directory": str(args.output_dir)})
+        return 0
+    except (GraphProviderError, OSError) as exc:
+        raise PluginError(str(exc), 2) from None
+
+
 def command_graph_compile(_spec: ToolSpec, args: argparse.Namespace) -> int:
     try:
         print_json(graph_compiler.run(args))
@@ -978,6 +997,17 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         template_export.add_argument("--output", required=True, type=pathlib.Path)
         template_export.add_argument("--json", action="store_true")
         template_export.set_defaults(func=command_graph_template_export)
+
+        template_publish = template_sub.add_parser("publish", help="Publish a confined reusable graph template package.")
+        template_publish.add_argument("--graph", required=True, type=pathlib.Path)
+        template_publish.add_argument("--inputs-json", type=pathlib.Path)
+        template_publish.add_argument("--output-dir", required=True, type=pathlib.Path)
+        template_publish.add_argument("--template-id", required=True)
+        template_publish.add_argument("--title", required=True)
+        template_publish.add_argument("--description", required=True)
+        template_publish.add_argument("--tag", action="append", default=[])
+        template_publish.add_argument("--json", action="store_true")
+        template_publish.set_defaults(func=command_graph_template_publish)
 
     one_shot = sub.add_parser(spec.one_shot, help=f"Plan and run {spec.recipe_title}.")
     add_common_plan_args(one_shot, spec)

@@ -28,7 +28,8 @@
         "properties": {
           "x": {"type": "number"},
           "y": {"type": "number"},
-          "collapsed": {"type": "boolean"}
+          "collapsed": {"type": "boolean"},
+          "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
         }
       }
     },
@@ -42,7 +43,57 @@
         "properties": {
           "x": {"type": "number"},
           "y": {"type": "number"},
-          "collapsed": {"type": "boolean"}
+          "collapsed": {"type": "boolean"},
+          "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+        }
+      }
+    },
+    "groups": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,63}$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y", "width", "height", "title", "node_ids"],
+        "properties": {
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "width": {"type": "number", "minimum": 120},
+          "height": {"type": "number", "minimum": 80},
+          "title": {"type": "string"},
+          "node_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}},
+          "collapsed": {"type": "boolean"},
+          "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+        }
+      }
+    },
+    "notes": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,63}$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y", "width", "height", "text"],
+        "properties": {
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "width": {"type": "number", "minimum": 120},
+          "height": {"type": "number", "minimum": 80},
+          "text": {"type": "string"},
+          "collapsed": {"type": "boolean"},
+          "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+        }
+      }
+    },
+    "selection_sets": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,63}$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["node_ids"],
+        "properties": {
+          "node_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}}
         }
       }
     }

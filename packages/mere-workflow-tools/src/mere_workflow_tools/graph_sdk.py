@@ -31,6 +31,21 @@ PORT_TYPES = {
     "asset_directory",
     "asset_collection",
 }
+VALUE_SCHEMA_TYPES = {"object", "array", "string", "integer", "number", "boolean", "enum"}
+VALUE_SCHEMA_KEYS = {
+    "type",
+    "title",
+    "description",
+    "default",
+    "values",
+    "properties",
+    "required",
+    "items",
+    "minimum",
+    "maximum",
+    "step",
+    "multiline",
+}
 
 
 class GraphProviderError(RuntimeError):
@@ -215,3 +230,53 @@ def validate_ports(raw_ports: list[object], label: str, required_flag: str) -> N
             raise GraphProviderError(f"{label}.{name}.secret must be a boolean")
         if secret is True and port_type != "string":
             raise GraphProviderError(f"{label}.{name} secret ports must use type string")
+        value_schema = port.get("value_schema")
+        if value_schema is not None:
+            if port_type not in {"json", "asset_collection"}:
+                raise GraphProviderError(f"{label}.{name}.value_schema requires a structured port type")
+            validate_value_schema(value_schema, f"{label}.{name}.value_schema")
+
+
+def validate_value_schema(value: object, label: str, depth: int = 0) -> None:
+    if depth > 16:
+        raise GraphProviderError(f"{label} exceeds the maximum nesting depth")
+    schema = as_map(value, label)
+    unknown = set(schema) - VALUE_SCHEMA_KEYS
+    if unknown:
+        raise GraphProviderError(f"{label} contains unsupported fields: {sorted(unknown)}")
+    schema_type = schema.get("type")
+    if schema_type not in VALUE_SCHEMA_TYPES:
+        raise GraphProviderError(f"{label}.type is invalid: {schema_type}")
+    for text_field in ["title", "description"]:
+        text_value = schema.get(text_field)
+        if text_value is not None and not isinstance(text_value, str):
+            raise GraphProviderError(f"{label}.{text_field} must be a string")
+    for numeric_field in ["minimum", "maximum", "step"]:
+        numeric_value = schema.get(numeric_field)
+        if numeric_value is not None and (not isinstance(numeric_value, (int, float)) or isinstance(numeric_value, bool)):
+            raise GraphProviderError(f"{label}.{numeric_field} must be a number")
+    step = schema.get("step")
+    if isinstance(step, (int, float)) and not isinstance(step, bool) and step <= 0:
+        raise GraphProviderError(f"{label}.step must be positive")
+    multiline = schema.get("multiline")
+    if multiline is not None and not isinstance(multiline, bool):
+        raise GraphProviderError(f"{label}.multiline must be a boolean")
+    if schema_type == "enum":
+        values = as_list(schema.get("values"), f"{label}.values")
+        if not values or any(not isinstance(item, str) for item in values) or len(set(values)) != len(values):
+            raise GraphProviderError(f"{label}.values must contain unique strings")
+    if schema_type == "object":
+        properties = as_map(schema.get("properties", {}), f"{label}.properties")
+        for name, child in properties.items():
+            if not isinstance(name, str) or not name:
+                raise GraphProviderError(f"{label}.properties contains an invalid name")
+            validate_value_schema(child, f"{label}.properties.{name}", depth + 1)
+        required = as_list(schema.get("required", []), f"{label}.required")
+        if any(not isinstance(item, str) or item not in properties for item in required):
+            raise GraphProviderError(f"{label}.required must name declared properties")
+        if len(set(cast(list[str], required))) != len(required):
+            raise GraphProviderError(f"{label}.required contains duplicates")
+    if schema_type == "array":
+        if "items" not in schema:
+            raise GraphProviderError(f"{label}.items is required for arrays")
+        validate_value_schema(schema["items"], f"{label}.items", depth + 1)
