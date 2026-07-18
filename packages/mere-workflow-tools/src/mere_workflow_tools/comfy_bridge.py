@@ -15,6 +15,7 @@ SUPPORTED_API_CLASSES = {
     "KSampler",
     "LoadImage",
     "LoraLoader",
+    "PreviewImage",
     "SaveImage",
     "VAEDecode",
     "VAEEncode",
@@ -35,6 +36,7 @@ def load_workflow(path: pathlib.Path) -> JsonMap:
 def inspect_workflow(workflow: JsonMap) -> JsonMap:
     workflow_format, nodes = workflow_nodes(workflow)
     class_types = class_type_counts(workflow_format, nodes)
+    source_nodes = node_compatibility(workflow_format, nodes)
     unsupported = sorted(name for name in class_types if name not in SUPPORTED_API_CLASSES)
     diagnostics: list[JsonMap] = []
     if workflow_format == "ui":
@@ -65,11 +67,13 @@ def inspect_workflow(workflow: JsonMap) -> JsonMap:
         "contract_version": BRIDGE_CONTRACT_VERSION,
         "format": workflow_format,
         "node_count": sum(class_types.values()),
+        "source_nodes": source_nodes,
         "class_types": dict(sorted(class_types.items())),
         "supported_class_types": sorted(name for name in class_types if name in SUPPORTED_API_CLASSES),
         "unsupported_class_types": unsupported,
         "importable": not any(item["severity"] == "blocker" for item in diagnostics),
         "diagnostics": diagnostics,
+        "recommended_export": "Save (API Format)" if workflow_format == "ui" else None,
     }
 
 
@@ -155,6 +159,8 @@ def import_workflow(
             "imported_from": "comfyui-api",
             "comfy_checkpoint": checkpoint_name,
             "bridge_contract": BRIDGE_CONTRACT_VERSION,
+            "comfy_source_node_count": report["node_count"],
+            "comfy_source_classes": sorted(cast(dict[str, int], report["class_types"])),
         },
     }
     import_report: JsonMap = {
@@ -164,6 +170,29 @@ def import_workflow(
         "warnings": warnings,
     }
     return graph, input_values, import_report
+
+
+def node_compatibility(workflow_format: str, raw_nodes: object) -> list[JsonMap]:
+    rows: list[JsonMap] = []
+    items = as_map(raw_nodes, "nodes").items() if workflow_format == "api" else enumerate(as_list(raw_nodes, "nodes"))
+    for fallback_id, raw_node in items:
+        item = as_map(raw_node, "node")
+        class_type = item.get("class_type") if workflow_format == "api" else item.get("type")
+        node_id = fallback_id if workflow_format == "api" else item.get("id", fallback_id)
+        supported = isinstance(class_type, str) and class_type in SUPPORTED_API_CLASSES
+        if workflow_format == "ui":
+            disposition = "requires_api_export" if supported else "unsupported"
+        elif class_type in {"SaveImage", "PreviewImage", "VAEDecode"}:
+            disposition = "native_output_replaces_node"
+        else:
+            disposition = "mapped" if supported else "unsupported"
+        rows.append({
+            "id": str(node_id),
+            "class_type": class_type,
+            "supported": supported,
+            "disposition": disposition,
+        })
+    return sorted(rows, key=lambda row: (str(row["class_type"]), str(row["id"])))
 
 
 def workflow_nodes(workflow: JsonMap) -> tuple[str, object]:

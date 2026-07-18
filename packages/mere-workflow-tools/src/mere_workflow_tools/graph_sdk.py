@@ -280,3 +280,70 @@ def validate_value_schema(value: object, label: str, depth: int = 0) -> None:
         if "items" not in schema:
             raise GraphProviderError(f"{label}.items is required for arrays")
         validate_value_schema(schema["items"], f"{label}.items", depth + 1)
+
+
+def validate_preflight(document: JsonMap) -> None:
+    if document.get("contract_version") != PREFLIGHT_CONTRACT_VERSION:
+        raise GraphProviderError(f"unsupported preflight contract: {document.get('contract_version')}")
+    if document.get("status") not in {"ok", "blocked"}:
+        raise GraphProviderError("preflight status must be ok or blocked")
+    diagnostics = as_list(document.get("diagnostics"), "preflight.diagnostics")
+    for raw_diagnostic in diagnostics:
+        item = as_map(raw_diagnostic, "preflight diagnostic")
+        if item.get("severity") not in {"info", "warning", "blocker"}:
+            raise GraphProviderError("preflight diagnostic severity is invalid")
+        for field in ["id", "title", "message"]:
+            if not isinstance(item.get(field), str) or not item[field]:
+                raise GraphProviderError(f"preflight diagnostic {field} must be a non-empty string")
+    if document.get("status") == "blocked" and not any(
+        as_map(item, "preflight diagnostic").get("severity") == "blocker" for item in diagnostics
+    ):
+        raise GraphProviderError("blocked preflight must include a blocker diagnostic")
+    requirements = as_map(document.get("requirements"), "preflight.requirements")
+    for field in ["model_ids", "accelerator_backends"]:
+        values = as_list(requirements.get(field), f"preflight.requirements.{field}")
+        if any(not isinstance(item, str) or not item for item in values):
+            raise GraphProviderError(f"preflight.requirements.{field} must contain non-empty strings")
+    actions = document.get("actions", [])
+    if not isinstance(actions, list) or any(not isinstance(item, dict) for item in actions):
+        raise GraphProviderError("preflight.actions must be an array of objects")
+
+
+def validate_event_stream(events: list[JsonMap], invocation: JsonMap, run_directory: pathlib.Path) -> None:
+    if not events:
+        raise GraphProviderError("provider execution emitted no events")
+    for sequence, item in enumerate(events):
+        if item.get("contract_version") != EVENT_CONTRACT_VERSION:
+            raise GraphProviderError(f"event {sequence} uses an unsupported contract")
+        if item.get("sequence") != sequence:
+            raise GraphProviderError(f"event sequence is not contiguous at index {sequence}")
+        if not isinstance(item.get("created_at"), str) or not item["created_at"]:
+            raise GraphProviderError(f"event {sequence} has no timestamp")
+        if not isinstance(item.get("type"), str) or not item["type"]:
+            raise GraphProviderError(f"event {sequence} has no type")
+    result_events = [item for item in events if item.get("type") == "node_result"]
+    if len(result_events) != 1 or events[-1].get("type") != "node_result":
+        raise GraphProviderError("provider execution must finish with exactly one node_result event")
+    outputs = as_map(result_events[0].get("outputs"), "node_result.outputs")
+    declarations = as_map(invocation.get("outputs"), "invocation.outputs")
+    missing = sorted(set(declarations) - set(outputs))
+    unknown = sorted(set(outputs) - set(declarations))
+    if missing:
+        raise GraphProviderError(f"node_result is missing declared outputs: {missing}")
+    if unknown:
+        raise GraphProviderError(f"node_result contains undeclared outputs: {unknown}")
+    for name, raw_declaration in declarations.items():
+        declaration = as_map(raw_declaration, f"invocation.outputs.{name}")
+        output_type = declaration.get("type")
+        output_value = outputs[name]
+        if output_value is None and declaration.get("optional") is True:
+            continue
+        if output_type in {"asset", "asset_directory", "asset_collection"}:
+            expected_path = declaration.get("path")
+            if not isinstance(expected_path, str) or output_value != expected_path:
+                raise GraphProviderError(f"node_result output {name} must equal its declared relative path")
+            path = confined_path(run_directory, expected_path)
+            if output_type == "asset_directory" and not path.is_dir():
+                raise GraphProviderError(f"declared output directory is missing: {name}")
+            if output_type != "asset_directory" and not path.is_file():
+                raise GraphProviderError(f"declared output artifact is missing: {name}")

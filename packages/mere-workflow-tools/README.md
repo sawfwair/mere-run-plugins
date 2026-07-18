@@ -60,6 +60,8 @@ native graph templates, and a conservative ComfyUI API importer:
 
 ```bash
 mere-graph-conformance --provider mere-dataset-tools --json
+mere-graph-conformance --provider ./provider --invocation ./fixture.json --run-dir ./fixture-run --execute --json
+mere-graph-provider-init ./provider --provider-id mere-example-tools --node-kind example.write
 mere-graph-compile ./program.json --output ./workflow.json --report-output ./compile.json --json
 mere-dataset-tools graph templates list --json
 mere-dataset-tools graph comfy inspect ./workflow.json --json
@@ -80,3 +82,9 @@ The separate `mere-run-graph-studio` application consumes these public graph
 provider, template, compiler, and Comfy bridge commands. Keeping the visual app
 outside this package lets workflow tools remain headless and independently
 versioned.
+
+The initializer writes only into a new or empty destination. Its generated
+provider is deterministic, emits a final `node_result`, confines declared
+outputs, and includes a catalog test. Full conformance additionally validates
+preflight requirements, contiguous event sequences, declared output names,
+and on-disk artifact paths.

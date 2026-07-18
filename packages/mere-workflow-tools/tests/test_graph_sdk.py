@@ -15,7 +15,9 @@ from mere_workflow_tools import (
     graph_compiler,
     graph_conformance,
     graph_provider,
+    graph_provider_init,
     graph_sdk,
+    graph_templates,
 )
 
 
@@ -65,6 +67,37 @@ class GraphSDKTests(unittest.TestCase):
         self.assertEqual(events[0]["contract_version"], graph_sdk.EVENT_CONTRACT_VERSION)
         with self.assertRaisesRegex(graph_sdk.GraphProviderError, "final provider event"):
             stream.emit("metric", metric={"name": "late", "value": 1})
+
+    def test_preflight_and_execution_documents_are_validated_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            artifact = root / "artifacts" / "result.txt"
+            artifact.parent.mkdir()
+            artifact.write_text("result\n")
+            invocation = {
+                "outputs": {"artifact": {"type": "asset", "path": "artifacts/result.txt"}},
+            }
+            preflight = {
+                "contract_version": graph_sdk.PREFLIGHT_CONTRACT_VERSION,
+                "status": "ok",
+                "diagnostics": [],
+                "actions": [],
+                "requirements": {"model_ids": [], "accelerator_backends": ["cpu"]},
+            }
+            events = [
+                graph_sdk.event(0, "progress", progress={"current": 1, "total": 1}),
+                graph_sdk.event(1, "node_result", outputs={"artifact": "artifacts/result.txt"}),
+            ]
+
+            graph_sdk.validate_preflight(preflight)
+            graph_sdk.validate_event_stream(events, invocation, root)
+
+            preflight["status"] = "blocked"
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "blocker diagnostic"):
+                graph_sdk.validate_preflight(preflight)
+            events[-1]["outputs"] = {"unknown": "result"}
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "missing declared outputs"):
+                graph_sdk.validate_event_stream(events, invocation, root)
 
     def test_catalog_rejects_duplicate_node_kinds_and_invalid_traits(self) -> None:
         catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
@@ -163,6 +196,63 @@ class GraphSDKTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("invalid catalog JSON", stderr.getvalue())
 
+    def test_conformance_cli_executes_fixture_and_verifies_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            provider = root / "fixture-provider"
+            provider.write_text(
+                "#!/usr/bin/env python3\n"
+                "import datetime, json, pathlib, sys\n"
+                "args = sys.argv[1:]\n"
+                "if args[1] == 'catalog':\n"
+                " print(json.dumps({'contract_version':'mere.run/plugin-graph-provider.v1','provider_id':'mere-fixture','provider_version':'1.0.0','nodes':[{'kind':'fixture.write','title':'Write','description':'Write fixture','inputs':[{'name':'text','type':'string','required':True}],'outputs':[{'name':'artifact','type':'asset','optional':False}],'requirements':{'model_ids':[],'accelerator_backends':['cpu'],'minimum_accelerator_memory_bytes':None},'traits':{'deterministic':True,'cacheable':True,'side_effects':'none','supports_progress':True,'supports_previews':False}}]}))\n"
+                "elif args[1] == 'preflight':\n"
+                " print(json.dumps({'contract_version':'mere.run/plugin-graph-preflight.v1','status':'ok','diagnostics':[],'actions':[],'requirements':{'model_ids':[],'accelerator_backends':['cpu']}}))\n"
+                "else:\n"
+                " request = json.loads(pathlib.Path(args[args.index('--request')+1]).read_text())\n"
+                " run = pathlib.Path(args[args.index('--run-dir')+1]); output = run / request['outputs']['artifact']['path']; output.parent.mkdir(parents=True, exist_ok=True); output.write_text('fixture\\n')\n"
+                " base = {'contract_version':'mere.run/plugin-graph-event.v1','created_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}\n"
+                " print(json.dumps({**base,'sequence':0,'type':'progress'})); print(json.dumps({**base,'sequence':1,'type':'node_result','outputs':{'artifact':request['outputs']['artifact']['path']}}))\n"
+            )
+            provider.chmod(0o755)
+            invocation = root / "invocation.json"
+            invocation.write_text(json.dumps({
+                "contract_version": graph_sdk.INVOCATION_CONTRACT_VERSION,
+                "kind": "fixture.write",
+                "arguments": {"text": "fixture"},
+                "outputs": {"artifact": {"type": "asset", "path": "artifacts/result.txt"}},
+            }))
+            stdout = io.StringIO()
+            with mock.patch.object(sys, "argv", [
+                "mere-graph-conformance",
+                "--provider", str(provider),
+                "--invocation", str(invocation),
+                "--run-dir", str(root / "run"),
+                "--execute",
+                "--json",
+            ]):
+                with contextlib.redirect_stdout(stdout):
+                    exit_code = graph_conformance.main()
+
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(result["checks"], ["catalog", "preflight", "execution"])
+            self.assertEqual(result["fixture"]["event_count"], 2)
+            self.assertTrue((root / "run/artifacts/result.txt").is_file())
+
+    def test_provider_initializer_creates_safe_typed_starter(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            destination = pathlib.Path(raw_root) / "provider"
+            graph_provider_init.create_provider(destination, "mere-example-tools", "example.write")
+            cli_source = (destination / "src/mere_example_tools/cli.py").read_text()
+
+            compile(cli_source, "generated-provider-cli.py", "exec")
+            self.assertIn("mere-graph-conformance", (destination / "README.md").read_text())
+            self.assertIn("example.write", cli_source)
+            self.assertTrue((destination / "tests/test_provider.py").is_file())
+            with self.assertRaisesRegex(graph_sdk.GraphProviderError, "not empty"):
+                graph_provider_init.create_provider(destination, "mere-example-tools", "example.write")
+
     def test_comfy_api_prompt_imports_as_native_image_graph(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             root = pathlib.Path(raw_root)
@@ -220,6 +310,8 @@ class GraphSDKTests(unittest.TestCase):
         self.assertEqual(report["format"], "ui")
         self.assertFalse(report["importable"])
         self.assertEqual(report["unsupported_class_types"], ["CustomMagicNode"])
+        self.assertEqual(report["recommended_export"], "Save (API Format)")
+        self.assertEqual(report["source_nodes"][0]["disposition"], "unsupported")
         with self.assertRaisesRegex(comfy_bridge.ComfyBridgeError, "API prompt format"):
             comfy_bridge.import_workflow(
                 {"version": 0.4, "nodes": [{"id": 1, "type": "KSampler"}]},
@@ -252,6 +344,10 @@ class GraphSDKTests(unittest.TestCase):
             self.assertEqual(result["status"], "exported")
             self.assertEqual(graph["metadata"]["template_id"], "lora-train-sample")
             self.assertEqual(graph["nodes"][0]["provider"], "mere-dataset-tools")
+
+            catalog = graph_templates.catalog()
+            template_ids = {item["id"] for item in catalog["templates"]}
+            self.assertIn("image-variants", template_ids)
 
     def test_workflow_compiler_expands_modules_map_branch_and_parallel_policy(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
