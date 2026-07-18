@@ -20,6 +20,14 @@ from mere_workflow_tools import (
 
 
 class GraphSDKTests(unittest.TestCase):
+    def test_editor_sidecar_keeps_graph_output_positions_non_executable(self) -> None:
+        contract_root = pathlib.Path(__file__).resolve().parents[3] / "contracts"
+        schema = json.loads((contract_root / "workflow-editor-sidecar.v1.schema.json").read_text())
+
+        self.assertEqual(schema["properties"]["outputs"], schema["properties"]["nodes"])
+        graph_schema = json.loads((contract_root / "workflow-graph.v1.schema.json").read_text())
+        self.assertNotIn("position", json.dumps(graph_schema))
+
     def test_canonical_parallel_graph_fixture_is_portable(self) -> None:
         fixture_root = (
             pathlib.Path(__file__).resolve().parents[3]

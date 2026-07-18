@@ -28,8 +28,8 @@ companion plugins.
   map, branch, and parallel-policy source compiled to an ordinary graph.
 - `workflow-module.v1.schema.json`: confined import format for reusable graph
   modules.
-- `workflow-editor-sidecar.v1.schema.json`: canvas-only positions and viewport
-  state stored separately from executable graphs.
+- `workflow-editor-sidecar.v1.schema.json`: canvas-only node and graph-output
+  positions plus viewport state stored separately from executable graphs.
 
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.
