@@ -58,7 +58,7 @@ name = "{provider_id}"
 version = "0.1.0"
 description = "Typed mere.run graph node provider"
 requires-python = ">=3.9"
-dependencies = ["mere-workflow-tools>=0.2.0"]
+dependencies = ["mere-workflow-tools>=0.3.0"]
 
 [project.scripts]
 {provider_id} = "{module}.cli:main"

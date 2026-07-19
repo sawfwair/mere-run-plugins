@@ -2,6 +2,20 @@
   "contract_version": "mere.run/graph-template-catalog.v1",
   "templates": [
     {
+      "id": "creative-prompt-lab",
+      "title": "Build a reusable creative prompt",
+      "description": "Combine material values, a seeded format choice, and an explicit installed chat model into a reusable image prompt.",
+      "path": "creative-prompt-lab.json",
+      "tags": ["creative", "prompt", "text", "values"]
+    },
+    {
+      "id": "describe-and-remix",
+      "title": "Describe and remix an image",
+      "description": "Describe a source image with an explicit vision model, then remix the description with an explicit chat model.",
+      "path": "describe-and-remix.json",
+      "tags": ["creative", "image", "prompt", "vision"]
+    },
+    {
       "id": "image-variants",
       "title": "Render deterministic image variants",
       "description": "Render two independently seeded image variants in parallel and preserve both outputs.",
