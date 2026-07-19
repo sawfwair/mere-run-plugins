@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "creative-prompt-lab",
+  "inputs": {
+    "idea": {
+      "type": "string",
+      "default": "A cinematic portrait of a botanist cataloging luminous plants"
+    },
+    "instruction": {
+      "type": "string",
+      "default": "Turn this idea into one vivid, production-ready image prompt. Preserve the subject and avoid commentary."
+    },
+    "model": {
+      "type": "string",
+      "default": "text-chat-gemma4-12b-4bit"
+    }
+  },
+  "nodes": [
+    {
+      "id": "idea",
+      "kind": "text.value",
+      "arguments": {"value": {"$ref": "inputs.idea"}}
+    },
+    {
+      "id": "format",
+      "kind": "choice.value",
+      "arguments": {
+        "options": ["square", "portrait", "landscape"],
+        "selected": "portrait"
+      }
+    },
+    {
+      "id": "enhance",
+      "kind": "text.enhance",
+      "arguments": {
+        "text": {"$ref": "nodes.idea.outputs.text"},
+        "instruction": {"$ref": "inputs.instruction"},
+        "model": {"$ref": "inputs.model"},
+        "max_tokens": 512,
+        "temperature": 0.3
+      },
+      "execution": {"cache": "auto", "max_attempts": 2, "timeout_seconds": 1800}
+    },
+    {
+      "id": "prompt",
+      "kind": "text.template",
+      "arguments": {
+        "template": "{{enhanced}}\nComposition: {{format}}.",
+        "variables": {
+          "enhanced": {"$ref": "nodes.enhance.outputs.text"},
+          "format": {"$ref": "nodes.format.outputs.value"}
+        }
+      }
+    },
+    {
+      "id": "seed",
+      "kind": "seed.value",
+      "arguments": {}
+    }
+  ],
+  "outputs": {
+    "prompt": {"$ref": "nodes.prompt.outputs.text"},
+    "format": {"$ref": "nodes.format.outputs.value"},
+    "seed": {"$ref": "nodes.seed.outputs.seed"}
+  },
+  "metadata": {"template_id": "creative-prompt-lab"}
+}

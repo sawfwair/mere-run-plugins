@@ -106,9 +106,12 @@ mere-dataset-tools graph templates export lora-train-sample \
   --output ./workflow.json --json
 ```
 
-The native template catalog includes dataset-to-LoRA-to-sample and
-image-to-video workflows. The canonical graph and run schemas are mirrored in
-`contracts/` and validated with every repository gate.
+The native template catalog includes dataset-to-LoRA-to-sample,
+image-to-video, Creative Prompt Lab, and Describe and Remix workflows. The
+creative templates compose the portable `text.value`, `text.join`,
+`text.template`, `text.enhance`, and `image.describe` catalog nodes without a
+Studio-specific graph format. The canonical graph and run schemas are mirrored
+in `contracts/` and validated with every repository gate.
 
 ## Reusable Composition
 

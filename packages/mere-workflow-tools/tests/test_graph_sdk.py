@@ -54,6 +54,36 @@ class GraphSDKTests(unittest.TestCase):
             canonical["input_fingerprint"],
         )
 
+    def test_canonical_creative_material_fixture_is_portable(self) -> None:
+        fixture_root = (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "contracts"
+            / "fixtures"
+            / "graph-v1"
+        )
+        compatibility = json.loads((fixture_root / "graph-compatibility.v1.json").read_text())
+        canonical = compatibility["material_fixture"]
+        graph = json.loads((fixture_root / canonical["graph"]).read_text())
+        inputs = json.loads((fixture_root / canonical["inputs"]).read_text())
+        assets = json.loads((fixture_root / canonical["assets"]).read_text())
+
+        self.assertEqual(
+            [node["kind"] for node in graph["nodes"]],
+            [
+                "text.value",
+                "text.value",
+                "text.join",
+                "choice.value",
+                "text.template",
+                "seed.value",
+            ],
+        )
+        self.assertEqual(graph_compiler.canonical_digest(graph), canonical["graph_fingerprint"])
+        self.assertEqual(
+            graph_compiler.canonical_digest({"inputs": inputs, "assets": assets}),
+            canonical["input_fingerprint"],
+        )
+
     def test_catalog_and_event_stream_conformance(self) -> None:
         catalog = graph_provider.graph_catalog("mere-dataset-tools", "1.2.3")
         graph_sdk.validate_catalog(catalog)

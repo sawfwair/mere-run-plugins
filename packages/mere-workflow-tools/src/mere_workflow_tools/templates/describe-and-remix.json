@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "describe-and-remix",
+  "inputs": {
+    "image": {"type": "asset"},
+    "vision-model": {
+      "type": "string",
+      "default": "text-chat-gemma4-12b-4bit"
+    },
+    "text-model": {
+      "type": "string",
+      "default": "text-chat-gemma4-12b-4bit"
+    },
+    "remix-instruction": {
+      "type": "string",
+      "default": "Transform this description into a fresh editorial image prompt with a bolder lighting concept. Return only the prompt."
+    }
+  },
+  "nodes": [
+    {
+      "id": "describe",
+      "kind": "image.describe",
+      "arguments": {
+        "image": {"$ref": "inputs.image"},
+        "instruction": "Describe the subject, setting, composition, lighting, palette, and camera perspective. Return only the description.",
+        "model": {"$ref": "inputs.vision-model"},
+        "max_tokens": 256,
+        "temperature": 0.2
+      },
+      "execution": {"cache": "auto", "max_attempts": 2, "timeout_seconds": 1800}
+    },
+    {
+      "id": "remix",
+      "kind": "text.enhance",
+      "arguments": {
+        "text": {"$ref": "nodes.describe.outputs.text"},
+        "instruction": {"$ref": "inputs.remix-instruction"},
+        "model": {"$ref": "inputs.text-model"},
+        "max_tokens": 512,
+        "temperature": 0.3
+      },
+      "execution": {"cache": "auto", "max_attempts": 2, "timeout_seconds": 1800}
+    },
+    {
+      "id": "seed",
+      "kind": "seed.value",
+      "arguments": {}
+    }
+  ],
+  "outputs": {
+    "description": {"$ref": "nodes.describe.outputs.text"},
+    "remix-prompt": {"$ref": "nodes.remix.outputs.text"},
+    "seed": {"$ref": "nodes.seed.outputs.seed"}
+  },
+  "metadata": {"template_id": "describe-and-remix"}
+}

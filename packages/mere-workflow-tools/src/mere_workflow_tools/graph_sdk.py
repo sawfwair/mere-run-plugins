@@ -31,7 +31,7 @@ PORT_TYPES = {
     "asset_directory",
     "asset_collection",
 }
-VALUE_SCHEMA_TYPES = {"object", "array", "string", "integer", "number", "boolean", "enum"}
+VALUE_SCHEMA_TYPES = {"object", "array", "string", "integer", "number", "boolean", "enum", "json"}
 VALUE_SCHEMA_KEYS = {
     "type",
     "title",
@@ -41,6 +41,7 @@ VALUE_SCHEMA_KEYS = {
     "properties",
     "required",
     "items",
+    "additional_properties",
     "minimum",
     "maximum",
     "step",
@@ -206,6 +207,18 @@ def validate_catalog(catalog: JsonMap) -> None:
                 raise GraphProviderError(f"{kind}.traits.{trait} must be a boolean")
         if traits.get("side_effects") not in {"none", "local", "external"}:
             raise GraphProviderError(f"{kind}.traits.side_effects is invalid")
+        presentation_value = node.get("presentation")
+        if presentation_value is not None:
+            presentation = as_map(presentation_value, f"{kind}.presentation")
+            if presentation.get("style") != "material":
+                raise GraphProviderError(f"{kind}.presentation.style must be material")
+            primary_argument = presentation.get("primary_argument")
+            input_names = {
+                cast(str, as_map(item, f"{kind}.inputs").get("name"))
+                for item in as_list(node.get("inputs"), f"{kind}.inputs")
+            }
+            if primary_argument is not None and primary_argument not in input_names:
+                raise GraphProviderError(f"{kind}.presentation.primary_argument must name an input")
     if not kinds:
         raise GraphProviderError("provider catalog must expose at least one node")
 
@@ -276,6 +289,13 @@ def validate_value_schema(value: object, label: str, depth: int = 0) -> None:
             raise GraphProviderError(f"{label}.required must name declared properties")
         if len(set(cast(list[str], required))) != len(required):
             raise GraphProviderError(f"{label}.required contains duplicates")
+        additional_properties = schema.get("additional_properties")
+        if additional_properties is not None:
+            validate_value_schema(
+                additional_properties,
+                f"{label}.additional_properties",
+                depth + 1,
+            )
     if schema_type == "array":
         if "items" not in schema:
             raise GraphProviderError(f"{label}.items is required for arrays")

@@ -67,6 +67,10 @@ mere-dataset-tools graph templates list --json
 mere-dataset-tools graph comfy inspect ./workflow.json --json
 ```
 
+The template catalog includes Creative Prompt Lab and Describe and Remix,
+which demonstrate reusable value, join, template, enhancement, and
+image-description nodes from the public `mere.run` catalog.
+
 ComfyUI compatibility stops at import. Imported requests become ordinary
 `mere.run/workflow-graph` documents and use the same local, SSH, or Relay
 execution contract as graphs authored elsewhere.
