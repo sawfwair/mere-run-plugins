@@ -70,6 +70,10 @@ files = [
 module = "shotgun_api3"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "mere_animatic_tools.blender_worker"
+ignore_errors = true
+
 [tool.coverage.run]
 source = [
   "packages/mere-animatic-tools/src/mere_animatic_tools",
@@ -88,6 +92,7 @@ show_missing = true
 skip_covered = false
 omit = [
   "*/__main__.py",
+  "*/blender_worker.py",
   "*/__init__.py",
   "*/batch_cli.py",
   "*/dataset_cli.py",

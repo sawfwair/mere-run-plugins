@@ -36,6 +36,32 @@ The production commands are:
 - `location-plates`
 - `style-lock`
 - `delivery-prep`
+- `build-set-proxy`
+- `solve-set-lighting`
+- `render-set-plate`
+
+The three Sets commands consume a typed set-version spec under `inputs.spec`.
+`build-set-proxy` always works without a DCC and emits canonical USD. The
+lighting and plate commands require Blender (`BLENDER_BIN` or Blender.app), emit
+an editable `proxy.blend`, and fail clearly when Blender is unavailable instead
+of advertising a false-ready Sets runtime.
+
+```json
+{
+  "inputs": {
+    "spec": {
+      "id": "set-version-1",
+      "name": "Ferry Slip",
+      "boxes": [
+        { "name": "Pier", "center": [0, 0, 0], "size": [8, 0.2, 3] }
+      ],
+      "cameraAnchors": [
+        { "name": "Master", "transform": { "translate": [0, -8, 3] } }
+      ]
+    }
+  }
+}
+```
 
 ## Request Shape
 

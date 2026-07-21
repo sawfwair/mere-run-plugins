@@ -20,6 +20,9 @@ and do not create paid resources.
 - `location-plates`
 - `style-lock`
 - `delivery-prep`
+- `build-set-proxy` (USD bundle; no Blender required)
+- `solve-set-lighting` (USD + editable Blender scene)
+- `render-set-plate` (USD + Blender scene + camera plates)
 
 Each command accepts:
 

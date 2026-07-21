@@ -18,7 +18,7 @@ from typing import Callable, cast
 import PIL
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
-from . import __version__
+from . import __version__, set_proxy
 
 JsonMap = dict[str, object]
 JsonList = list[object]
@@ -113,6 +113,27 @@ TOOLS: dict[str, ToolSpec] = {
         "Create final delivery manifests, issue lists, and review checklists.",
         ["animatic", "delivery-prep", "delivery", "qa"],
         "delivery",
+    ),
+    "build-set-proxy": ToolSpec(
+        "build-set-proxy",
+        "Build Set Proxy",
+        "Build a deterministic USD-first set-proxy bundle from an Animatic version spec.",
+        ["animatic", "sets", "set-proxy", "usd", "build-set-proxy"],
+        "set-proxy",
+    ),
+    "solve-set-lighting": ToolSpec(
+        "solve-set-lighting",
+        "Solve Set Lighting",
+        "Create a Blender scene and durable lighting solution for a set-proxy version.",
+        ["animatic", "sets", "set-proxy", "blender", "lighting", "solve-set-lighting"],
+        "set-lighting",
+    ),
+    "render-set-plate": ToolSpec(
+        "render-set-plate",
+        "Render Set Plates",
+        "Render one Blender camera plate per set-proxy camera anchor.",
+        ["animatic", "sets", "set-proxy", "blender", "camera-plate", "render-set-plate"],
+        "set-plate",
     ),
 }
 
@@ -648,6 +669,45 @@ def execute_delivery_prep(manifest: JsonMap, _images: list[pathlib.Path]) -> Non
     markdown_artifact(manifest, output_dir / "delivery-checklist.md", "delivery-checklist", "\n".join(f"- {item}" for item in checklist))
 
 
+def set_proxy_spec(manifest: JsonMap) -> JsonMap:
+    inputs = request_inputs(manifest_request(manifest))
+    value = inputs.get("spec") or inputs.get("set_proxy")
+    if not isinstance(value, dict):
+        raise PluginError("set-proxy inputs.spec must be a JSON object", 2)
+    return cast(JsonMap, value)
+
+
+def set_proxy_artifact_kind(path: pathlib.Path) -> tuple[str, str, str]:
+    if path.suffix == ".usda":
+        return ("geometry", "usd-set-proxy", "application/vnd.usda")
+    if path.suffix == ".blend":
+        return ("blender_scene", "blender-set-proxy", "application/x-blender")
+    if path.suffix == ".png":
+        return ("plate", "camera-plate", "image/png")
+    if path.suffix == ".json":
+        return ("json", "set-proxy-manifest", "application/json")
+    return ("text", "set-proxy-notes", "text/markdown")
+
+
+def execute_set_proxy_action(manifest: JsonMap, action: str | None) -> None:
+    artifacts = set_proxy.create_bundle(set_proxy_spec(manifest), manifest_output_dir(manifest), action)
+    for path in artifacts:
+        kind, label, content_type = set_proxy_artifact_kind(path)
+        add_artifact(manifest, path, kind, label, content_type)
+
+
+def execute_build_set_proxy(manifest: JsonMap, _images: list[pathlib.Path]) -> None:
+    execute_set_proxy_action(manifest, None)
+
+
+def execute_solve_set_lighting(manifest: JsonMap, _images: list[pathlib.Path]) -> None:
+    execute_set_proxy_action(manifest, "solve-lighting")
+
+
+def execute_render_set_plate(manifest: JsonMap, _images: list[pathlib.Path]) -> None:
+    execute_set_proxy_action(manifest, "render-plates")
+
+
 EXECUTORS: dict[str, Callable[[JsonMap, list[pathlib.Path]], None]] = {
     "character-knockout": execute_character_knockout,
     "reference-pack": execute_reference_pack,
@@ -659,6 +719,9 @@ EXECUTORS: dict[str, Callable[[JsonMap, list[pathlib.Path]], None]] = {
     "location-plates": execute_location_plates,
     "style-lock": execute_style_lock,
     "delivery-prep": execute_delivery_prep,
+    "build-set-proxy": execute_build_set_proxy,
+    "solve-set-lighting": execute_solve_set_lighting,
+    "render-set-plate": execute_render_set_plate,
 }
 
 
@@ -707,10 +770,12 @@ def command_manifest(args: argparse.Namespace) -> int:
 
 
 def command_doctor(_args: argparse.Namespace) -> int:
+    blender = set_proxy.blender_binary()
     checks = [
         {"name": "python", "ok": True, "detail": sys.version.split()[0]},
         {"name": "pillow", "ok": True, "detail": PIL.__version__},
         {"name": "mere-image-tools", "ok": shutil.which("mere-image-tools") is not None, "optional": True},
+        {"name": "blender", "ok": blender is not None, "detail": str(blender) if blender else "not found", "optional": True},
     ]
     print_json({"ok": all(item["ok"] or item.get("optional") for item in checks), "checks": checks})
     return 0

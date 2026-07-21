@@ -276,6 +276,9 @@ def validate_plugin_manifests() -> None:
             "location-plates",
             "style-lock",
             "delivery-prep",
+            "build-set-proxy",
+            "solve-set-lighting",
+            "render-set-plate",
         },
     )
     validate_plugin_manifest(

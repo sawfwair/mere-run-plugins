@@ -64,6 +64,8 @@ class MereAnimaticToolsTests(unittest.TestCase):
                 }
             }))
             for name in cli.TOOLS:
+                if name in {"build-set-proxy", "solve-set-lighting", "render-set-plate"}:
+                    continue
                 stdout = StringIO()
                 with redirect_stdout(stdout), redirect_stderr(StringIO()):
                     exit_code = cli.main([
@@ -134,6 +136,94 @@ class MereAnimaticToolsTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             payload = json.loads(stdout.getvalue())
             self.assertEqual(payload["cleanup"]["status"], "skipped")
+
+    def test_build_set_proxy_emits_usd_bundle_without_blender(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            request = root / "request.json"
+            request.write_text(json.dumps({
+                "inputs": {
+                    "spec": {
+                        "id": "version_1",
+                        "name": "Ferry Slip Proxy",
+                        "locationId": "location_1",
+                        "proxyType": "spatial",
+                        "summary": "Reusable ferry slip blocking proxy.",
+                        "boxes": [{
+                            "name": "PierDeck",
+                            "role": "floor",
+                            "center": [0, 0, 0],
+                            "size": [4, 0.1, 2],
+                        }],
+                        "cameraAnchors": [{
+                            "name": "Master",
+                            "label": "Master",
+                            "transform": {"translate": [0, -8, 3]},
+                        }],
+                        "lightingRigs": [{"name": "Key", "label": "Key"}],
+                    }
+                }
+            }))
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = cli.main([
+                    "build-set-proxy",
+                    "--request-json", str(request),
+                    "--output-dir", str(root / "bundle"),
+                    "--run-id", "unit-set-proxy",
+                ])
+            self.assertEqual(exit_code, 0, stderr.getvalue())
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], "succeeded")
+            usd = (root / "bundle" / "proxy.usda").read_text()
+            self.assertIn('def Xform "SetProxy"', usd)
+            self.assertIn('def Mesh "PierDeck"', usd)
+            self.assertIn('def Camera "Master"', usd)
+            self.assertIn('def DistantLight "Key"', usd)
+            labels = [item["label"] for item in payload["artifacts"]["items"]]
+            self.assertEqual(labels[0], "usd-set-proxy")
+            self.assertIn("set-proxy-manifest", labels)
+
+    @unittest.skipUnless(cli.set_proxy.blender_binary(), "Blender is not installed")
+    def test_render_set_plate_creates_editable_scene_and_camera_plate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            request = root / "request.json"
+            request.write_text(json.dumps({
+                "inputs": {
+                    "spec": {
+                        "id": "version_blender",
+                        "name": "Minimal Stage",
+                        "meshes": [{
+                            "name": "FloorMesh",
+                            "role": "floor",
+                            "points": [[-2, -2, 0], [2, -2, 0], [2, 2, 0], [-2, 2, 0]],
+                            "faceVertexCounts": [4],
+                            "faceVertexIndices": [0, 1, 2, 3],
+                        }],
+                        "stagingZones": [{"name": "Blocking", "center": [0, 0, 0.05]}],
+                        "maskRegions": [{"name": "Holdout", "center": [1, 1, 0.05]}],
+                        "cameraAnchors": [{"name": "Master", "transform": {"translate": [0, -8, 3]}}],
+                        "lightingRigs": [{"name": "Key", "type": "sun", "intensity": 3}],
+                        "renderSettings": {"width": 64, "height": 64},
+                    }
+                }
+            }))
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = cli.main([
+                    "render-set-plate",
+                    "--request-json", str(request),
+                    "--output-dir", str(root / "render"),
+                    "--run-id", "unit-blender-set",
+                ])
+            self.assertEqual(exit_code, 0, stderr.getvalue())
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], "succeeded")
+            self.assertTrue((root / "render" / "proxy.blend").is_file())
+            self.assertEqual(len(list((root / "render" / "plates").glob("*.png"))), 1)
 
 
 if __name__ == "__main__":
