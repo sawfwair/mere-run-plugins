@@ -249,6 +249,7 @@ class MereVFXToolsTests(unittest.TestCase):
     def test_manifest_and_plan_contract(self) -> None:
         manifest = cli.plugin_manifest()
         self.assertEqual(manifest["contractVersion"], "mere.run/plugin.v1")
+        self.assertEqual(manifest["version"], "0.2.0")
         names = {command["name"] for command in manifest["commands"]}
         self.assertTrue(set(cli.TOOLS).issubset(names))
         self.assertEqual(manifest["security"]["cleanupDefault"], "none")
