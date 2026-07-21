@@ -151,7 +151,14 @@
         "actor-voice-kit",
         "location-plates",
         "style-lock",
-        "delivery-prep"
+        "delivery-prep",
+        "sets",
+        "set-proxy",
+        "usd",
+        "blender",
+        "build-set-proxy",
+        "solve-set-lighting",
+        "render-set-plate"
       ],
       "channels": {
         "main": {
