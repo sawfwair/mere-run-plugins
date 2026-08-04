@@ -51,7 +51,7 @@ def plugin_manifest() -> JsonMap:
 def doctor_report() -> JsonMap:
     from .runtime import resolve_mere_run_executable
 
-    required = ["impactmesh", "numpy", "rasterio", "safetensors", "zarr"]
+    required = ["numpy", "rasterio", "safetensors", "zarr"]
     modules = {name: importlib.util.find_spec(name) is not None for name in required}
     compatible_python = sys.version_info >= (3, 10)
     executable = resolve_mere_run_executable()

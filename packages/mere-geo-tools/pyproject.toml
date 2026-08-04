@@ -13,7 +13,6 @@ authors = [
   { name = "Sawfwair Inc. and mere.run contributors" }
 ]
 dependencies = [
-  "impactmesh==0.1.2",
   "mere-workflow-tools @ git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
   "numpy>=1.26,<3",
   "Pillow>=10,<13",

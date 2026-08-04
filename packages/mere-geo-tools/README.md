@@ -11,6 +11,10 @@ in the provider. The neural forward pass runs natively through
 PyTorch CPU fallback. Set `MERE_RUN_EXECUTABLE` for a development build and
 `MERE_TERRAMIND_FLOOD_MODEL` for an explicit converted model root.
 
+The plugin therefore does not depend on ImpactMesh, TerraTorch, or PyTorch at
+runtime. Those projects remain useful upstream references, but local flood
+inference is owned by the native Mere runtime.
+
 ```bash
 mere-geo-tools manifest --json
 mere-geo-tools doctor --json

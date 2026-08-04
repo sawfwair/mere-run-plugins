@@ -87,6 +87,19 @@ class GeoProviderTests(unittest.TestCase):
         self.assertEqual(manifest["graphProvider"]["contractVersion"], "mere.run/plugin-graph-provider.v1")
         self.assertIn("flood-segmentation", manifest["capabilities"])
 
+    def test_doctor_requires_only_native_provider_dependencies(self) -> None:
+        with mock.patch(
+            "mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"
+        ), mock.patch.object(cli.importlib.util, "find_spec", return_value=object()), mock.patch.object(
+            cli.platform, "system", return_value="Darwin"
+        ):
+            report = cli.doctor_report()
+
+        self.assertEqual(set(report["modules"]), {"numpy", "rasterio", "safetensors", "zarr"})
+        self.assertNotIn("impactmesh", report["modules"])
+        self.assertEqual(report["native_runtime"]["command"], "mere.run geo flood")
+        self.assertEqual(report["native_runtime"]["accelerator"], "metal")
+
     def test_bundle_rejects_wrong_temporal_order_and_hash_drift(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             root = pathlib.Path(raw_root)

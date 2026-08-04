@@ -270,7 +270,7 @@ def tiled_native_inference(
             raise GraphProviderError(
                 f"native TerraMind logits have invalid shape {tuple(native_logits.shape)}"
             )
-        predictions.extend(zip(tile_batch, native_logits, strict=True))
+        predictions.extend(zip(tile_batch, native_logits))
         native_runs.append(metadata)
 
     output = np.zeros((batch_size, 2, padded_height, padded_width), dtype=np.float32)
