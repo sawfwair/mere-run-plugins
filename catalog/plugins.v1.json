@@ -1,8 +1,30 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-08-03T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
+    {
+      "id": "mere-geo-tools",
+      "name": "Geospatial Tools",
+      "description": "Run pinned geospatial candidate models with content-addressed raster provenance, including TerraMind flood segmentation.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-geo-tools",
+      "subdirectory": "packages/mere-geo-tools",
+      "entrypoint": "mere-geo-tools",
+      "capabilities": [
+        "geospatial",
+        "flood-segmentation",
+        "graph-node-provider-v1",
+        "provenance"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-geo-tools"
+        }
+      }
+    },
     {
       "id": "mere-runpod",
       "name": "RunPod Runner",

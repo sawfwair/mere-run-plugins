@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -21,12 +21,13 @@ if rg -n "\bAny\b" packages/*/src scripts; then
   echo "Production code must not use the dynamic top type; define typed JSON/provider boundaries instead." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-workflow-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
 "$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-face-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-workflow-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-geo-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-animatic-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-shotgrid-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-perform/tests
@@ -40,6 +41,11 @@ unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-face-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-workflow-tools
+if "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  "$PYTHON" -m pip install -q --disable-pip-version-check --no-deps ./packages/mere-geo-tools
+  "$CHECK_TMP/venv/bin/mere-geo-tools" manifest --json >/dev/null
+  "$CHECK_TMP/venv/bin/mere-geo-tools" graph catalog --json >/dev/null
+fi
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-animatic-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-shotgrid-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-perform

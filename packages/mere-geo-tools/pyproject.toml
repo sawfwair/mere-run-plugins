@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-geo-tools"
+version = "0.1.0"
+description = "Provenance-preserving geospatial graph providers for mere.run"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = [
+  "huggingface-hub>=0.30,<2",
+  "impactmesh==0.1.2",
+  "mere-workflow-tools @ git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+  "numpy>=1.26,<3",
+  "Pillow>=10,<13",
+  "planetary-computer>=1,<2",
+  "pystac-client>=0.8,<1",
+  "PyYAML>=6,<7",
+  "rasterio>=1.4,<2",
+  "terratorch==1.2.10",
+  "zarr==2.18.0",
+  "numcodecs==0.15.1",
+]
+
+[project.scripts]
+mere-geo-tools = "mere_geo_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mere_geo_tools = ["py.typed"]

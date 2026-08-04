@@ -198,6 +198,7 @@ def plugin_env() -> dict[str, str]:
         ROOT / "packages" / "mere-image-tools" / "src",
         ROOT / "packages" / "mere-face-tools" / "src",
         ROOT / "packages" / "mere-workflow-tools" / "src",
+        ROOT / "packages" / "mere-geo-tools" / "src",
         ROOT / "packages" / "mere-animatic-tools" / "src",
         ROOT / "packages" / "mere-shotgrid-tools" / "src",
         ROOT / "packages" / "mere-perform" / "src",
@@ -241,6 +242,11 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_geo_tools",
+        "mere-geo-tools",
+        {"manifest", "doctor", "prepare", "inspect", "compare", "graph"},
+    )
     validate_plugin_manifest(
         "mere_runpod",
         "mere-runpod",
@@ -346,6 +352,27 @@ def validate_graph_provider() -> None:
     nodes = as_list(catalog["nodes"], "dataset graph nodes")
     if len(nodes) != 1 or as_map(nodes[0], "dataset graph node")["kind"] != "dataset.prepare":
         fail("dataset graph provider must expose dataset.prepare")
+
+    geo_result = subprocess.run(
+        [sys.executable, "-m", "mere_geo_tools", "graph", "catalog", "--json"],
+        cwd=ROOT,
+        env=plugin_env(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    geo_catalog = as_map(json.loads(geo_result.stdout), "mere-geo-tools graph catalog")
+    validate_schema(
+        pathlib.Path("mere-geo-tools graph catalog"),
+        contract_schema("graph-node-provider.v1.schema.json"),
+        geo_catalog,
+    )
+    if geo_catalog["provider_id"] != "mere-geo-tools":
+        fail("geo graph provider reported the wrong provider id")
+    geo_nodes = as_list(geo_catalog["nodes"], "geo graph nodes")
+    if len(geo_nodes) != 1 or as_map(geo_nodes[0], "geo graph node")["kind"] != "geo.flood.segment":
+        fail("geo graph provider must expose geo.flood.segment")
 
 
 def validate_runpod_plan() -> None:

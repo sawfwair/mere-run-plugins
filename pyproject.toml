@@ -10,6 +10,7 @@ src = [
   "packages/mere-shotgrid-tools/src",
   "packages/mere-vfx-tools/src",
   "packages/mere-workflow-tools/src",
+  "packages/mere-geo-tools/src",
   "scripts",
 ]
 
@@ -52,6 +53,7 @@ mypy_path = [
   "packages/mere-shotgrid-tools/src",
   "packages/mere-vfx-tools/src",
   "packages/mere-workflow-tools/src",
+  "packages/mere-geo-tools/src",
 ]
 files = [
   "packages/mere-animatic-tools/src",
@@ -62,6 +64,7 @@ files = [
   "packages/mere-shotgrid-tools/src",
   "packages/mere-vfx-tools/src",
   "packages/mere-workflow-tools/src",
+  "packages/mere-geo-tools/src",
   "scripts/check_structure.py",
   "scripts/validate_repo.py",
 ]
@@ -74,6 +77,10 @@ ignore_missing_imports = true
 module = "mere_animatic_tools.blender_worker"
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = ["mere_geo_tools.prepare", "mere_geo_tools.runtime"]
+ignore_errors = true
+
 [tool.coverage.run]
 source = [
   "packages/mere-animatic-tools/src/mere_animatic_tools",
@@ -84,6 +91,7 @@ source = [
   "packages/mere-shotgrid-tools/src/mere_shotgrid_tools",
   "packages/mere-vfx-tools/src/mere_vfx_tools",
   "packages/mere-workflow-tools/src/mere_workflow_tools",
+  "packages/mere-geo-tools/src/mere_geo_tools",
 ]
 
 [tool.coverage.report]
@@ -100,4 +108,7 @@ omit = [
   "*/image_compose_cli.py",
   "*/media_cli.py",
   "*/transcript_cli.py",
+  "*/mere_geo_tools/cli.py",
+  "*/mere_geo_tools/prepare.py",
+  "*/mere_geo_tools/runtime.py",
 ]
