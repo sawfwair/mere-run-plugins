@@ -64,7 +64,7 @@ class GeoProviderTests(unittest.TestCase):
         return {
             "contract_version": "mere.run/plugin-graph-invocation.v1",
             "kind": provider.NODE_KIND,
-            "arguments": {"input_bundle": str(bundle), "device": "cpu"},
+            "arguments": {"input_bundle": str(bundle), "device": "auto"},
             "outputs": {
                 "mask": {"type": "asset", "path": "artifacts/flood-mask.tif"},
                 "probability": {"type": "asset", "path": "artifacts/flood-probability.tif"},
@@ -79,7 +79,10 @@ class GeoProviderTests(unittest.TestCase):
         self.assertEqual(value["provider_id"], "mere-geo-tools")
         self.assertEqual(value["nodes"][0]["kind"], "geo.flood.segment")
         self.assertIn("metal", value["nodes"][0]["requirements"]["accelerator_backends"])
-        self.assertEqual(value["nodes"][0]["requirements"]["model_ids"], [])
+        self.assertEqual(
+            value["nodes"][0]["requirements"]["model_ids"],
+            ["vision-flood-terramind-base"],
+        )
         manifest = cli.plugin_manifest()
         self.assertEqual(manifest["graphProvider"]["contractVersion"], "mere.run/plugin-graph-provider.v1")
         self.assertIn("flood-segmentation", manifest["capabilities"])
@@ -99,16 +102,30 @@ class GeoProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(GraphProviderError, "hash mismatch"):
                 load_bundle(bundle)
 
-    def test_preflight_blocks_mps_temporal_unet_boundary(self) -> None:
+    def test_preflight_blocks_non_native_device(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             root = pathlib.Path(raw_root)
             bundle = self.make_bundle(root)
             invocation = self.invocation(bundle)
-            invocation["arguments"]["device"] = "mps"
-            report = provider.preflight(invocation, root / "run")
+            invocation["arguments"]["device"] = "cpu"
+            with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
+                provider, "probe_native_geo_flood", return_value=None
+            ):
+                report = provider.preflight(invocation, root / "run")
             validate_preflight(report)
             self.assertEqual(report["status"], "blocked")
-            self.assertIn("mps_unet_unsupported", [item["id"] for item in report["diagnostics"]])
+            self.assertIn("device_invalid", [item["id"] for item in report["diagnostics"]])
+
+    def test_preflight_accepts_native_geo_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            invocation = self.invocation(self.make_bundle(root))
+            with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
+                provider, "probe_native_geo_flood", return_value=None
+            ):
+                report = provider.preflight(invocation, root / "run")
+            validate_preflight(report)
+            self.assertEqual(report["status"], "ok")
 
     def test_fixture_execution_preserves_candidate_only_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
@@ -130,7 +147,9 @@ class GeoProviderTests(unittest.TestCase):
                 )
 
             events = []
-            with mock.patch.object(provider, "run_candidate", side_effect=fixture_candidate):
+            with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
+                provider, "probe_native_geo_flood", return_value=None
+            ), mock.patch.object(provider, "run_candidate", side_effect=fixture_candidate):
                 provider.graph_execute(invocation, run_root, events.append)
             validate_event_stream(events, invocation, run_root)
             self.assertEqual(events[-1]["type"], "node_result")

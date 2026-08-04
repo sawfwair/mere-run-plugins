@@ -49,17 +49,22 @@ def plugin_manifest() -> JsonMap:
 
 
 def doctor_report() -> JsonMap:
-    required = ["huggingface_hub", "impactmesh", "numpy", "rasterio", "terratorch", "torch", "zarr"]
+    from .runtime import resolve_mere_run_executable
+
+    required = ["impactmesh", "numpy", "rasterio", "safetensors", "zarr"]
     modules = {name: importlib.util.find_spec(name) is not None for name in required}
     compatible_python = sys.version_info >= (3, 10)
+    executable = resolve_mere_run_executable()
+    native_platform = platform.system() == "Darwin"
     return {
-        "status": "ready" if compatible_python and all(modules.values()) else "blocked",
+        "status": "ready" if compatible_python and native_platform and executable and all(modules.values()) else "blocked",
         "python": platform.python_version(),
         "platform": platform.platform(),
         "modules": modules,
-        "mps": {
-            "supported": False,
-            "reason": "Pinned TerraMind temporal UNet decoder is not a supported MPS execution path; use CPU or Relay GPU.",
+        "native_runtime": {
+            "executable": executable,
+            "command": "mere.run geo flood",
+            "accelerator": "metal",
         },
     }
 

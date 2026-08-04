@@ -2,8 +2,11 @@ from __future__ import annotations
 
 MODEL_ID = "ibm-esa-geospatial/TerraMind-base-Flood"
 MODEL_REVISION = "1e4b2429d17234922f8d92beb0d725af4db85c08"
-MODEL_CONFIG = "terramind_v1_base_impactmesh_flood.yaml"
 MODEL_CHECKPOINT = "TerraMind_v1_base_ImpactMesh_flood.pt"
+MODEL_CHECKPOINT_SHA256 = "22627584c2db618c2f6ddb64b411a95762a893becb25104e3f66bfebecaa71e9"
+MODEL_CONFIG_SHA256 = "d6c74ef58085a6d3f27bca2d570d84b9256100b885e7c51521c9d0cf7f335282"
+NATIVE_MODEL_ID = "vision-flood-terramind-base"
+NATIVE_WEIGHTS_SHA256 = "4940ad94df06a923e3a919f944a71ad01892872e89c428abe718eefc44d0f95a"
 
 THOR_MODEL_ID = "FM4CS/THOR-1.0-base"
 THOR_REVISION = "823c265cbb941a3e1b9054910a65dbe190c11f11"

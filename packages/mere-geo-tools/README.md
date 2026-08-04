@@ -5,10 +5,11 @@
 `ibm-esa-geospatial/TerraMind-base-Flood` checkpoint on an ImpactMesh-compatible
 four-timestep bundle and emits candidate-only Cloud Optimized GeoTIFF artifacts.
 
-The provider accepts a Metal-capable host so it can share a local graph with
-native Metal nodes, but it does not execute this checkpoint through MPS.
-TerraTorch's temporal UNet decoder remains an unsafe macOS MPS path; `auto`
-selects CPU on macOS and an explicit `mps` request fails preflight.
+Raster acquisition, normalization, tiling, reconstruction, and COG export stay
+in the provider. The neural forward pass runs natively through
+`mere.run geo flood` using Swift, MLX, and Apple Metal; it does not use the old
+PyTorch CPU fallback. Set `MERE_RUN_EXECUTABLE` for a development build and
+`MERE_TERRAMIND_FLOOD_MODEL` for an explicit converted model root.
 
 ```bash
 mere-geo-tools manifest --json
