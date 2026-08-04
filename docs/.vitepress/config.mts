@@ -83,6 +83,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'All plugins', link: '/plugins/' },
+            { text: 'Geospatial Tools', link: '/plugins/geo-tools' },
             { text: 'Face Tools', link: '/plugins/face-tools' },
             { text: 'VFX Tools', link: '/plugins/vfx-tools' },
             { text: 'Perform', link: '/plugins/perform' },

@@ -4,6 +4,7 @@ Start from the outcome, not the model.
 
 | I need to… | Use | Why |
 | --- | --- | --- |
+| Run a pinned flood-candidate model with raster provenance | [`mere-geo-tools`](/plugins/geo-tools) | Typed graph inputs, content-addressed rasters, pinned model identity, and candidate-only outputs |
 | Index a photo library or find photos of the same person | [`mere-face-tools`](/plugins/face-tools) | Resumable local indexing, similarity search, and review exports without changing source photos |
 | Roto, key, track, relight, restore, extend, or reconstruct a shot | [`mere-vfx-tools`](/plugins/vfx-tools) | Shot-oriented workflows and verified production handoffs |
 | Cut a subject out of a still | [`mere-image-tools`](/plugins/image-tools) | Focused SAM 3.1 knockout and matte cleanup |
@@ -26,6 +27,7 @@ tracking, alpha delivery, and QC, VFX Tools owns the larger lifecycle.
 
 ## Local or provider-backed?
 
-Twelve catalog commands operate locally. RunPod Runner is provider-backed and
-therefore has stronger planning and cleanup obligations. Read
+Thirteen catalog commands can operate locally. Geospatial Tools can also run on
+a provisioned Relay fleet. RunPod Runner is provider-backed and therefore has
+stronger planning and cleanup obligations. Read
 [Provider safety](/operations/provider-safety) before creating paid resources.
