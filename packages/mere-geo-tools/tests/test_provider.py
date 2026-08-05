@@ -123,7 +123,7 @@ class GeoProviderTests(unittest.TestCase):
             invocation["arguments"]["device"] = "cpu"
             with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
                 provider, "probe_native_geo_flood", return_value=None
-            ):
+            ), mock.patch.object(provider.platform, "system", return_value="Darwin"):
                 report = provider.preflight(invocation, root / "run")
             validate_preflight(report)
             self.assertEqual(report["status"], "blocked")
@@ -135,7 +135,7 @@ class GeoProviderTests(unittest.TestCase):
             invocation = self.invocation(self.make_bundle(root))
             with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
                 provider, "probe_native_geo_flood", return_value=None
-            ):
+            ), mock.patch.object(provider.platform, "system", return_value="Darwin"):
                 report = provider.preflight(invocation, root / "run")
             validate_preflight(report)
             self.assertEqual(report["status"], "ok")
@@ -162,7 +162,9 @@ class GeoProviderTests(unittest.TestCase):
             events = []
             with mock.patch("mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"), mock.patch.object(
                 provider, "probe_native_geo_flood", return_value=None
-            ), mock.patch.object(provider, "run_candidate", side_effect=fixture_candidate):
+            ), mock.patch.object(provider.platform, "system", return_value="Darwin"), mock.patch.object(
+                provider, "run_candidate", side_effect=fixture_candidate
+            ):
                 provider.graph_execute(invocation, run_root, events.append)
             validate_event_stream(events, invocation, run_root)
             self.assertEqual(events[-1]["type"], "node_result")
