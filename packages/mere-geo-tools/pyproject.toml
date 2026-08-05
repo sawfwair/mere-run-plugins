@@ -13,16 +13,13 @@ authors = [
   { name = "Sawfwair Inc. and mere.run contributors" }
 ]
 dependencies = [
-  "huggingface-hub>=0.30,<2",
-  "impactmesh==0.1.2",
   "mere-workflow-tools @ git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
   "numpy>=1.26,<3",
   "Pillow>=10,<13",
   "planetary-computer>=1,<2",
   "pystac-client>=0.8,<1",
-  "PyYAML>=6,<7",
   "rasterio>=1.4,<2",
-  "terratorch==1.2.10",
+  "safetensors>=0.5,<1",
   "zarr==2.18.0",
   "numcodecs==0.15.1",
 ]

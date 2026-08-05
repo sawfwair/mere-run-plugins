@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import platform
+import subprocess
 from dataclasses import dataclass
 from typing import cast
 
@@ -32,13 +33,13 @@ OUTPUT_TYPES = {
     "preview": "image/png",
 }
 REQUIREMENTS: JsonMap = {
-    "model_ids": [],
-    "accelerator_backends": ["cpu", "metal", "cuda", "rocm"],
+    "model_ids": ["vision-flood-terramind-base"],
+    "accelerator_backends": ["metal"],
     "minimum_accelerator_memory_bytes": 8_000_000_000,
     "minimum_system_memory_bytes": 16_000_000_000,
     "minimum_disk_bytes": 4_000_000_000,
     "minimum_cpu_cores": 4,
-    "network_access": True,
+    "network_access": False,
 }
 
 
@@ -74,9 +75,9 @@ def catalog() -> JsonMap:
                         "name": "device",
                         "type": "enum",
                         "required": False,
-                        "description": "Execution device. Auto intentionally selects CPU on macOS.",
+                        "description": "Native execution device. Auto selects Apple Metal.",
                         "default": "auto",
-                        "values": ["auto", "cpu", "cuda", "rocm", "mps"],
+                        "values": ["auto", "metal"],
                     },
                 ],
                 "outputs": [
@@ -137,28 +138,42 @@ def preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap:
         except GraphProviderError as exc:
             diagnostics.append(diagnostic("bundle_invalid", "blocker", "Input bundle is invalid", str(exc)))
     device = arguments.get("device", "auto")
-    if device not in {"auto", "cpu", "cuda", "rocm", "mps"}:
+    if device not in {"auto", "metal"}:
         diagnostics.append(
             diagnostic("device_invalid", "blocker", "Device is invalid", f"Unsupported device: {device}")
         )
-    if device == "mps":
+    if platform.system() != "Darwin":
         diagnostics.append(
             diagnostic(
-                "mps_unet_unsupported",
+                "native_mlx_platform_unsupported",
                 "blocker",
-                "TerraMind temporal UNet is not supported on MPS",
-                "Use device=cpu on macOS; the pinned UNet decoder has an unresolved MPS batch-normalization boundary.",
+                "Native TerraMind Flood requires Apple silicon",
+                "Run this provider on a macOS Metal executor.",
             )
         )
-    elif platform.system() == "Darwin" and device == "auto":
+    from .runtime import resolve_mere_run_executable
+
+    executable = resolve_mere_run_executable()
+    if executable is None:
         diagnostics.append(
             diagnostic(
-                "macos_cpu_fallback",
-                "warning",
-                "macOS uses CPU for this checkpoint",
-                "Auto avoids the unsafe MPS temporal UNet path; Relay CUDA/ROCm is recommended for routine runs.",
+                "mere_run_missing",
+                "blocker",
+                "mere.run is not available",
+                "Install mere.run or set MERE_RUN_EXECUTABLE to a native build containing `geo flood`.",
             )
         )
+    else:
+        probe_error = probe_native_geo_flood(executable)
+        if probe_error:
+            diagnostics.append(
+                diagnostic(
+                    "geo_flood_unavailable",
+                    "blocker",
+                    "mere.run geo flood is unavailable",
+                    probe_error,
+                )
+            )
     try:
         output_locations(invocation, run_directory)
     except GraphProviderError as exc:
@@ -183,7 +198,7 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
     for path in locations.values():
         path.parent.mkdir(parents=True, exist_ok=True)
     events = GraphEventStream(write_event)
-    events.emit("progress", message="Loading pinned TerraMind flood checkpoint", progress={"current": 0, "total": 3})
+    events.emit("progress", message="Running native TerraMind Flood through mere.run", progress={"current": 0, "total": 3})
     result = run_candidate(bundle_root, locations, device)
     events.emit("progress", message="Writing georeferenced candidate artifacts", progress={"current": 2, "total": 3})
     for name, path in result.outputs.items():
@@ -210,3 +225,19 @@ def run_candidate(bundle_root: pathlib.Path, locations: dict[str, pathlib.Path],
     from .runtime import execute_candidate
 
     return execute_candidate(bundle_root, locations, device)
+
+
+def probe_native_geo_flood(executable: str) -> str | None:
+    try:
+        result = subprocess.run(
+            [executable, "geo", "flood", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return str(exc)
+    if result.returncode == 0:
+        return None
+    return result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"

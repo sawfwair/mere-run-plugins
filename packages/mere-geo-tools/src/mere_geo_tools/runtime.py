@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import platform
+import shutil
+import subprocess
 import tempfile
 import time
+from dataclasses import dataclass
 from typing import cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_map
 
@@ -14,28 +21,36 @@ from .constants import (
     FLOOD_MEANS,
     FLOOD_STDS,
     MODEL_CHECKPOINT,
-    MODEL_CONFIG,
+    MODEL_CHECKPOINT_SHA256,
+    MODEL_CONFIG_SHA256,
     MODEL_ID,
     MODEL_REVISION,
+    NATIVE_MODEL_ID,
+    NATIVE_WEIGHTS_SHA256,
     THOR_CHECKPOINT_BYTES,
     THOR_MODEL_ID,
     THOR_REVISION,
 )
 from .provider import CandidateResult
 
+FloatArray = NDArray[np.float32]
+
+
+@dataclass(frozen=True)
+class FloodTile:
+    batch: int
+    y: slice
+    x: slice
+    data: dict[str, FloatArray]
+
 
 def execute_candidate(
     bundle_root: pathlib.Path, locations: dict[str, pathlib.Path], requested_device: str
 ) -> CandidateResult:
-    import numpy as np
     import rasterio
-    import torch
     import zarr
-    from huggingface_hub import hf_hub_download
     from PIL import Image
     from rasterio.transform import Affine
-    from terratorch.cli_tools import LightningInferenceModel
-    from terratorch.tasks.tiled_inference import tiled_inference
 
     bundle = load_bundle(bundle_root)
     artifacts = as_map(bundle["artifacts"], "input artifacts")
@@ -45,46 +60,26 @@ def execute_candidate(
         dem = source.read().astype(np.float32)
 
     tensors = {
-        "S2L2A": normalized_tensor(torch, s2.transpose(1, 0, 2, 3), FLOOD_MEANS["S2L2A"], FLOOD_STDS["S2L2A"]),
-        "S1RTC": normalized_tensor(torch, s1.transpose(1, 0, 2, 3), FLOOD_MEANS["S1RTC"], FLOOD_STDS["S1RTC"]),
-        "DEM": normalized_tensor(
-            torch,
+        "S2L2A": normalized_array(s2.transpose(1, 0, 2, 3), FLOOD_MEANS["S2L2A"], FLOOD_STDS["S2L2A"]),
+        "S1RTC": normalized_array(s1.transpose(1, 0, 2, 3), FLOOD_MEANS["S1RTC"], FLOOD_STDS["S1RTC"]),
+        "DEM": normalized_array(
             np.repeat(dem[:, None, :, :], 4, axis=1),
             FLOOD_MEANS["DEM"],
             FLOOD_STDS["DEM"],
         ),
     }
-    device = select_device(torch, requested_device)
-    config_path = pathlib.Path(
-        hf_hub_download(repo_id=MODEL_ID, filename=MODEL_CONFIG, revision=MODEL_REVISION)
-    )
-    checkpoint_path = hf_hub_download(repo_id=MODEL_ID, filename=MODEL_CHECKPOINT, revision=MODEL_REVISION)
-    checkpoint_hash = sha256_file(pathlib.Path(checkpoint_path))
-    config_hash = sha256_file(config_path)
-    runtime_config = inference_config(config_path, device)
-    try:
-        task = LightningInferenceModel.from_config(str(runtime_config), checkpoint_path)
-    finally:
-        runtime_config.unlink(missing_ok=True)
-    task.model.eval()
-    task.model.to(device)
-
-    def model_forward(value: object, **kwargs: object) -> object:
-        return task.model(value, **kwargs).output
+    if requested_device not in {"auto", "metal"}:
+        raise GraphProviderError("TerraMind Flood executes through native mere.run Metal; use device=auto or device=metal")
+    executable = resolve_mere_run_executable()
+    if executable is None:
+        raise GraphProviderError("mere.run is required for native TerraMind Flood inference")
+    model_root = os.environ.get("MERE_TERRAMIND_FLOOD_MODEL")
 
     started = time.monotonic()
-    with torch.no_grad():
-        logits = tiled_inference(
-            model_forward,
-            tensors,
-            crop=256,
-            stride=208,
-            batch_size=1 if device == "cpu" else 4,
-            delta=8,
-            verbose=False,
-            device=device,
-        )
-        probability = torch.softmax(logits, dim=1)[0, 1].cpu().numpy().astype(np.float32)
+    logits, native_runs = tiled_native_inference(tensors, executable, model_root)
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exponent = np.exp(shifted)
+    probability = (exponent / exponent.sum(axis=1, keepdims=True))[0, 1].astype(np.float32)
     elapsed = time.monotonic() - started
     mask = (probability >= 0.5).astype(np.uint8)
 
@@ -115,18 +110,14 @@ def execute_candidate(
             "id": MODEL_ID,
             "revision": MODEL_REVISION,
             "checkpoint": MODEL_CHECKPOINT,
-            "checkpoint_sha256": checkpoint_hash,
-            "config_sha256": config_hash,
-            "framework": "terratorch==1.2.10",
+            "checkpoint_sha256": MODEL_CHECKPOINT_SHA256,
+            "config_sha256": MODEL_CONFIG_SHA256,
+            "native_model_id": NATIVE_MODEL_ID,
+            "native_weights_sha256": NATIVE_WEIGHTS_SHA256,
+            "framework": "mere.run Swift/MLX",
             "decoder": "UNetDecoder",
-            "runtime_config_overrides": {
-                "trainer.logger": False,
-                "trainer.callbacks": [],
-                "trainer.enable_checkpointing": False,
-                "trainer.accelerator": device,
-                "trainer.devices": 1,
-                "trainer.precision": "32-true" if device == "cpu" else "16-mixed",
-            },
+            "precision": "float32",
+            "runtime_command": "mere.run geo flood",
         },
         "input": {
             "digest": bundle["input_digest"],
@@ -135,9 +126,10 @@ def execute_candidate(
             "grid": grid,
         },
         "execution": {
-            "device": device,
+            "device": "metal",
             "platform": platform.platform(),
             "elapsed_seconds": round(elapsed, 3),
+            "native_runs": native_runs,
             "crop": 256,
             "stride": 208,
             "delta": 8,
@@ -192,27 +184,6 @@ def artifact_path(artifacts: JsonMap, name: str) -> str:
     return value
 
 
-def inference_config(source: pathlib.Path, device: str) -> pathlib.Path:
-    import yaml
-
-    payload = yaml.safe_load(source.read_text())
-    if not isinstance(payload, dict):
-        raise GraphProviderError("TerraMind model config must be an object")
-    payload["trainer"] = {
-        "accelerator": device,
-        "devices": 1,
-        "logger": False,
-        "callbacks": [],
-        "enable_checkpointing": False,
-        "precision": "32-true" if device == "cpu" else "16-mixed",
-    }
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", prefix="mere-terramind-", delete=False
-    ) as handle:
-        yaml.safe_dump(payload, handle, sort_keys=False)
-        return pathlib.Path(handle.name)
-
-
 def load_zarr(zarr_module: object, path: pathlib.Path) -> object:
     store = zarr_module.ZipStore(str(path), mode="r")
     try:
@@ -222,27 +193,142 @@ def load_zarr(zarr_module: object, path: pathlib.Path) -> object:
         store.close()
 
 
-def normalized_tensor(torch_module: object, value: object, means: list[float], stds: list[float]) -> object:
-    tensor = torch_module.from_numpy(value).float()
-    mean = torch_module.tensor(means, dtype=tensor.dtype)[:, None, None, None]
-    std = torch_module.tensor(stds, dtype=tensor.dtype)[:, None, None, None]
-    return ((tensor - mean) / std).unsqueeze(0)
+def normalized_array(value: object, means: list[float], stds: list[float]) -> FloatArray:
+    tensor = np.asarray(value, dtype=np.float32)
+    mean = np.asarray(means, dtype=np.float32)[:, None, None, None]
+    std = np.asarray(stds, dtype=np.float32)[:, None, None, None]
+    return ((tensor - mean) / std)[None, ...]
 
 
-def select_device(torch_module: object, requested: str) -> str:
-    if requested == "mps":
-        raise GraphProviderError("MPS is blocked for the pinned TerraMind temporal UNet decoder")
-    if requested == "auto":
-        if torch_module.cuda.is_available():
-            return "cuda"
-        return "cpu"
-    if requested == "rocm":
-        if not torch_module.cuda.is_available() or torch_module.version.hip is None:
-            raise GraphProviderError("ROCm was requested but is unavailable")
-        return "cuda"
-    if requested == "cuda" and not torch_module.cuda.is_available():
-        raise GraphProviderError("CUDA was requested but is unavailable")
-    return requested
+def resolve_mere_run_executable() -> str | None:
+    override = os.environ.get("MERE_RUN_EXECUTABLE")
+    if override:
+        candidate = pathlib.Path(override).expanduser().resolve()
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+        return None
+    return shutil.which("mere.run")
+
+
+def tiled_native_inference(
+    tensors: dict[str, FloatArray],
+    executable: str,
+    model_root: str | None,
+) -> tuple[FloatArray, list[JsonMap]]:
+    crop = 256
+    stride = 208
+    delta = 8
+    values = list(tensors.values())
+    if not values or any(value.ndim != 5 for value in values):
+        raise GraphProviderError("TerraMind inputs must be B,C,T,H,W arrays")
+    shapes = {(value.shape[0], value.shape[-2], value.shape[-1]) for value in values}
+    if len(shapes) != 1:
+        raise GraphProviderError("TerraMind modalities must share batch and image dimensions")
+    batch_size, height, width = next(iter(shapes))
+    padded = {
+        name: np.pad(value, ((0, 0), (0, 0), (0, 0), (delta, delta), (delta, delta)), mode="reflect")
+        for name, value in tensors.items()
+    }
+    padded_height = height + 2 * delta
+    padded_width = width + 2 * delta
+    blend = blend_mask(crop, stride, delta)
+    tiles: list[FloodTile] = []
+
+    def append_tiles(row: int, column: int) -> None:
+        for batch in range(batch_size):
+            tiles.append(
+                FloodTile(
+                    batch=batch,
+                    y=slice(row + delta, row + crop - delta),
+                    x=slice(column + delta, column + crop - delta),
+                    data={
+                        name: value[batch, ..., row : row + crop, column : column + crop]
+                        for name, value in padded.items()
+                    },
+                )
+            )
+
+    for row in range(0, padded_height - crop - 1, stride):
+        append_tiles(row, padded_width - crop)
+    for column in range(0, padded_width - crop - 1, stride):
+        append_tiles(padded_height - crop, column)
+    append_tiles(padded_height - crop, padded_width - crop)
+    for row in range(0, padded_height - crop - 1, stride):
+        for column in range(0, padded_width - crop - 1, stride):
+            append_tiles(row, column)
+
+    predictions: list[tuple[FloodTile, FloatArray]] = []
+    native_runs: list[JsonMap] = []
+    for start in range(0, len(tiles), 4):
+        tile_batch = tiles[start : start + 4]
+        native_inputs = {
+            name: np.ascontiguousarray(np.stack([tile.data[name] for tile in tile_batch], axis=0))
+            for name in tensors
+        }
+        native_logits, metadata = native_flood_forward(native_inputs, executable, model_root)
+        if tuple(native_logits.shape) != (len(tile_batch), 2, crop, crop):
+            raise GraphProviderError(
+                f"native TerraMind logits have invalid shape {tuple(native_logits.shape)}"
+            )
+        predictions.extend(zip(tile_batch, native_logits))
+        native_runs.append(metadata)
+
+    output = np.zeros((batch_size, 2, padded_height, padded_width), dtype=np.float32)
+    counts = np.zeros((batch_size, padded_height, padded_width), dtype=np.float32)
+    output_crop = (slice(delta, crop - delta), slice(delta, crop - delta))
+    for tile, prediction in predictions:
+        cropped = prediction[:, output_crop[0], output_crop[1]]
+        output[tile.batch, :, tile.y, tile.x] += cropped * blend
+        counts[tile.batch, tile.y, tile.x] += blend
+    output = output[..., delta:-delta, delta:-delta]
+    counts = counts[..., delta:-delta, delta:-delta]
+    if np.any(counts == 0):
+        raise GraphProviderError("some raster pixels did not receive a TerraMind classification")
+    return output / counts[:, None, :, :], native_runs
+
+
+def blend_mask(crop: int, stride: int, delta: int) -> FloatArray:
+    overlap = min(crop // 2, crop - stride) - delta
+    axis = np.ones(crop - 2 * delta, dtype=np.float32)
+    if overlap:
+        positions = np.arange(overlap, dtype=np.float32)
+        ramp = np.cos(np.pi * (positions + 1) / (overlap + 1)) / 2 + 0.5
+        axis[:overlap] = ramp[::-1]
+        axis[-overlap:] = ramp
+    return axis[:, None] * axis[None, :] + np.float32(1e-6)
+
+
+def native_flood_forward(
+    inputs: dict[str, FloatArray], executable: str, model_root: str | None
+) -> tuple[FloatArray, JsonMap]:
+    from safetensors.numpy import load_file, save_file
+
+    with tempfile.TemporaryDirectory(prefix="mere-terramind-native-") as raw_directory:
+        directory = pathlib.Path(raw_directory)
+        input_path = directory / "input.safetensors"
+        output_path = directory / "logits.safetensors"
+        save_file(inputs, str(input_path), metadata={"format": "mere.run/terramind-flood-input-v1"})
+        command = [executable, "geo", "flood", str(input_path), "--output", str(output_path), "--json"]
+        if model_root:
+            command.extend(["--model", model_root])
+        result = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"
+            raise GraphProviderError(f"native mere.run geo flood failed: {detail}")
+        try:
+            payload = as_map(json.loads(result.stdout), "native geo flood result")
+        except (json.JSONDecodeError, GraphProviderError) as exc:
+            raise GraphProviderError("native mere.run geo flood returned invalid JSON") from exc
+        arrays = load_file(str(output_path))
+        logits = arrays.get("logits")
+        if logits is None:
+            raise GraphProviderError("native mere.run geo flood did not emit logits")
+        metadata: JsonMap = {
+            key: payload[key]
+            for key in ["status", "model_id", "batch_size", "device", "model_load_seconds", "inference_seconds"]
+            if key in payload
+        }
+        return logits.astype("float32", copy=False), metadata
 
 
 def ndvi_comparison(np: object, s2: object, mask: object) -> JsonMap:

@@ -12,8 +12,8 @@ Entry points:
   boundary for `geo.flood.segment`.
 - `prepare.py`: schema-checked Planetary Computer discovery, reprojection,
   temporal stacking, and content-addressed input bundle creation.
-- `runtime.py`: pinned TerraTorch model loading, normalization, tiled inference,
-  COG/preview writing, and candidate comparison metrics.
+- `runtime.py`: normalization, deterministic tiling, native `mere.run geo flood`
+  handoff, COG/preview writing, and candidate comparison metrics.
 - `bundle.py`: input-bundle parsing, ordering, path containment, and digest
   verification.
 - `constants.py`: pinned model, checkpoint, modality, and normalization
@@ -26,5 +26,5 @@ Important boundaries:
 - Preserve canonical source identities and SHA-256 provenance in every output.
 - Keep flood artifacts classified as `candidate-only`; this provider does not
   author authoritative findings or ranked analyst briefs.
-- Do not advertise MPS execution for the current TerraTorch temporal UNet path;
-  macOS `auto` selects CPU and explicit `mps` fails preflight.
+- Keep neural inference native: the provider may prepare and reconstruct arrays,
+  but the TerraMind forward pass belongs to Swift/MLX on Apple Metal.
