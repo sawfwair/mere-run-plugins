@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from mere_geo_tools import cli, provider
+from mere_geo_tools import cli, prepare, provider
 from mere_geo_tools.bundle import BUNDLE_KIND, BUNDLE_VERSION, canonical_digest, load_bundle, sha256_file
 from mere_geo_tools.constants import MODEL_ID, MODEL_REVISION, S1_BANDS, S2_BANDS, TEMPORAL_ROLES
 from mere_workflow_tools.graph_sdk import (
@@ -18,6 +18,23 @@ from mere_workflow_tools.graph_sdk import (
 
 
 class GeoProviderTests(unittest.TestCase):
+    def source_recipe(self, crs: str = "EPSG:32617") -> dict[str, object]:
+        return {
+            "kind": "mere.geo/terramind-flood-source-recipe",
+            "version": 1,
+            "sample_id": "fixture",
+            "target": {"aoi": [32.6772, 46.5981, 32.7801, 46.6358], "crs": crs},
+            "timesteps": [
+                {
+                    "role": role,
+                    "S2L2A": {"collection": "sentinel-2-l2a", "item": f"s2-{role}"},
+                    "S1RTC": {"collection": "sentinel-1-rtc", "item": f"s1-{role}"},
+                }
+                for role in TEMPORAL_ROLES
+            ],
+            "DEM": {"collection": "cop-dem-glo-30", "item": "dem"},
+        }
+
     def make_bundle(self, root: pathlib.Path) -> pathlib.Path:
         bundle = root / "bundle"
         bundle.mkdir(parents=True)
@@ -99,6 +116,20 @@ class GeoProviderTests(unittest.TestCase):
         self.assertNotIn("impactmesh", report["modules"])
         self.assertEqual(report["native_runtime"]["command"], "mere.run geo flood")
         self.assertEqual(report["native_runtime"]["accelerator"], "metal")
+
+    def test_source_recipe_accepts_projected_crs_for_arbitrary_aoi(self) -> None:
+        prepare.validate_recipe(self.source_recipe("EPSG:32617"))
+        prepare.validate_recipe(self.source_recipe("EPSG:32636"))
+
+    def test_source_recipe_rejects_invalid_aoi_and_non_metric_crs(self) -> None:
+        reversed_aoi = self.source_recipe("EPSG:32636")
+        reversed_aoi["target"]["aoi"] = [32.7801, 46.5981, 32.6772, 46.6358]
+        with self.assertRaisesRegex(GraphProviderError, "finite ordered WGS84 bounds"):
+            prepare.validate_recipe(reversed_aoi)
+        with self.assertRaisesRegex(GraphProviderError, "WGS84 UTM projected CRS with metre units"):
+            prepare.validate_recipe(self.source_recipe("EPSG:4326"))
+        with self.assertRaisesRegex(GraphProviderError, "target.crs is invalid"):
+            prepare.validate_recipe(self.source_recipe("not-a-crs"))
 
     def test_bundle_rejects_wrong_temporal_order_and_hash_drift(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
