@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import pathlib
+import re
 from datetime import timezone
 from typing import cast
 
@@ -167,8 +168,20 @@ def validate_recipe(recipe: JsonMap) -> None:
     aoi = as_list(target.get("aoi"), "target.aoi")
     if len(aoi) != 4 or any(not isinstance(value, (int, float)) for value in aoi):
         raise GraphProviderError("target.aoi must be [west,south,east,north]")
-    if target.get("crs") != "EPSG:32617":
-        raise GraphProviderError("the Helene reference recipe must use EPSG:32617")
+    west, south, east, north = cast(list[float], aoi)
+    if not all(math.isfinite(value) for value in aoi) or not (
+        -180 <= west < east <= 180 and -90 <= south < north <= 90
+    ):
+        raise GraphProviderError("target.aoi must be finite ordered WGS84 bounds")
+    crs_value = target.get("crs")
+    if not isinstance(crs_value, str) or not crs_value.strip():
+        raise GraphProviderError("target.crs is required")
+    epsg_match = re.fullmatch(r"EPSG:(\d+)", crs_value.strip().upper())
+    if epsg_match is None:
+        raise GraphProviderError(f"target.crs is invalid: {crs_value}") from None
+    epsg = int(epsg_match.group(1))
+    if epsg not in range(32601, 32661) and epsg not in range(32701, 32761):
+        raise GraphProviderError("target.crs must be a WGS84 UTM projected CRS with metre units")
     timesteps = as_list(recipe.get("timesteps"), "timesteps")
     roles = [as_map(item, "timestep").get("role") for item in timesteps]
     if roles != TEMPORAL_ROLES:
