@@ -4,6 +4,7 @@ import json
 import math
 import pathlib
 import re
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import cast
 
@@ -21,8 +22,13 @@ from .constants import (
     OLMOEARTH_LANDSAT_BANDS,
     OLMOEARTH_LANDSAT_SOURCE_CONTRACT,
     OLMOEARTH_S2_BANDS,
+    PLANETARY_COMPUTER_STAC_ENDPOINT,
     S1_BANDS,
     TESSERA_S2_BANDS,
+    USGS_LANDSAT_ASSETS,
+    USGS_LANDSAT_AWS_REGION,
+    USGS_LANDSAT_COLLECTION,
+    USGS_LANDSAT_STAC_ENDPOINT,
 )
 from .prepare import aligned_grid, asset_provenance, item_provenance, paired_item, sha256_bytes
 
@@ -67,28 +73,53 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
         projected_bounds, resolution, block_multiple, min_size
     )
     transform = Affine(resolution, 0, left, 0, -resolution, top)
-    endpoint = cast(
-        str,
-        recipe.get("stac_endpoint", "https://planetarycomputer.microsoft.com/api/stac/v1"),
+    default_endpoint = stac_endpoint(
+        recipe.get("stac_endpoint", PLANETARY_COMPUTER_STAC_ENDPOINT),
+        "source recipe stac_endpoint",
     )
-    unsigned_catalog = pystac_client.Client.open(endpoint)
-    signed_catalog = pystac_client.Client.open(endpoint, modifier=pc.sign_inplace)
+    catalog_cache: dict[str, tuple[object, object]] = {}
 
-    def read_asset(href: str, resampling: object, nodata: float) -> object:
-        with (
-            rasterio.open(href) as source,
-            WarpedVRT(
-                source,
-                crs=crs,
-                transform=transform,
-                width=width,
-                height=height,
-                resampling=resampling,
-                nodata=nodata,
-                dtype="float32",
-            ) as warped,
-        ):
-            return warped.read(1, masked=True).filled(nodata).astype(np.float32)
+    def catalogs_for_spec(spec: JsonMap) -> tuple[object, object, str]:
+        endpoint = stac_endpoint(spec.get("stac_endpoint", default_endpoint), "source item stac_endpoint")
+        if endpoint not in catalog_cache:
+            unsigned_catalog = pystac_client.Client.open(endpoint)
+            if endpoint == PLANETARY_COMPUTER_STAC_ENDPOINT:
+                signed_catalog = pystac_client.Client.open(endpoint, modifier=pc.sign_inplace)
+            else:
+                signed_catalog = pystac_client.Client.open(endpoint)
+            catalog_cache[endpoint] = (unsigned_catalog, signed_catalog)
+        unsigned_catalog, signed_catalog = catalog_cache[endpoint]
+        return unsigned_catalog, signed_catalog, endpoint
+
+    def read_asset(href: str, resampling: object, nodata: float, requester_pays: bool) -> object:
+        environment = (
+            {"AWS_REQUEST_PAYER": "requester", "AWS_REGION": USGS_LANDSAT_AWS_REGION}
+            if requester_pays
+            else {}
+        )
+        try:
+            with (
+                rasterio.Env(**environment),
+                rasterio.open(href) as source,
+                WarpedVRT(
+                    source,
+                    crs=crs,
+                    transform=transform,
+                    width=width,
+                    height=height,
+                    resampling=resampling,
+                    nodata=nodata,
+                    dtype="float32",
+                ) as warped,
+            ):
+                return warped.read(1, masked=True).filled(nodata).astype(np.float32)
+        except rasterio.errors.RasterioIOError as exc:
+            if requester_pays:
+                raise GraphProviderError(
+                    "USGS Landsat Level-1 access failed. The official usgs-landsat S3 bucket is "
+                    "requester-pays and requires authenticated AWS credentials with billing enabled."
+                ) from exc
+            raise
 
     output_root.mkdir(parents=True, exist_ok=True)
     sample_id = cast(str, recipe["sample_id"])
@@ -101,8 +132,7 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
         s2, s2_valid, s2_doy, s2_provenance = read_sequence(
             observations["S2"],
             TESSERA_S2_BANDS,
-            unsigned_catalog,
-            signed_catalog,
+            catalogs_for_spec,
             read_asset,
             Resampling,
             np,
@@ -126,8 +156,7 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
             values, _, doy, source_provenance = read_sequence(
                 raw_sequence,
                 S1_BANDS,
-                unsigned_catalog,
-                signed_catalog,
+                catalogs_for_spec,
                 read_asset,
                 Resampling,
                 np,
@@ -163,13 +192,13 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
             values, _, _, source_provenance = read_sequence(
                 specs,
                 bands,
-                unsigned_catalog,
-                signed_catalog,
+                catalogs_for_spec,
                 read_asset,
                 Resampling,
                 np,
                 mode=mode,
                 include_scl=False,
+                default_assets=USGS_LANDSAT_ASSETS if name == "LANDSAT" else None,
             )
             arrays[name] = values
             modalities[name] = {
@@ -231,6 +260,10 @@ def validate_embedding_recipe(recipe: JsonMap) -> None:
         raise GraphProviderError("unsupported embedding source recipe")
     if not isinstance(recipe.get("sample_id"), str) or not recipe["sample_id"]:
         raise GraphProviderError("source recipe sample_id is required")
+    default_endpoint = stac_endpoint(
+        recipe.get("stac_endpoint", PLANETARY_COMPUTER_STAC_ENDPOINT),
+        "source recipe stac_endpoint",
+    )
     validate_target(as_map(recipe.get("target"), "target"))
     if kind == TESSERA_RECIPE_KIND:
         observations = as_map(recipe.get("observations"), "observations")
@@ -259,7 +292,7 @@ def validate_embedding_recipe(recipe: JsonMap) -> None:
                 spec = as_map(step[name], name)
                 validate_item_spec(spec)
                 if name == "LANDSAT":
-                    validate_landsat_spec(spec)
+                    validate_landsat_spec(spec, default_endpoint)
 
 
 def validate_target(target: JsonMap) -> None:
@@ -295,26 +328,45 @@ def validate_item_spec(spec: JsonMap) -> None:
     assets = spec.get("assets")
     if assets is not None:
         mapping = as_map(assets, "source item assets")
-        if any(not isinstance(key, str) or not isinstance(value, str) for key, value in mapping.items()):
+        if any(
+            not isinstance(key, str) or not key or not isinstance(value, str) or not value
+            for key, value in mapping.items()
+        ):
             raise GraphProviderError("source item assets must map canonical band names to STAC asset names")
+    if "stac_endpoint" in spec:
+        stac_endpoint(spec["stac_endpoint"], "source item stac_endpoint")
 
 
-def validate_landsat_spec(spec: JsonMap) -> None:
-    if spec.get("collection") == "landsat-c2-l2":
+def validate_landsat_spec(spec: JsonMap, default_endpoint: str) -> None:
+    endpoint = stac_endpoint(spec.get("stac_endpoint", default_endpoint), "OlmoEarth LANDSAT stac_endpoint")
+    collection = spec.get("collection")
+    if collection == "landsat-c2-l2":
         raise GraphProviderError(
             "Planetary Computer landsat-c2-l2 is incompatible with OlmoEarth LANDSAT: "
             "the model requires the raw 11-band OLI/TIRS Level-1 DN tensor"
+        )
+    if endpoint != USGS_LANDSAT_STAC_ENDPOINT or collection != USGS_LANDSAT_COLLECTION:
+        raise GraphProviderError(
+            "OlmoEarth LANDSAT requires the official USGS Level-1 source: "
+            f"{USGS_LANDSAT_STAC_ENDPOINT} collection {USGS_LANDSAT_COLLECTION}"
         )
     if spec.get("source_contract") != OLMOEARTH_LANDSAT_SOURCE_CONTRACT:
         raise GraphProviderError(
             f"OlmoEarth LANDSAT source_contract must be {OLMOEARTH_LANDSAT_SOURCE_CONTRACT}"
         )
-    assets = as_map(spec.get("assets"), "OlmoEarth LANDSAT assets")
-    missing = [band for band in OLMOEARTH_LANDSAT_BANDS if band not in assets]
-    if missing:
-        raise GraphProviderError(
-            f"OlmoEarth LANDSAT assets are missing canonical bands: {', '.join(missing)}"
-        )
+    if "assets" in spec:
+        assets = as_map(spec["assets"], "OlmoEarth LANDSAT assets")
+        missing = [band for band in OLMOEARTH_LANDSAT_BANDS if band not in assets]
+        if missing:
+            raise GraphProviderError(
+                f"OlmoEarth LANDSAT assets are missing canonical bands: {', '.join(missing)}"
+            )
+
+
+def stac_endpoint(value: object, name: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"https://[^/\s]+(?:/[^\s]*)?", value) is None:
+        raise GraphProviderError(f"{name} must be a non-empty HTTPS URL")
+    return value.rstrip("/")
 
 
 def timestamp_components(value: object) -> list[int]:
@@ -333,13 +385,13 @@ def timestamp_components(value: object) -> list[int]:
 def read_sequence(
     raw_specs: object,
     bands: list[str],
-    unsigned_catalog: object,
-    signed_catalog: object,
+    catalogs_for_spec: Callable[[JsonMap], tuple[object, object, str]],
     read_asset: object,
     resampling: object,
     np: object,
     mode: str,
     include_scl: bool,
+    default_assets: dict[str, str] | None = None,
 ) -> tuple[object, object | None, list[int], list[JsonMap]]:
     specs = [as_map(value, "source item") for value in as_list(raw_specs, "source sequence")]
     values: list[object] = []
@@ -347,11 +399,12 @@ def read_sequence(
     days: list[int] = []
     provenance: list[JsonMap] = []
     for spec in specs:
+        unsigned_catalog, signed_catalog, endpoint = catalogs_for_spec(spec)
         unsigned, signed = paired_item(unsigned_catalog, signed_catalog, spec)
         if unsigned.datetime is None:
             raise GraphProviderError(f"STAC item has no observation datetime: {unsigned.collection_id}/{unsigned.id}")
         days.append(unsigned.datetime.astimezone(timezone.utc).timetuple().tm_yday)
-        asset_overrides = cast(dict[str, str], spec.get("assets", {}))
+        asset_overrides = {**(default_assets or {}), **cast(dict[str, str], spec.get("assets", {}))}
         source_bands: list[object] = []
         assets: list[JsonMap] = []
         for band in bands:
@@ -363,7 +416,8 @@ def read_sequence(
                 raise GraphProviderError(
                     f"STAC item {unsigned.collection_id}/{unsigned.id} is missing asset {asset_name} for {band}"
                 ) from None
-            array = cast(object, read_asset(signed_asset.href, resampling.bilinear, 0.0))
+            access_href, requester_pays = asset_read_access(signed_asset, endpoint)
+            array = cast(object, read_asset(access_href, resampling.bilinear, 0.0, requester_pays))
             if mode in {"tessera_radar", "radar_db"}:
                 valid = np.isfinite(array) & (array > 0)
                 converted = np.zeros_like(array, dtype=np.float32)
@@ -372,7 +426,11 @@ def read_sequence(
                     converted[valid] = (converted[valid] + 50.0) * 200.0
                 array = converted
             source_bands.append(array)
-            assets.append(asset_provenance(band, unsigned_asset))
+            source_asset = asset_provenance(band, unsigned_asset)
+            source_asset["access_href"] = access_href
+            if requester_pays:
+                source_asset["requester_pays"] = True
+            assets.append(source_asset)
         values.append(np.stack(source_bands, axis=0).astype(np.float32))
         if include_scl:
             scl_name = asset_overrides.get("SCL", "SCL")
@@ -382,14 +440,32 @@ def read_sequence(
                 raise GraphProviderError(
                     f"STAC item {unsigned.collection_id}/{unsigned.id} is missing cloud mask asset {scl_name}"
                 ) from None
-            scl = cast(object, read_asset(scl_asset.href, resampling.nearest, 0.0))
+            scl = cast(object, read_asset(scl_asset.href, resampling.nearest, 0.0, False))
             invalid = np.isin(scl.astype(np.uint8), [0, 1, 3, 8, 9, 10, 11])
             validity.append((~invalid).astype(np.uint8))
             assets.append(asset_provenance("SCL", unsigned.assets[scl_name]))
-        provenance.append(item_provenance(unsigned, assets))
+        source_provenance = item_provenance(unsigned, assets)
+        source_provenance["stac_endpoint"] = endpoint
+        if "source_contract" in spec:
+            source_provenance["source_contract"] = spec["source_contract"]
+        provenance.append(source_provenance)
     stacked = np.stack(values, axis=0).astype(np.float32)
     valid_stack = np.stack(validity, axis=0).astype(np.uint8) if validity else None
     return stacked, valid_stack, days, provenance
+
+
+def asset_read_access(asset: object, endpoint: str) -> tuple[str, bool]:
+    if endpoint != USGS_LANDSAT_STAC_ENDPOINT:
+        return cast(str, asset.href), False
+    extra = cast(JsonMap, asset.extra_fields)
+    alternates = as_map(extra.get("alternate"), "USGS Landsat STAC asset alternate access")
+    s3 = as_map(alternates.get("s3"), "USGS Landsat STAC asset S3 access")
+    href = s3.get("href")
+    if not isinstance(href, str) or not href.startswith("s3://usgs-landsat/"):
+        raise GraphProviderError("USGS Landsat STAC asset is missing its official usgs-landsat S3 URI")
+    if s3.get("storage:requester_pays") is not True:
+        raise GraphProviderError("USGS Landsat STAC asset must declare requester-pays access")
+    return href, True
 
 
 def write_zarr(zarr_module: object, path: pathlib.Path, array: object) -> None:

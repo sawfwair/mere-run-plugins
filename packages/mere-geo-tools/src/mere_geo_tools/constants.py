@@ -96,6 +96,23 @@ TESSERA_S2_BANDS = ["B04", "B02", "B03", "B08", "B8A", "B05", "B06", "B07", "B11
 OLMOEARTH_S2_BANDS = ["B02", "B03", "B04", "B08", "B05", "B06", "B07", "B8A", "B11", "B12", "B01", "B09"]
 OLMOEARTH_LANDSAT_BANDS = ["B8", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B9", "B10", "B11"]
 OLMOEARTH_LANDSAT_SOURCE_CONTRACT = "landsat-oli-tirs-level1-dn-v1"
+PLANETARY_COMPUTER_STAC_ENDPOINT = "https://planetarycomputer.microsoft.com/api/stac/v1"
+USGS_LANDSAT_STAC_ENDPOINT = "https://landsatlook.usgs.gov/stac-server"
+USGS_LANDSAT_COLLECTION = "landsat-c2l1"
+USGS_LANDSAT_AWS_REGION = "us-west-2"
+USGS_LANDSAT_ASSETS = {
+    "B8": "pan",
+    "B1": "coastal",
+    "B2": "blue",
+    "B3": "green",
+    "B4": "red",
+    "B5": "nir08",
+    "B6": "swir16",
+    "B7": "swir22",
+    "B9": "cirrus",
+    "B10": "lwir11",
+    "B11": "lwir12",
+}
 
 FLOOD_MEANS = {
     "S2L2A": [

@@ -259,10 +259,10 @@ class GeoProviderTests(unittest.TestCase):
     def test_olmoearth_landsat_requires_compatible_level1_contract(self) -> None:
         target = {"aoi": [32.67, 46.59, 32.78, 46.64], "crs": "EPSG:32636"}
         landsat = {
-            "collection": "landsat-oli-tirs-level1",
-            "item": "landsat-a",
+            "stac_endpoint": prepare_embeddings.USGS_LANDSAT_STAC_ENDPOINT,
+            "collection": prepare_embeddings.USGS_LANDSAT_COLLECTION,
+            "item": "LC08_L1TP_046027_20250821_20250828_02_T1",
             "source_contract": "landsat-oli-tirs-level1-dn-v1",
-            "assets": {band: band for band in prepare_embeddings.OLMOEARTH_LANDSAT_BANDS},
         }
         recipe = {
             "kind": "mere.geo/olmoearth-v1.2-source-recipe",
@@ -273,11 +273,13 @@ class GeoProviderTests(unittest.TestCase):
         }
         prepare_embeddings.validate_embedding_recipe(recipe)
 
+        landsat["assets"] = dict(prepare_embeddings.USGS_LANDSAT_ASSETS)
+        prepare_embeddings.validate_embedding_recipe(recipe)
         del landsat["assets"]["B11"]
         with self.assertRaisesRegex(GraphProviderError, "missing canonical bands: B11"):
             prepare_embeddings.validate_embedding_recipe(recipe)
 
-        landsat["assets"]["B11"] = "B11"
+        landsat["assets"]["B11"] = "lwir12"
         landsat["source_contract"] = "surface-reflectance"
         with self.assertRaisesRegex(GraphProviderError, "source_contract must be"):
             prepare_embeddings.validate_embedding_recipe(recipe)
@@ -286,6 +288,34 @@ class GeoProviderTests(unittest.TestCase):
         landsat["collection"] = "landsat-c2-l2"
         with self.assertRaisesRegex(GraphProviderError, "landsat-c2-l2 is incompatible"):
             prepare_embeddings.validate_embedding_recipe(recipe)
+
+        landsat["collection"] = prepare_embeddings.USGS_LANDSAT_COLLECTION
+        landsat["stac_endpoint"] = "https://planetarycomputer.microsoft.com/api/stac/v1"
+        with self.assertRaisesRegex(GraphProviderError, "requires the official USGS Level-1 source"):
+            prepare_embeddings.validate_embedding_recipe(recipe)
+
+        landsat["stac_endpoint"] = "http://landsatlook.usgs.gov/stac-server"
+        with self.assertRaisesRegex(GraphProviderError, "must be a non-empty HTTPS URL"):
+            prepare_embeddings.validate_embedding_recipe(recipe)
+
+    def test_olmoearth_landsat_uses_official_requester_pays_asset(self) -> None:
+        asset = mock.Mock()
+        asset.href = "https://landsatlook.usgs.gov/data/scene_B8.TIF"
+        asset.extra_fields = {
+            "alternate": {
+                "s3": {
+                    "href": "s3://usgs-landsat/collection02/level-1/scene_B8.TIF",
+                    "storage:requester_pays": True,
+                }
+            }
+        }
+        self.assertEqual(
+            prepare_embeddings.asset_read_access(asset, prepare_embeddings.USGS_LANDSAT_STAC_ENDPOINT),
+            ("s3://usgs-landsat/collection02/level-1/scene_B8.TIF", True),
+        )
+        asset.extra_fields["alternate"]["s3"]["storage:requester_pays"] = False
+        with self.assertRaisesRegex(GraphProviderError, "must declare requester-pays access"):
+            prepare_embeddings.asset_read_access(asset, prepare_embeddings.USGS_LANDSAT_STAC_ENDPOINT)
 
     def test_embedding_bundles_are_typed_and_content_addressed(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:

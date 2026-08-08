@@ -12,7 +12,8 @@ Entry points:
   `geo.fire.segment`, `geo.tessera.embed`, and `geo.olmoearth.embed`.
 - `prepare.py`: shared four-timestep TerraMind Flood/Fire STAC preparation.
 - `prepare_embeddings.py`: TESSERA temporal and OlmoEarth multisensor STAC
-  preparation, band ordering, cloud masks, timestamps, and radar conversion.
+  preparation, including Planetary Computer Sentinel sources, official USGS
+  Landsat Level-1 band mapping, cloud masks, timestamps, and radar conversion.
 - `runtime.py`: TerraMind normalization, deterministic tiling, native hazard
   handoff, COG writing, and review previews.
 - `embedding_runtime.py`: TESSERA cloud-valid pixel batching and OlmoEarth
