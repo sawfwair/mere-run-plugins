@@ -8,6 +8,8 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import cast
 
+import numpy as np
+
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_list, as_map
 
 from .bundle import (
@@ -30,10 +32,20 @@ from .constants import (
     USGS_LANDSAT_COLLECTION,
     USGS_LANDSAT_STAC_ENDPOINT,
 )
+from .external_types import (
+    FloatArray,
+    NumericArray,
+    ResamplingNamespace,
+    StacAsset,
+    StacCatalog,
+    UInt8Array,
+)
 from .prepare import aligned_grid, asset_provenance, item_provenance, paired_item, sha256_bytes
 
 TESSERA_RECIPE_KIND = "mere.geo/tessera-v2-source-recipe"
 OLMOEARTH_RECIPE_KIND = "mere.geo/olmoearth-v1.2-source-recipe"
+CatalogResolver = Callable[[JsonMap], tuple[StacCatalog, StacCatalog, str]]
+AssetReader = Callable[[str, object, float, bool], FloatArray]
 
 
 def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> JsonMap:
@@ -52,11 +64,9 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
             return existing
         raise GraphProviderError(f"output directory already contains a different bundle: {output_root}")
 
-    import numpy as np
     import planetary_computer as pc
     import pystac_client
     import rasterio
-    import zarr
     from rasterio.enums import Resampling
     from rasterio.transform import Affine
     from rasterio.vrt import WarpedVRT
@@ -65,7 +75,10 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
     target = as_map(recipe["target"], "target")
     aoi = cast(list[float], target["aoi"])
     crs = cast(str, target["crs"])
-    resolution = float(cast(int | float, target.get("resolution_m", 10)))
+    raw_resolution = target.get("resolution_m", 10)
+    if not isinstance(raw_resolution, (int, float)) or isinstance(raw_resolution, bool):
+        raise GraphProviderError("target resolution_m must be numeric")
+    resolution = float(raw_resolution)
     block_multiple = cast(int, target.get("block_multiple", 16))
     min_size = cast(int, target.get("minimum_size", 16))
     projected_bounds = transform_bounds("EPSG:4326", crs, *aoi, densify_pts=21)
@@ -77,21 +90,21 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
         recipe.get("stac_endpoint", PLANETARY_COMPUTER_STAC_ENDPOINT),
         "source recipe stac_endpoint",
     )
-    catalog_cache: dict[str, tuple[object, object]] = {}
+    catalog_cache: dict[str, tuple[StacCatalog, StacCatalog]] = {}
 
-    def catalogs_for_spec(spec: JsonMap) -> tuple[object, object, str]:
+    def catalogs_for_spec(spec: JsonMap) -> tuple[StacCatalog, StacCatalog, str]:
         endpoint = stac_endpoint(spec.get("stac_endpoint", default_endpoint), "source item stac_endpoint")
         if endpoint not in catalog_cache:
-            unsigned_catalog = pystac_client.Client.open(endpoint)
+            unsigned_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint))
             if endpoint == PLANETARY_COMPUTER_STAC_ENDPOINT:
-                signed_catalog = pystac_client.Client.open(endpoint, modifier=pc.sign_inplace)
+                signed_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint, modifier=pc.sign_inplace))
             else:
-                signed_catalog = pystac_client.Client.open(endpoint)
+                signed_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint))
             catalog_cache[endpoint] = (unsigned_catalog, signed_catalog)
         unsigned_catalog, signed_catalog = catalog_cache[endpoint]
         return unsigned_catalog, signed_catalog, endpoint
 
-    def read_asset(href: str, resampling: object, nodata: float, requester_pays: bool) -> object:
+    def read_asset(href: str, resampling: object, nodata: float, requester_pays: bool) -> FloatArray:
         environment = (
             {"AWS_REQUEST_PAYER": "requester", "AWS_REGION": USGS_LANDSAT_AWS_REGION}
             if requester_pays
@@ -112,7 +125,7 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
                     dtype="float32",
                 ) as warped,
             ):
-                return warped.read(1, masked=True).filled(nodata).astype(np.float32)
+                return cast(FloatArray, warped.read(1, masked=True).filled(nodata).astype(np.float32))
         except rasterio.errors.RasterioIOError as exc:
             if requester_pays:
                 raise GraphProviderError(
@@ -123,7 +136,7 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
 
     output_root.mkdir(parents=True, exist_ok=True)
     sample_id = cast(str, recipe["sample_id"])
-    arrays: dict[str, object] = {}
+    arrays: dict[str, NumericArray] = {}
     modalities: JsonMap = {}
     provenance: JsonMap = {}
     manifest_extra: JsonMap = {}
@@ -135,10 +148,11 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
             catalogs_for_spec,
             read_asset,
             Resampling,
-            np,
             mode="reflectance",
             include_scl=True,
         )
+        if s2_valid is None:
+            raise GraphProviderError("TESSERA Sentinel-2 preparation did not produce a validity mask")
         arrays["S2"] = s2
         arrays["S2_VALID"] = s2_valid
         modalities["S2"] = {
@@ -159,7 +173,6 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
                 catalogs_for_spec,
                 read_asset,
                 Resampling,
-                np,
                 mode="tessera_radar",
                 include_scl=False,
             )
@@ -195,19 +208,19 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
                 catalogs_for_spec,
                 read_asset,
                 Resampling,
-                np,
                 mode=mode,
                 include_scl=False,
                 default_assets=USGS_LANDSAT_ASSETS if name == "LANDSAT" else None,
             )
             arrays[name] = values
-            modalities[name] = {
+            modality: JsonMap = {
                 "bands": bands,
                 "shape": list(values.shape),
                 "units": units,
             }
             if name == "LANDSAT":
-                modalities[name]["source_contract"] = OLMOEARTH_LANDSAT_SOURCE_CONTRACT
+                modality["source_contract"] = OLMOEARTH_LANDSAT_SOURCE_CONTRACT
+            modalities[name] = modality
             provenance[name] = source_provenance
         manifest_extra["timestamps"] = timestamps
         model_family = {
@@ -223,7 +236,7 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
         directory = output_root / name
         directory.mkdir()
         path = directory / f"{sample_id}_{name}.zarr.zip"
-        write_zarr(zarr, path, array)
+        write_zarr(path, array)
         relative = path.relative_to(output_root).as_posix()
         digest = sha256_file(path)
         artifacts[name] = {"path": relative, "bytes": path.stat().st_size, "sha256": digest}
@@ -299,8 +312,9 @@ def validate_target(target: JsonMap) -> None:
     aoi = as_list(target.get("aoi"), "target.aoi")
     if len(aoi) != 4 or any(not isinstance(value, (int, float)) for value in aoi):
         raise GraphProviderError("target.aoi must be [west,south,east,north]")
-    west, south, east, north = cast(list[float], aoi)
-    if not all(math.isfinite(value) for value in aoi) or not (
+    numeric_aoi = cast(list[float], aoi)
+    west, south, east, north = numeric_aoi
+    if not all(math.isfinite(value) for value in numeric_aoi) or not (
         -180 <= west < east <= 180 and -90 <= south < north <= 90
     ):
         raise GraphProviderError("target.aoi must be finite ordered WGS84 bounds")
@@ -385,17 +399,16 @@ def timestamp_components(value: object) -> list[int]:
 def read_sequence(
     raw_specs: object,
     bands: list[str],
-    catalogs_for_spec: Callable[[JsonMap], tuple[object, object, str]],
-    read_asset: object,
-    resampling: object,
-    np: object,
+    catalogs_for_spec: CatalogResolver,
+    read_asset: AssetReader,
+    resampling: ResamplingNamespace,
     mode: str,
     include_scl: bool,
     default_assets: dict[str, str] | None = None,
-) -> tuple[object, object | None, list[int], list[JsonMap]]:
+) -> tuple[FloatArray, UInt8Array | None, list[int], list[JsonMap]]:
     specs = [as_map(value, "source item") for value in as_list(raw_specs, "source sequence")]
-    values: list[object] = []
-    validity: list[object] = []
+    values: list[FloatArray] = []
+    validity: list[UInt8Array] = []
     days: list[int] = []
     provenance: list[JsonMap] = []
     for spec in specs:
@@ -405,7 +418,7 @@ def read_sequence(
             raise GraphProviderError(f"STAC item has no observation datetime: {unsigned.collection_id}/{unsigned.id}")
         days.append(unsigned.datetime.astimezone(timezone.utc).timetuple().tm_yday)
         asset_overrides = {**(default_assets or {}), **cast(dict[str, str], spec.get("assets", {}))}
-        source_bands: list[object] = []
+        source_bands: list[FloatArray] = []
         assets: list[JsonMap] = []
         for band in bands:
             asset_name = asset_overrides.get(band, band)
@@ -417,7 +430,7 @@ def read_sequence(
                     f"STAC item {unsigned.collection_id}/{unsigned.id} is missing asset {asset_name} for {band}"
                 ) from None
             access_href, requester_pays = asset_read_access(signed_asset, endpoint)
-            array = cast(object, read_asset(access_href, resampling.bilinear, 0.0, requester_pays))
+            array = read_asset(access_href, resampling.bilinear, 0.0, requester_pays)
             if mode in {"tessera_radar", "radar_db"}:
                 valid = np.isfinite(array) & (array > 0)
                 converted = np.zeros_like(array, dtype=np.float32)
@@ -440,23 +453,23 @@ def read_sequence(
                 raise GraphProviderError(
                     f"STAC item {unsigned.collection_id}/{unsigned.id} is missing cloud mask asset {scl_name}"
                 ) from None
-            scl = cast(object, read_asset(scl_asset.href, resampling.nearest, 0.0, False))
+            scl = read_asset(scl_asset.href, resampling.nearest, 0.0, False)
             invalid = np.isin(scl.astype(np.uint8), [0, 1, 3, 8, 9, 10, 11])
-            validity.append((~invalid).astype(np.uint8))
+            validity.append(cast(UInt8Array, (~invalid).astype(np.uint8)))
             assets.append(asset_provenance("SCL", unsigned.assets[scl_name]))
         source_provenance = item_provenance(unsigned, assets)
         source_provenance["stac_endpoint"] = endpoint
         if "source_contract" in spec:
             source_provenance["source_contract"] = spec["source_contract"]
         provenance.append(source_provenance)
-    stacked = np.stack(values, axis=0).astype(np.float32)
-    valid_stack = np.stack(validity, axis=0).astype(np.uint8) if validity else None
+    stacked = cast(FloatArray, np.stack(values, axis=0).astype(np.float32))
+    valid_stack = cast(UInt8Array, np.stack(validity, axis=0).astype(np.uint8)) if validity else None
     return stacked, valid_stack, days, provenance
 
 
-def asset_read_access(asset: object, endpoint: str) -> tuple[str, bool]:
+def asset_read_access(asset: StacAsset, endpoint: str) -> tuple[str, bool]:
     if endpoint != USGS_LANDSAT_STAC_ENDPOINT:
-        return cast(str, asset.href), False
+        return asset.href, False
     extra = cast(JsonMap, asset.extra_fields)
     alternates = as_map(extra.get("alternate"), "USGS Landsat STAC asset alternate access")
     s3 = as_map(alternates.get("s3"), "USGS Landsat STAC asset S3 access")
@@ -468,13 +481,15 @@ def asset_read_access(asset: object, endpoint: str) -> tuple[str, bool]:
     return href, True
 
 
-def write_zarr(zarr_module: object, path: pathlib.Path, array: object) -> None:
-    store = zarr_module.ZipStore(str(path), mode="w")
+def write_zarr(path: pathlib.Path, array: NumericArray) -> None:
+    import zarr
+
+    store = zarr.ZipStore(str(path), mode="w")
     try:
-        group = zarr_module.group(store=store)
+        group = zarr.group(store=store)
         height, width = array.shape[-2:]
         chunks = tuple([1] * (array.ndim - 2) + [min(256, height), min(256, width)])
         group.create_dataset("bands", data=array, chunks=chunks, overwrite=True)
-        zarr_module.consolidate_metadata(store)
+        zarr.consolidate_metadata(store)
     finally:
         store.close()

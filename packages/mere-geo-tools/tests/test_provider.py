@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from unittest import mock
 
 from mere_geo_tools import cli, prepare, prepare_embeddings, provider
@@ -37,6 +40,15 @@ from mere_workflow_tools.graph_sdk import (
 
 
 class GeoProviderTests(unittest.TestCase):
+    def invoke_cli(self, arguments: list[str]) -> tuple[int, str, str]:
+        stdout = StringIO()
+        stderr = StringIO()
+        with mock.patch.object(sys, "argv", ["mere-geo-tools", *arguments]), redirect_stdout(
+            stdout
+        ), redirect_stderr(stderr):
+            exit_code = cli.main()
+        return exit_code, stdout.getvalue(), stderr.getvalue()
+
     def source_recipe(self, crs: str = "EPSG:32617") -> dict[str, object]:
         return {
             "kind": "mere.geo/terramind-flood-source-recipe",
@@ -202,6 +214,80 @@ class GeoProviderTests(unittest.TestCase):
         self.assertNotIn("impactmesh", report["modules"])
         self.assertEqual(report["native_runtime"]["command"], "mere.run geo flood")
         self.assertEqual(report["native_runtime"]["accelerator"], "metal")
+
+    def test_cli_routes_every_machine_readable_command(self) -> None:
+        exit_code, stdout, _ = self.invoke_cli(["manifest", "--json"])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout)["name"], provider.PROVIDER_ID)
+
+        with mock.patch.object(cli, "doctor_report", return_value={"status": "blocked"}):
+            exit_code, _, _ = self.invoke_cli(["doctor", "--json"])
+        self.assertEqual(exit_code, 2)
+
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            recipe = root / "recipe.json"
+            output = root / "output"
+            recipe.write_text('{"kind":"mere.geo/terramind-flood-source-recipe"}')
+            with mock.patch("mere_geo_tools.prepare.prepare_bundle", return_value={"kind": "flood"}):
+                exit_code, stdout, _ = self.invoke_cli(
+                    ["prepare", "--recipe", str(recipe), "--output", str(output), "--json"]
+                )
+            self.assertEqual(json.loads(stdout)["kind"], "flood")
+
+            recipe.write_text('{"kind":"mere.geo/tessera-v2-source-recipe"}')
+            with mock.patch(
+                "mere_geo_tools.prepare_embeddings.prepare_embedding_bundle",
+                return_value={"kind": "tessera"},
+            ):
+                exit_code, stdout, _ = self.invoke_cli(
+                    ["prepare", "--recipe", str(recipe), "--output", str(output), "--json"]
+                )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(stdout)["kind"], "tessera")
+
+            with mock.patch.object(cli, "load_bundle", return_value={"kind": "bundle"}):
+                exit_code, stdout, _ = self.invoke_cli(["inspect", str(root), "--json"])
+            self.assertEqual(json.loads(stdout)["kind"], "bundle")
+
+            comparison = root / "comparison.json"
+            comparison.write_text('{"comparison":{"jaccard":0.5}}')
+            exit_code, stdout, _ = self.invoke_cli(["compare", str(comparison), "--json"])
+            self.assertEqual(json.loads(stdout)["jaccard"], 0.5)
+
+            request = root / "request.json"
+            request.write_text("{}")
+            exit_code, stdout, _ = self.invoke_cli(["graph", "catalog", "--json"])
+            self.assertEqual(json.loads(stdout)["provider_id"], provider.PROVIDER_ID)
+
+            with mock.patch.object(cli, "read_invocation", return_value={}), mock.patch.object(
+                cli, "preflight", return_value={"status": "ok"}
+            ), mock.patch.object(cli, "validate_preflight"):
+                exit_code, stdout, _ = self.invoke_cli(
+                    ["graph", "preflight", "--request", str(request), "--run-dir", str(root), "--json"]
+                )
+            self.assertEqual(json.loads(stdout)["status"], "ok")
+
+            with mock.patch.object(cli, "read_invocation", return_value={}), mock.patch.object(
+                cli, "graph_execute", side_effect=lambda _invocation, _run_dir, emit: emit({"type": "done"})
+            ):
+                exit_code, stdout, _ = self.invoke_cli(
+                    [
+                        "graph",
+                        "execute",
+                        "--request",
+                        str(request),
+                        "--run-dir",
+                        str(root),
+                        "--json-stream",
+                    ]
+                )
+            self.assertEqual(json.loads(stdout)["type"], "done")
+
+            with mock.patch.object(cli, "load_bundle", side_effect=GraphProviderError("bad bundle")):
+                exit_code, _, stderr = self.invoke_cli(["inspect", str(root), "--json"])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("bad bundle", stderr)
 
     def test_source_recipe_accepts_projected_crs_for_arbitrary_aoi(self) -> None:
         prepare.validate_recipe(self.source_recipe("EPSG:32617"))

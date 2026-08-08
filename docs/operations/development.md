@@ -9,7 +9,7 @@ docs/          VitePress source and product documentation
 packages/      plugin Python packages
 recipes/       executable and evaluation recipes
 scripts/       repository validation and maintenance
-site/          marketing and docs Workers
+package.json   root VitePress development and build commands
 ```
 
 ## Local Python workflow
@@ -24,7 +24,7 @@ and tests in the same change.
 ## Local docs workflow
 
 ```bash
-corepack pnpm install
+corepack pnpm install --frozen-lockfile
 corepack pnpm docs:dev
 ```
 
@@ -33,15 +33,17 @@ copper identity. The canonical host is `plugins-docs.mere.run`.
 
 ## Catalog changes
 
-Every catalog plugin must have a dedicated page under `docs/plugins/`. Update
-`site/scripts/check-docs-coverage.mjs` only when adding a genuinely new catalog
-ID and page mapping.
+Every catalog plugin must have a dedicated page under `docs/plugins/`.
+`scripts/check-docs-coverage.mjs` verifies that every live catalog ID is named
+by at least one plugin page.
 
 ## Before review
 
-Run both product gates:
+Run the fast gate while iterating, then both release gates before review:
 
 ```bash
+./scripts/check-fast.sh
 ./scripts/check.sh
-corepack pnpm --dir site check
+corepack pnpm docs:coverage
+corepack pnpm docs:build
 ```

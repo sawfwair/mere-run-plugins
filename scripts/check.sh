@@ -17,8 +17,16 @@ export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tool
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
-if rg -n "\bAny\b" packages/*/src scripts; then
+if rg -n "\bAny\b" packages scripts --glob '*.py'; then
   echo "Production code must not use the dynamic top type; define typed JSON/provider boundaries instead." >&2
+  exit 1
+fi
+if rg -n 'type:\s*ignore|#\s*noqa' packages scripts --glob '*.py'; then
+  echo "Narrow the boundary instead of suppressing type or lint findings." >&2
+  exit 1
+fi
+if rg -n 'ignore_errors\s*=\s*true' pyproject.toml; then
+  echo "Whole-module mypy exemptions are forbidden." >&2
   exit 1
 fi
 "$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts

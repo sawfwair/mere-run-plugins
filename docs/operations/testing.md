@@ -2,6 +2,16 @@
 
 ## Repository gate
 
+For a sub-ten-second local/pre-commit pass with the current development
+dependencies installed, run:
+
+```bash
+./scripts/check-fast.sh
+```
+
+It runs Ruff, strict mypy, compilation, repository validation, and all package
+unit suites in parallel. Before review or release, run the reproducible gate:
+
 Run:
 
 ```bash
@@ -19,30 +29,29 @@ The gate:
 - installs every package;
 - smoke-tests manifests and planned workflows from installed executables.
 
-## Docs and Worker gate
+## Docs gate
 
 Run:
 
 ```bash
 corepack pnpm install --frozen-lockfile
-corepack pnpm --dir site install --frozen-lockfile
-corepack pnpm --dir site check
+corepack pnpm docs:coverage
+corepack pnpm docs:build
 ```
 
-This syncs the public catalog, checks one-page-per-plugin documentation coverage,
-builds VitePress with dead-link enforcement, and dry-runs both Cloudflare Worker
-deployments.
+This checks catalog documentation coverage and builds VitePress with dead-link
+enforcement. Hosting and the visual catalog deploy from their owning systems,
+not this repository.
 
 ## Focused docs commands
 
 ```bash
-corepack pnpm --dir site docs:coverage
-corepack pnpm --dir site docs:build
-corepack pnpm --dir site docs:worker:dry-run
+corepack pnpm docs:coverage
+corepack pnpm docs:build
+corepack pnpm docs:preview
 ```
 
 ## Production proof
 
-A dry-run validates the bundle and configuration but does not prove DNS or live
-routing. After deployment, verify the docs root, a clean nested URL, search
-assets, and the `Content-Signal` response header on the public host.
+A successful local build proves the documentation artifact, not DNS or live
+routing. Deployment verification belongs to the docs-hosting owner.

@@ -7,6 +7,8 @@ import re
 from datetime import timezone
 from typing import cast
 
+import numpy as np
+
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_list, as_map
 
 from .bundle import (
@@ -26,6 +28,7 @@ from .constants import (
     S2_BANDS,
     TEMPORAL_ROLES,
 )
+from .external_types import FloatArray, StacAsset, StacCatalog, StacItem
 
 FLOOD_RECIPE_KIND = "mere.geo/terramind-flood-source-recipe"
 FIRE_RECIPE_KIND = "mere.geo/terramind-fire-source-recipe"
@@ -46,11 +49,9 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
             return existing
         raise GraphProviderError(f"output directory already contains a different bundle: {output_root}")
 
-    import numpy as np
     import planetary_computer as pc
     import pystac_client
     import rasterio
-    import zarr
     from rasterio.enums import Resampling
     from rasterio.transform import Affine
     from rasterio.vrt import WarpedVRT
@@ -64,7 +65,10 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
     target = as_map(recipe["target"], "target")
     aoi = cast(list[float], target["aoi"])
     crs = cast(str, target["crs"])
-    resolution = float(cast(int | float, target.get("resolution_m", 10)))
+    raw_resolution = target.get("resolution_m", 10)
+    if not isinstance(raw_resolution, (int, float)) or isinstance(raw_resolution, bool):
+        raise GraphProviderError("target resolution_m must be numeric")
+    resolution = float(raw_resolution)
     block_multiple = cast(int, target.get("block_multiple", 64))
     min_size = cast(int, target.get("minimum_size", 256))
     projected_bounds = transform_bounds("EPSG:4326", crs, *aoi, densify_pts=21)
@@ -72,13 +76,13 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
     transform = Affine(resolution, 0, left, 0, -resolution, top)
 
     endpoint = cast(str, recipe.get("stac_endpoint", "https://planetarycomputer.microsoft.com/api/stac/v1"))
-    unsigned_catalog = pystac_client.Client.open(endpoint)
-    signed_catalog = pystac_client.Client.open(endpoint, modifier=pc.sign_inplace)
+    unsigned_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint))
+    signed_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint, modifier=pc.sign_inplace))
     s2_stack = np.zeros((4, len(S2_BANDS), height, width), dtype=np.float32)
     s1_stack = np.zeros((4, len(S1_BANDS), height, width), dtype=np.float32)
     timestep_provenance: list[JsonMap] = []
 
-    def read_asset(href: str, resampling: object, nodata: float) -> object:
+    def read_asset(href: str, resampling: object, nodata: float) -> FloatArray:
         with (
             rasterio.open(href) as source,
             WarpedVRT(
@@ -92,7 +96,7 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
                 dtype="float32",
             ) as warped,
         ):
-            return warped.read(1, masked=True).filled(nodata).astype(np.float32)
+            return cast(FloatArray, warped.read(1, masked=True).filled(nodata).astype(np.float32))
 
     for index, raw_step in enumerate(as_list(recipe["timesteps"], "timesteps")):
         step = as_map(raw_step, "timestep")
@@ -105,18 +109,18 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
         for band_index, band in enumerate(S2_BANDS):
             unsigned_asset = s2_unsigned.assets[band]
             signed_asset = s2_signed.assets[band]
-            s2_stack[index, band_index] = cast(object, read_asset(signed_asset.href, Resampling.bilinear, 0.0))
+            s2_stack[index, band_index] = read_asset(signed_asset.href, Resampling.bilinear, 0.0)
             s2_assets.append(asset_provenance(band, unsigned_asset))
         for band_index, band in enumerate(S1_BANDS):
             unsigned_asset = s1_unsigned.assets[band]
             signed_asset = s1_signed.assets[band]
-            linear = cast(object, read_asset(signed_asset.href, Resampling.bilinear, float("nan")))
+            linear = read_asset(signed_asset.href, Resampling.bilinear, float("nan"))
             valid = np.isfinite(linear) & (linear > 0)
             db = np.zeros((height, width), dtype=np.float32)
             db[valid] = 10.0 * np.log10(linear[valid])
             s1_stack[index, band_index] = db
             s1_assets.append(asset_provenance(band, unsigned_asset))
-        scl = cast(object, read_asset(s2_signed.assets["SCL"].href, Resampling.nearest, 0.0))
+        scl = read_asset(s2_signed.assets["SCL"].href, Resampling.nearest, 0.0)
         invalid_classes = np.isin(scl.astype(np.uint8), [0, 1, 3, 8, 9, 10, 11])
         timestep_provenance.append(
             {
@@ -129,16 +133,16 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
 
     dem_spec = as_map(recipe["DEM"], "DEM source")
     dem_unsigned, dem_signed = paired_item(unsigned_catalog, signed_catalog, dem_spec)
-    dem = cast(object, read_asset(dem_signed.assets["data"].href, Resampling.bilinear, -9999.0))
+    dem = read_asset(dem_signed.assets["data"].href, Resampling.bilinear, -9999.0)
     dem = np.where(np.isfinite(dem), dem, -9999.0).astype(np.float32)[None, :, :]
 
     sample_id = cast(str, recipe["sample_id"])
     s2_path = output_root / "S2L2A" / f"{sample_id}_S2L2A.zarr.zip"
     s1_path = output_root / "S1RTC" / f"{sample_id}_S1RTC.zarr.zip"
     dem_path = output_root / "DEM" / f"{sample_id}_DEM.tif"
-    write_zarr(zarr, s2_path, s2_stack)
-    write_zarr(zarr, s1_path, s1_stack)
-    write_cog(rasterio, dem_path, dem, crs, transform, "float32", -9999.0)
+    write_zarr(s2_path, s2_stack)
+    write_zarr(s1_path, s1_stack)
+    write_cog(dem_path, dem, crs, transform, "float32", -9999.0)
 
     artifact_paths = {"S2L2A": s2_path, "S1RTC": s1_path, "DEM": dem_path}
     artifacts: JsonMap = {}
@@ -188,8 +192,9 @@ def validate_recipe(recipe: JsonMap) -> None:
     aoi = as_list(target.get("aoi"), "target.aoi")
     if len(aoi) != 4 or any(not isinstance(value, (int, float)) for value in aoi):
         raise GraphProviderError("target.aoi must be [west,south,east,north]")
-    west, south, east, north = cast(list[float], aoi)
-    if not all(math.isfinite(value) for value in aoi) or not (
+    numeric_aoi = cast(list[float], aoi)
+    west, south, east, north = numeric_aoi
+    if not all(math.isfinite(value) for value in numeric_aoi) or not (
         -180 <= west < east <= 180 and -90 <= south < north <= 90
     ):
         raise GraphProviderError("target.aoi must be finite ordered WGS84 bounds")
@@ -227,11 +232,15 @@ def validate_item_spec(spec: JsonMap) -> None:
             raise GraphProviderError(f"source item {field} is required")
 
 
-def paired_item(unsigned_catalog: object, signed_catalog: object, spec: JsonMap) -> tuple[object, object]:
+def paired_item(unsigned_catalog: StacCatalog, signed_catalog: StacCatalog, spec: JsonMap) -> tuple[StacItem, StacItem]:
     collection_id = cast(str, spec["collection"])
     item_id = cast(str, spec["item"])
-    unsigned = unsigned_catalog.get_collection(collection_id).get_item(item_id)
-    signed = signed_catalog.get_collection(collection_id).get_item(item_id)
+    unsigned_collection = unsigned_catalog.get_collection(collection_id)
+    signed_collection = signed_catalog.get_collection(collection_id)
+    if unsigned_collection is None or signed_collection is None:
+        raise GraphProviderError(f"STAC collection is unavailable: {collection_id}")
+    unsigned = unsigned_collection.get_item(item_id)
+    signed = signed_collection.get_item(item_id)
     if unsigned is None or signed is None:
         raise GraphProviderError(f"STAC item is unavailable: {collection_id}/{item_id}")
     return unsigned, signed
@@ -252,8 +261,8 @@ def aligned_grid(
     return left, bottom, right, top, width, height
 
 
-def asset_provenance(name: str, asset: object) -> JsonMap:
-    extra = cast(JsonMap, asset.extra_fields)
+def asset_provenance(name: str, asset: StacAsset) -> JsonMap:
+    extra = dict(asset.extra_fields)
     value: JsonMap = {"name": name, "href": str(asset.href).split("?", 1)[0]}
     for key in ["file:size", "file:checksum"]:
         if key in extra:
@@ -261,7 +270,7 @@ def asset_provenance(name: str, asset: object) -> JsonMap:
     return value
 
 
-def item_provenance(item: object, assets: list[JsonMap]) -> JsonMap:
+def item_provenance(item: StacItem, assets: list[JsonMap]) -> JsonMap:
     observed = item.datetime
     return {
         "collection": item.collection_id,
@@ -271,10 +280,12 @@ def item_provenance(item: object, assets: list[JsonMap]) -> JsonMap:
     }
 
 
-def write_zarr(zarr_module: object, path: pathlib.Path, array: object) -> None:
-    store = zarr_module.ZipStore(str(path), mode="w")
+def write_zarr(path: pathlib.Path, array: FloatArray) -> None:
+    import zarr
+
+    store = zarr.ZipStore(str(path), mode="w")
     try:
-        group = zarr_module.group(store=store)
+        group = zarr.group(store=store)
         height, width = array.shape[-2:]
         group.create_dataset(
             "bands",
@@ -282,21 +293,22 @@ def write_zarr(zarr_module: object, path: pathlib.Path, array: object) -> None:
             chunks=(1, 1, min(256, height), min(256, width)),
             overwrite=True,
         )
-        zarr_module.consolidate_metadata(store)
+        zarr.consolidate_metadata(store)
     finally:
         store.close()
 
 
 def write_cog(
-    rasterio_module: object,
     path: pathlib.Path,
-    array: object,
+    array: FloatArray,
     crs: str,
     transform: object,
     dtype: str,
     nodata: float | int,
 ) -> None:
-    with rasterio_module.open(
+    import rasterio
+
+    with rasterio.open(
         path,
         "w",
         driver="COG",

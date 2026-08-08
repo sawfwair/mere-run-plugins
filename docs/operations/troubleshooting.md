@@ -51,7 +51,8 @@ The docs build deliberately fails on dead internal links. Fix the destination or
 the source link; do not add it to an ignore list unless the target is genuinely
 external and unresolvable at build time.
 
-## Docs Worker dry-run fails
+## Docs build fails
 
-Run `corepack pnpm --dir site docs:build` first, then check
-`site/wrangler.docs.jsonc` and the generated `docs/.vitepress/dist` directory.
+Run `corepack pnpm docs:coverage` and `corepack pnpm docs:build`, then fix the
+reported catalog mapping or VitePress source. Hosting failures belong to the
+separately owned deployment system; this repo has no Worker configuration.

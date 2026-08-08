@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import tempfile
 import unittest
@@ -185,7 +186,10 @@ class MereAnimaticToolsTests(unittest.TestCase):
             self.assertEqual(labels[0], "usd-set-proxy")
             self.assertIn("set-proxy-manifest", labels)
 
-    @unittest.skipUnless(cli.set_proxy.blender_binary(), "Blender is not installed")
+    @unittest.skipUnless(
+        os.environ.get("MERE_RUN_BLENDER_INTEGRATION") == "1" and cli.set_proxy.blender_binary(),
+        "set MERE_RUN_BLENDER_INTEGRATION=1 to run the installed Blender integration",
+    )
     def test_render_set_plate_creates_editable_scene_and_camera_plate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)

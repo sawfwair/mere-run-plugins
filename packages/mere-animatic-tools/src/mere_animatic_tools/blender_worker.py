@@ -5,11 +5,33 @@ import math
 import pathlib
 import re
 import sys
+from typing import Protocol, cast
 
 import bpy
 
 JsonMap = dict[str, object]
 Vector3 = tuple[float, float, float]
+
+
+class MaterialCollection(Protocol):
+    def append(self, value: object) -> None: ...
+
+
+class MaterialData(Protocol):
+    materials: MaterialCollection
+
+
+class BlenderMaterialObject(Protocol):
+    name: str
+    data: MaterialData
+
+
+class BlenderObject(Protocol):
+    name: str
+    location: Vector3
+    rotation_euler: Vector3
+
+    def __setitem__(self, key: str, value: object) -> None: ...
 
 
 def mapping(value: object) -> JsonMap:
@@ -20,12 +42,27 @@ def items(value: object) -> list[object]:
     return value if isinstance(value, list) else []
 
 
+def float_value(value: object, fallback: float | None = None) -> float:
+    if isinstance(value, (int, float, str)):
+        return float(value)
+    if fallback is not None:
+        return fallback
+    raise ValueError(f"expected a numeric value, got {type(value).__name__}")
+
+
+def int_value(value: object) -> int:
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    raise ValueError(f"expected an integer value, got {type(value).__name__}")
+
+
 def vector(value: object, fallback: Vector3 = (0.0, 0.0, 0.0)) -> Vector3:
     if not isinstance(value, list):
         return fallback
-    return tuple(
-        float(value[index]) if index < len(value) else fallback[index]
-        for index in range(3)
+    return (
+        float_value(value[0]) if len(value) > 0 else fallback[0],
+        float_value(value[1]) if len(value) > 1 else fallback[1],
+        float_value(value[2]) if len(value) > 2 else fallback[2],
     )
 
 
@@ -33,7 +70,7 @@ def safe_name(value: object, fallback: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "-", str(value or fallback)).strip("-")[:80] or fallback
 
 
-def add_material(obj: object, color: object) -> None:
+def add_material(obj: BlenderMaterialObject, color: object) -> None:
     rgb = vector(color, (0.5, 0.5, 0.5))
     material = bpy.data.materials.new(name=f"{obj.name}_Material")
     material.diffuse_color = (*rgb, 1.0)
@@ -48,13 +85,13 @@ def add_box(item: JsonMap, index: int) -> None:
     obj.name = safe_name(item.get("name"), f"Box_{index + 1}")
     obj.scale = tuple(component / 2.0 for component in size)
     obj["animatic_role"] = str(item.get("role") or "set_piece")
-    add_material(obj, item.get("displayColor") or [0.5, 0.5, 0.5])
+    add_material(cast(BlenderMaterialObject, obj), item.get("displayColor") or [0.5, 0.5, 0.5])
 
 
 def add_mesh(item: JsonMap, index: int) -> None:
     points = [vector(value) for value in items(item.get("points"))]
-    counts = [max(3, int(value)) for value in items(item.get("faceVertexCounts"))]
-    indices = [max(0, int(value)) for value in items(item.get("faceVertexIndices"))]
+    counts = [max(3, int_value(value)) for value in items(item.get("faceVertexCounts"))]
+    indices = [max(0, int_value(value)) for value in items(item.get("faceVertexIndices"))]
     faces: list[list[int]] = []
     offset = 0
     for count in counts:
@@ -71,41 +108,45 @@ def add_mesh(item: JsonMap, index: int) -> None:
     obj = bpy.data.objects.new(name, mesh_data)
     bpy.context.collection.objects.link(obj)
     obj["animatic_role"] = str(item.get("role") or "set_piece")
-    add_material(obj, item.get("displayColor") or [0.5, 0.5, 0.5])
+    add_material(cast(BlenderMaterialObject, obj), item.get("displayColor") or [0.5, 0.5, 0.5])
 
 
-def add_camera(item: JsonMap, index: int) -> object:
+def add_camera(item: JsonMap, index: int) -> BlenderObject:
     camera_data = bpy.data.cameras.new(safe_name(item.get("name"), f"Camera_{index + 1}"))
-    camera_data.lens = float(item.get("focalLength") or 35.0)
+    camera_data.lens = float_value(item.get("focalLength"), 35.0)
     camera = bpy.data.objects.new(camera_data.name, camera_data)
     bpy.context.collection.objects.link(camera)
     transform = mapping(item.get("transform"))
     camera.location = vector(transform.get("translate"), (0.0, -8.0, 3.0))
-    pitch = math.radians(float(transform.get("rotate_x_degrees") or 68.0))
-    yaw = math.radians(float(transform.get("rotate_y_degrees") or 0.0))
-    roll = math.radians(float(transform.get("rotate_z_degrees") or 0.0))
+    pitch = math.radians(float_value(transform.get("rotate_x_degrees"), 68.0))
+    yaw = math.radians(float_value(transform.get("rotate_y_degrees"), 0.0))
+    roll = math.radians(float_value(transform.get("rotate_z_degrees"), 0.0))
     camera.rotation_euler = (pitch, roll, yaw)
     camera["animatic_label"] = str(item.get("label") or camera.name)
-    return camera
+    return cast(BlenderObject, camera)
 
 
 def add_light(item: JsonMap, index: int) -> None:
     kind = "SUN" if str(item.get("type") or "sun").lower() in {"sun", "distant"} else "AREA"
     light_data = bpy.data.lights.new(safe_name(item.get("name"), f"Light_{index + 1}"), type=kind)
-    light_data.energy = float(item.get("intensity") or (3.0 if kind == "SUN" else 800.0))
+    light_data.energy = float_value(item.get("intensity"), 3.0 if kind == "SUN" else 800.0)
     light_data.color = vector(item.get("color"), (1.0, 0.96, 0.88))
     light = bpy.data.objects.new(light_data.name, light_data)
     bpy.context.collection.objects.link(light)
     transform = mapping(item.get("transform"))
     light.location = vector(transform.get("translate") or item.get("position"), (4.0, -4.0, 6.0))
-    light.rotation_euler = (math.radians(35.0), 0.0, math.radians(float(transform.get("rotate_y_degrees") or -35.0)))
+    light.rotation_euler = (
+        math.radians(35.0),
+        0.0,
+        math.radians(float_value(transform.get("rotate_y_degrees"), -35.0)),
+    )
 
 
 def main() -> None:
     args = sys.argv[sys.argv.index("--") + 1:]
     spec_path, output_value, action = args
     output_dir = pathlib.Path(output_value)
-    spec = json.loads(pathlib.Path(spec_path).read_text())
+    spec = mapping(json.loads(pathlib.Path(spec_path).read_text()))
     geometry = mapping(spec.get("geometry"))
     boxes = items(spec.get("boxes") or geometry.get("boxes"))
     meshes = items(spec.get("meshes") or geometry.get("meshes"))
@@ -124,8 +165,8 @@ def main() -> None:
     except TypeError:
         scene.render.engine = "BLENDER_EEVEE"
     settings = mapping(spec.get("renderSettings"))
-    scene.render.resolution_x = int(settings.get("width") or 1280)
-    scene.render.resolution_y = int(settings.get("height") or 720)
+    scene.render.resolution_x = int_value(settings.get("width") or 1280)
+    scene.render.resolution_y = int_value(settings.get("height") or 720)
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
 

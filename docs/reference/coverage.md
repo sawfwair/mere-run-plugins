@@ -13,7 +13,7 @@ This site covers every public product surface in the repository.
 | Evaluations | `contracts/eval-recipe.v1.schema.json` | [Klein reference evaluations](/recipes/klein-reference-evals) |
 | Provider safety | implementations and repository rules | [Provider safety](/operations/provider-safety) |
 | Repository validation | `scripts/check.sh` | [Testing](/operations/testing) |
-| Docs hosting | `site/wrangler.docs.jsonc` | [Releasing](/operations/releasing) |
+| Docs build and release handoff | `package.json`, `docs/.vitepress/dist/` | [Releasing](/operations/releasing) |
 
 `pnpm docs:coverage` verifies that each live catalog ID maps to a dedicated page
 and that every contract schema is represented in this reference.

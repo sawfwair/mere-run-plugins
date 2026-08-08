@@ -2,7 +2,7 @@ repos:
   - repo: local
     hooks:
       - id: check
-        name: repo readiness gate
-        entry: ./scripts/check.sh
+        name: fast repo readiness gate
+        entry: ./scripts/check-fast.sh
         language: system
         pass_filenames: false
