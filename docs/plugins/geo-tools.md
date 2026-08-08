@@ -1,9 +1,15 @@
 # Geospatial Tools
 
-`mere-geo-tools` exposes typed, provenance-preserving geospatial nodes to
-portable `mere.run` graphs. Its first node, `geo.flood.segment`, runs the pinned
-`ibm-esa-geospatial/TerraMind-base-Flood` checkpoint against a canonical
-four-timestep Sentinel-1 and Sentinel-2 bundle.
+`mere-geo-tools` is the portable workflow layer around core `mere.run` geo
+models. It prepares exact source imagery, preserves raster and preprocessing
+provenance, invokes native Swift/MLX inference, and georeferences the result.
+
+| Node | Inputs | Outputs |
+| --- | --- | --- |
+| `geo.flood.segment` | Four S2 L2A, S1 RTC, and DEM timesteps | Candidate mask, probability COG, preview, manifest |
+| `geo.fire.segment` | Four S2 L2A, S1 RTC, and DEM timesteps | Candidate mask, probability COG, preview, manifest |
+| `geo.tessera.embed` | Annual S2 plus ascending or descending S1 histories | Per-pixel embedding safetensors and manifest |
+| `geo.olmoearth.embed` | One to twelve S2, S1, or Landsat observations | Per-modality spatial embedding safetensors and manifest |
 
 ## Install and inspect
 
@@ -17,30 +23,99 @@ mere-graph-conformance --provider mere-geo-tools --json
 
 ## Prepare pinned inputs
 
-Materialize a source recipe before running the graph node:
+All recipes declare WGS84 bounds and the target WGS84 UTM grid. Sources are
+exact STAC collection/item pairs; preparation never silently searches for a
+different scene.
 
-```bash
-mere-geo-tools prepare \
-  --recipe ./terramind-flood-sources.json \
-  --output ./flood-inputs \
-  --json
+Hazard recipes use four ordered roles and differ only in their typed kind:
+
+```json
+{
+  "kind": "mere.geo/terramind-fire-source-recipe",
+  "version": 1,
+  "sample_id": "fire-review-001",
+  "target": {"aoi": [-123.3, 49.1, -123.2, 49.2], "crs": "EPSG:32610"},
+  "timesteps": [
+    {"role": "pre_month", "S2L2A": {"collection": "sentinel-2-l2a", "item": "..."}, "S1RTC": {"collection": "sentinel-1-rtc", "item": "..."}},
+    {"role": "pre_event", "S2L2A": {"collection": "sentinel-2-l2a", "item": "..."}, "S1RTC": {"collection": "sentinel-1-rtc", "item": "..."}},
+    {"role": "event", "S2L2A": {"collection": "sentinel-2-l2a", "item": "..."}, "S1RTC": {"collection": "sentinel-1-rtc", "item": "..."}},
+    {"role": "post_event", "S2L2A": {"collection": "sentinel-2-l2a", "item": "..."}, "S1RTC": {"collection": "sentinel-1-rtc", "item": "..."}}
+  ],
+  "DEM": {"collection": "cop-dem-glo-30", "item": "..."}
+}
 ```
 
-The prepared bundle records canonical STAC item and asset identities, temporal
-roles, grid metadata, and SHA-256 hashes for every materialized input. The graph
-output manifest pins the Hugging Face repository revision and model checkpoint
-hash.
+TESSERA keeps independent S2, ascending S1, and descending S1 timelines:
 
-## Execution boundary
+```json
+{
+  "kind": "mere.geo/tessera-v2-source-recipe",
+  "version": 1,
+  "sample_id": "annual-context-001",
+  "target": {"aoi": [-123.3, 49.1, -123.2, 49.2], "crs": "EPSG:32610"},
+  "observations": {
+    "S2": [{"collection": "sentinel-2-l2a", "item": "..."}],
+    "S1_ASC": [{"collection": "sentinel-1-rtc", "item": "..."}],
+    "S1_DESC": [{"collection": "sentinel-1-rtc", "item": "..."}]
+  }
+}
+```
 
-The provider can share a local graph with native Metal nodes, but TerraTorch's
-temporal UNet decoder does not execute through MPS. `auto` selects CPU on macOS;
-an explicit `mps` request fails preflight. Relay GPU execution requires the
-target fleet to have the same `mere-geo-tools` provider installed.
+OlmoEarth uses a shared timeline; every timestep must contain the same selected
+modalities:
 
-## Evidence boundary
+```json
+{
+  "kind": "mere.geo/olmoearth-v1.2-source-recipe",
+  "version": 1,
+  "sample_id": "multisensor-context-001",
+  "target": {"aoi": [-123.3, 49.1, -123.2, 49.2], "crs": "EPSG:32610"},
+  "timesteps": [
+    {
+      "observed_at": "2026-06-15T10:00:00Z",
+      "S2L2A": {"collection": "sentinel-2-l2a", "item": "..."},
+      "S1RTC": {"collection": "sentinel-1-rtc", "item": "..."}
+    }
+  ]
+}
+```
 
-Flood masks and probabilities are emitted as Cloud Optimized GeoTIFFs and are
-always labeled `candidate-only`. Downstream analyst workflows must compare them
-with independent observations before promoting any area to evidence or a final
-finding.
+Sentinel-2 L2A and Sentinel-1 RTC recipes use their canonical STAC asset names
+and are exercised against the Planetary Computer catalog. Landsat is deliberately
+fail-closed: OlmoEarth expects raw unsigned 16-bit OLI/TIRS Level-1 DN values in
+the canonical `B8, B1, B2, B3, B4, B5, B6, B7, B9, B10, B11` order. Every
+Landsat item must declare `source_contract` as
+`landsat-oli-tirs-level1-dn-v1` and provide an explicit `assets` map for all
+eleven bands. Planetary Computer's `landsat-c2-l2` collection is not compatible
+because it lacks the required tensor and has different radiometry.
+
+Prepare and inspect any recipe with the same commands:
+
+```bash
+mere-geo-tools prepare --recipe ./sources.json --output ./prepared-inputs --json
+mere-geo-tools inspect ./prepared-inputs --json
+```
+
+Each bundle records source item/asset identities, acquisition times, canonical
+band order, cloud-mask or radar conversion policy, grid metadata, and SHA-256
+hashes for every materialized input.
+
+## Hardware scaling
+
+Leaving `model` as `auto` delegates tier selection to core `mere.run` based on
+unified memory and installed checkpoints. Graphs may explicitly select every
+managed tier, including TESSERA Teacher and OlmoEarth Base. TESSERA's
+`batch_pixels` can be increased on larger machines. OlmoEarth exposes
+`patch_size`, `input_resolution`, and `include_tokens`; smaller patches and full
+tokens preserve more detail and consume more memory.
+
+The neural commands are `mere.run geo flood`, `geo fire`, `geo tessera`, and
+`geo olmoearth`. There is no PyTorch fallback in this provider.
+
+## Evidence and license boundaries
+
+Flood and fire masks remain `candidate-only` until independently corroborated
+and reviewed. TESSERA and OlmoEarth outputs are `derived-feature` artifacts, not
+findings. OlmoEarth use remains subject to its upstream artifact license and its
+restrictions on military, defense, intelligence, human-surveillance, policing,
+and listed extractive uses.

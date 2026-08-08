@@ -19,7 +19,7 @@ def plugin_manifest() -> JsonMap:
     commands = [
         {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
         {"name": "doctor", "description": "Check geospatial and model runtime readiness.", "stdout": "json"},
-        {"name": "prepare", "description": "Prepare an ImpactMesh-compatible input bundle.", "stdout": "json"},
+        {"name": "prepare", "description": "Prepare a typed geospatial input bundle from pinned STAC items.", "stdout": "json"},
         {"name": "inspect", "description": "Validate and inspect a prepared input bundle.", "stdout": "json"},
         {
             "name": "compare",
@@ -33,11 +33,18 @@ def plugin_manifest() -> JsonMap:
         "name": PROVIDER_ID,
         "version": __version__,
         "executable": PROVIDER_ID,
-        "description": "Pinned geospatial candidate models with content-addressed raster provenance.",
+        "description": "Humanitarian geospatial candidates and embeddings with content-addressed raster provenance.",
         "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-geo-tools",
         "graphProvider": {"contractVersion": "mere.run/plugin-graph-provider.v1"},
         "commands": commands,
-        "capabilities": ["geospatial", "flood-segmentation", "graph-node-provider-v1", "provenance"],
+        "capabilities": [
+            "geospatial",
+            "flood-segmentation",
+            "fire-segmentation",
+            "earth-observation-embeddings",
+            "graph-node-provider-v1",
+            "provenance",
+        ],
         "stdout": {"machineReadableByDefault": True, "diagnostics": "stderr"},
         "security": {
             "usesUserCredentials": False,
@@ -64,6 +71,12 @@ def doctor_report() -> JsonMap:
         "native_runtime": {
             "executable": executable,
             "command": "mere.run geo flood",
+            "commands": [
+                "mere.run geo flood",
+                "mere.run geo fire",
+                "mere.run geo tessera",
+                "mere.run geo olmoearth",
+            ],
             "accelerator": "metal",
         },
     }
@@ -110,9 +123,18 @@ def main() -> int:
             print_json(report)
             return 0 if report["status"] == "ready" else 2
         elif args.command == "prepare":
-            from .prepare import prepare_bundle
+            recipe = cast(JsonMap, json.loads(args.recipe.read_text()))
+            if recipe.get("kind") in {
+                "mere.geo/tessera-v2-source-recipe",
+                "mere.geo/olmoearth-v1.2-source-recipe",
+            }:
+                from .prepare_embeddings import prepare_embedding_bundle
 
-            print_json(prepare_bundle(args.recipe, args.output))
+                print_json(prepare_embedding_bundle(args.recipe, args.output))
+            else:
+                from .prepare import prepare_bundle
+
+                print_json(prepare_bundle(args.recipe, args.output))
         elif args.command == "inspect":
             print_json(load_bundle(args.bundle))
         elif args.command == "compare":

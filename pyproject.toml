@@ -78,7 +78,12 @@ module = "mere_animatic_tools.blender_worker"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ["mere_geo_tools.prepare", "mere_geo_tools.runtime"]
+module = [
+  "mere_geo_tools.prepare",
+  "mere_geo_tools.prepare_embeddings",
+  "mere_geo_tools.runtime",
+  "mere_geo_tools.embedding_runtime",
+]
 ignore_errors = true
 
 [tool.coverage.run]
@@ -110,5 +115,7 @@ omit = [
   "*/transcript_cli.py",
   "*/mere_geo_tools/cli.py",
   "*/mere_geo_tools/prepare.py",
+  "*/mere_geo_tools/prepare_embeddings.py",
   "*/mere_geo_tools/runtime.py",
+  "*/mere_geo_tools/embedding_runtime.py",
 ]

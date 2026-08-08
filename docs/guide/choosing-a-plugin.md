@@ -4,7 +4,7 @@ Start from the outcome, not the model.
 
 | I need to… | Use | Why |
 | --- | --- | --- |
-| Run a pinned flood-candidate model with raster provenance | [`mere-geo-tools`](/plugins/geo-tools) | Typed graph inputs, content-addressed rasters, pinned model identity, and candidate-only outputs |
+| Segment flood/fire candidates or create Earth-observation embeddings | [`mere-geo-tools`](/plugins/geo-tools) | Typed STAC inputs, content-addressed rasters, hardware-scaled native models, and explicit evidence boundaries |
 | Index a photo library or find photos of the same person | [`mere-face-tools`](/plugins/face-tools) | Resumable local indexing, similarity search, and review exports without changing source photos |
 | Roto, key, track, relight, restore, extend, or reconstruct a shot | [`mere-vfx-tools`](/plugins/vfx-tools) | Shot-oriented workflows and verified production handoffs |
 | Cut a subject out of a still | [`mere-image-tools`](/plugins/image-tools) | Focused SAM 3.1 knockout and matte cleanup |

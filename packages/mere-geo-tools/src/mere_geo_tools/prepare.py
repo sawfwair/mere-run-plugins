@@ -9,8 +9,26 @@ from typing import cast
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_list, as_map
 
-from .bundle import BUNDLE_KIND, BUNDLE_VERSION, canonical_digest, load_bundle, sha256_file
-from .constants import MODEL_ID, MODEL_REVISION, S1_BANDS, S2_BANDS, TEMPORAL_ROLES
+from .bundle import (
+    BUNDLE_VERSION,
+    FIRE_BUNDLE_KIND,
+    FLOOD_BUNDLE_KIND,
+    canonical_digest,
+    load_bundle,
+    sha256_file,
+)
+from .constants import (
+    FIRE_MODEL_ID,
+    FIRE_MODEL_REVISION,
+    MODEL_ID,
+    MODEL_REVISION,
+    S1_BANDS,
+    S2_BANDS,
+    TEMPORAL_ROLES,
+)
+
+FLOOD_RECIPE_KIND = "mere.geo/terramind-flood-source-recipe"
+FIRE_RECIPE_KIND = "mere.geo/terramind-fire-source-recipe"
 
 
 def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> JsonMap:
@@ -20,6 +38,8 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
     except json.JSONDecodeError as exc:
         raise GraphProviderError(f"invalid preparation recipe JSON: {exc}") from None
     validate_recipe(recipe)
+    recipe_kind = cast(str, recipe["kind"])
+    bundle_kind, model_id, model_revision = hazard_contract(recipe_kind)
     if output_root.exists() and any(output_root.iterdir()):
         existing = load_bundle(output_root)
         if existing.get("source_recipe_sha256") == sha256_bytes(recipe_bytes):
@@ -130,11 +150,11 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
         digest_entries.append({"name": name, "path": relative, "sha256": digest})
 
     manifest: JsonMap = {
-        "kind": BUNDLE_KIND,
+        "kind": bundle_kind,
         "version": BUNDLE_VERSION,
         "sample_id": sample_id,
         "source_recipe_sha256": sha256_bytes(recipe_bytes),
-        "model": {"id": MODEL_ID, "revision": MODEL_REVISION},
+        "model": {"id": model_id, "revision": model_revision},
         "aoi": {"bounds_wgs84": aoi},
         "grid": {
             "crs": crs,
@@ -160,8 +180,8 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
 
 
 def validate_recipe(recipe: JsonMap) -> None:
-    if recipe.get("kind") != "mere.geo/terramind-flood-source-recipe" or recipe.get("version") != 1:
-        raise GraphProviderError("unsupported TerraMind flood source recipe")
+    if recipe.get("kind") not in {FLOOD_RECIPE_KIND, FIRE_RECIPE_KIND} or recipe.get("version") != 1:
+        raise GraphProviderError("unsupported TerraMind hazard source recipe")
     if not isinstance(recipe.get("sample_id"), str):
         raise GraphProviderError("source recipe sample_id is required")
     target = as_map(recipe.get("target"), "target")
@@ -191,6 +211,14 @@ def validate_recipe(recipe: JsonMap) -> None:
         for modality in ["S2L2A", "S1RTC"]:
             validate_item_spec(as_map(step.get(modality), modality))
     validate_item_spec(as_map(recipe.get("DEM"), "DEM"))
+
+
+def hazard_contract(recipe_kind: str) -> tuple[str, str, str]:
+    if recipe_kind == FLOOD_RECIPE_KIND:
+        return FLOOD_BUNDLE_KIND, MODEL_ID, MODEL_REVISION
+    if recipe_kind == FIRE_RECIPE_KIND:
+        return FIRE_BUNDLE_KIND, FIRE_MODEL_ID, FIRE_MODEL_REVISION
+    raise GraphProviderError(f"unsupported TerraMind hazard source recipe: {recipe_kind}")
 
 
 def validate_item_spec(spec: JsonMap) -> None:

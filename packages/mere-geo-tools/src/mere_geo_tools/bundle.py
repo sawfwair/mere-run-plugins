@@ -3,13 +3,35 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+from collections.abc import Iterable
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_list, as_map
 
-from .constants import MODEL_ID, MODEL_REVISION, S1_BANDS, S2_BANDS, TEMPORAL_ROLES
+from .constants import (
+    FIRE_MODEL_ID,
+    FIRE_MODEL_REVISION,
+    MODEL_ID,
+    MODEL_REVISION,
+    OLMOEARTH_LANDSAT_BANDS,
+    OLMOEARTH_S2_BANDS,
+    S1_BANDS,
+    S2_BANDS,
+    TEMPORAL_ROLES,
+    TESSERA_S2_BANDS,
+)
 
-BUNDLE_KIND = "mere.geo/terramind-flood-input"
+FLOOD_BUNDLE_KIND = "mere.geo/terramind-flood-input"
+FIRE_BUNDLE_KIND = "mere.geo/terramind-fire-input"
+TESSERA_BUNDLE_KIND = "mere.geo/tessera-v2-input"
+OLMOEARTH_BUNDLE_KIND = "mere.geo/olmoearth-v1.2-input"
+BUNDLE_KIND = FLOOD_BUNDLE_KIND  # Backwards-compatible public name.
 BUNDLE_VERSION = 1
+SUPPORTED_BUNDLE_KINDS = {
+    FLOOD_BUNDLE_KIND,
+    FIRE_BUNDLE_KIND,
+    TESSERA_BUNDLE_KIND,
+    OLMOEARTH_BUNDLE_KIND,
+}
 
 
 def sha256_file(path: pathlib.Path) -> str:
@@ -25,7 +47,11 @@ def canonical_digest(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def load_bundle(root: pathlib.Path, verify_hashes: bool = True) -> JsonMap:
+def load_bundle(
+    root: pathlib.Path,
+    verify_hashes: bool = True,
+    expected_kinds: Iterable[str] | None = None,
+) -> JsonMap:
     manifest_path = root / "manifest.json"
     if not root.is_dir():
         raise GraphProviderError(f"input bundle is not a directory: {root}")
@@ -35,25 +61,65 @@ def load_bundle(root: pathlib.Path, verify_hashes: bool = True) -> JsonMap:
         manifest = as_map(json.loads(manifest_path.read_text()), "input bundle manifest")
     except json.JSONDecodeError as exc:
         raise GraphProviderError(f"invalid input bundle manifest JSON: {exc}") from None
-    validate_bundle(manifest, root, verify_hashes)
+    validate_bundle(manifest, root, verify_hashes, expected_kinds)
     return manifest
 
 
-def validate_bundle(manifest: JsonMap, root: pathlib.Path, verify_hashes: bool = True) -> None:
-    if manifest.get("kind") != BUNDLE_KIND or manifest.get("version") != BUNDLE_VERSION:
-        raise GraphProviderError("unsupported TerraMind flood input bundle contract")
-    model = as_map(manifest.get("model"), "input bundle model")
-    if model.get("id") != MODEL_ID or model.get("revision") != MODEL_REVISION:
-        raise GraphProviderError("input bundle is not pinned to the supported TerraMind flood checkpoint")
+def validate_bundle(
+    manifest: JsonMap,
+    root: pathlib.Path,
+    verify_hashes: bool = True,
+    expected_kinds: Iterable[str] | None = None,
+) -> None:
+    kind = manifest.get("kind")
+    if kind not in SUPPORTED_BUNDLE_KINDS or manifest.get("version") != BUNDLE_VERSION:
+        raise GraphProviderError("unsupported geospatial input bundle contract")
+    if expected_kinds is not None and kind not in set(expected_kinds):
+        raise GraphProviderError(f"input bundle kind {kind} is not accepted by this node")
+
+    grid = validate_grid(manifest)
+    if kind in {FLOOD_BUNDLE_KIND, FIRE_BUNDLE_KIND}:
+        validate_hazard_bundle(manifest, grid, cast_kind(kind))
+    elif kind == TESSERA_BUNDLE_KIND:
+        validate_tessera_bundle(manifest, grid)
+    else:
+        validate_olmoearth_bundle(manifest, grid)
+    validate_artifacts(manifest, root, verify_hashes)
+
+
+def cast_kind(value: object) -> str:
+    if not isinstance(value, str):
+        raise GraphProviderError("input bundle kind must be a string")
+    return value
+
+
+def validate_grid(manifest: JsonMap) -> JsonMap:
     grid = as_map(manifest.get("grid"), "input bundle grid")
     for field in ["crs", "transform", "width", "height", "resolution_m"]:
         if field not in grid:
             raise GraphProviderError(f"input bundle grid is missing {field}")
     if not isinstance(grid["width"], int) or not isinstance(grid["height"], int):
         raise GraphProviderError("input bundle grid dimensions must be integers")
-    if grid["width"] < 256 or grid["height"] < 256:
-        raise GraphProviderError("input bundle grid must be at least 256 by 256 pixels")
+    if grid["width"] < 1 or grid["height"] < 1:
+        raise GraphProviderError("input bundle grid dimensions must be positive")
+    return grid
 
+
+def validate_hazard_bundle(manifest: JsonMap, grid: JsonMap, kind: str) -> None:
+    width = grid["width"]
+    height = grid["height"]
+    if not isinstance(width, int) or not isinstance(height, int):
+        raise GraphProviderError("input bundle grid dimensions must be integers")
+    if width < 256 or height < 256:
+        raise GraphProviderError("TerraMind input bundle grid must be at least 256 by 256 pixels")
+    expected_model = (
+        (MODEL_ID, MODEL_REVISION)
+        if kind == FLOOD_BUNDLE_KIND
+        else (FIRE_MODEL_ID, FIRE_MODEL_REVISION)
+    )
+    model = as_map(manifest.get("model"), "input bundle model")
+    if (model.get("id"), model.get("revision")) != expected_model:
+        raise GraphProviderError("input bundle is not pinned to the supported TerraMind checkpoint")
     timesteps = as_list(manifest.get("timesteps"), "input bundle timesteps")
     roles = [as_map(item, "input bundle timestep").get("role") for item in timesteps]
     if roles != TEMPORAL_ROLES:
@@ -70,9 +136,91 @@ def validate_bundle(manifest: JsonMap, root: pathlib.Path, verify_hashes: bool =
     if dem.get("shape") != [1, grid["height"], grid["width"]]:
         raise GraphProviderError("DEM must be [1,H,W] and is repeated by the runtime")
 
+
+def validate_tessera_bundle(manifest: JsonMap, grid: JsonMap) -> None:
+    modalities = as_map(manifest.get("modalities"), "input bundle modalities")
+    s2 = as_map(modalities.get("S2"), "S2 modality")
+    s2_count = validate_temporal_modality(s2, "S2", 10, TESSERA_S2_BANDS, grid)
+    if s2_count > 256:
+        raise GraphProviderError("TESSERA supports at most 256 Sentinel-2 observations")
+    if s2.get("doy") != manifest.get("S2_DOY"):
+        raise GraphProviderError("TESSERA S2 day-of-year inventory is inconsistent")
+    radar_count = 0
+    for name in ["S1_ASC", "S1_DESC"]:
+        value = modalities.get(name)
+        if value is None:
+            continue
+        modality = as_map(value, f"{name} modality")
+        count = validate_temporal_modality(modality, name, 2, S1_BANDS, grid)
+        if modality.get("doy") != manifest.get(f"{name}_DOY"):
+            raise GraphProviderError(f"TESSERA {name} day-of-year inventory is inconsistent")
+        radar_count += count
+    if radar_count == 0:
+        raise GraphProviderError("TESSERA requires S1_ASC or S1_DESC observations")
+
+
+def validate_olmoearth_bundle(manifest: JsonMap, grid: JsonMap) -> None:
+    timestamps = as_list(manifest.get("timestamps"), "OlmoEarth timestamps")
+    if not timestamps or len(timestamps) > 12:
+        raise GraphProviderError("OlmoEarth requires between 1 and 12 timestamps")
+    for value in timestamps:
+        if (
+            not isinstance(value, list)
+            or len(value) != 3
+            or any(not isinstance(component, int) for component in value)
+        ):
+            raise GraphProviderError("OlmoEarth timestamps must be [day,zero-indexed-month,year]")
+    modalities = as_map(manifest.get("modalities"), "input bundle modalities")
+    contracts = {
+        "S2L2A": (12, OLMOEARTH_S2_BANDS),
+        "S1RTC": (2, S1_BANDS),
+        "LANDSAT": (11, OLMOEARTH_LANDSAT_BANDS),
+    }
+    present = 0
+    for name, (channels, bands) in contracts.items():
+        value = modalities.get(name)
+        if value is None:
+            continue
+        count = validate_temporal_modality(as_map(value, f"{name} modality"), name, channels, bands, grid)
+        if count != len(timestamps):
+            raise GraphProviderError(f"OlmoEarth {name} timestamps do not match the shared timeline")
+        present += 1
+    if present == 0:
+        raise GraphProviderError("OlmoEarth requires S2L2A, S1RTC, or LANDSAT")
+
+
+def validate_temporal_modality(
+    modality: JsonMap,
+    name: str,
+    channels: int,
+    bands: list[str],
+    grid: JsonMap,
+) -> int:
+    shape = modality.get("shape")
+    if (
+        not isinstance(shape, list)
+        or len(shape) != 4
+        or shape[1:] != [channels, grid["height"], grid["width"]]
+        or not isinstance(shape[0], int)
+        or shape[0] < 1
+        or modality.get("bands") != bands
+    ):
+        raise GraphProviderError(f"{name} must be [T,{channels},H,W] in canonical band order")
+    return shape[0]
+
+
+def validate_artifacts(manifest: JsonMap, root: pathlib.Path, verify_hashes: bool) -> None:
     artifacts = as_map(manifest.get("artifacts"), "input bundle artifacts")
+    modalities = as_map(manifest.get("modalities"), "input bundle modalities")
+    kind = manifest.get("kind")
+    if kind in {FLOOD_BUNDLE_KIND, FIRE_BUNDLE_KIND}:
+        required = ["S2L2A", "S1RTC", "DEM"]
+    elif kind == TESSERA_BUNDLE_KIND:
+        required = ["S2", "S2_VALID", *[name for name in ["S1_ASC", "S1_DESC"] if name in modalities]]
+    else:
+        required = [name for name in ["S2L2A", "S1RTC", "LANDSAT"] if name in modalities]
     digest_entries: list[JsonMap] = []
-    for name in ["S2L2A", "S1RTC", "DEM"]:
+    for name in required:
         artifact = as_map(artifacts.get(name), f"input artifact {name}")
         relative = artifact.get("path")
         expected_hash = artifact.get("sha256")
@@ -84,6 +232,8 @@ def validate_bundle(manifest: JsonMap, root: pathlib.Path, verify_hashes: bool =
         if verify_hashes and sha256_file(path) != expected_hash:
             raise GraphProviderError(f"input artifact hash mismatch: {name}")
         digest_entries.append({"name": name, "path": relative, "sha256": expected_hash})
+    if set(artifacts) != set(required):
+        raise GraphProviderError("input bundle artifact inventory does not match its modalities")
     if manifest.get("input_digest") != canonical_digest(digest_entries):
         raise GraphProviderError("input bundle digest does not match its artifact inventory")
 

@@ -16,8 +16,17 @@ from numpy.typing import NDArray
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_map
 
-from .bundle import confined_bundle_path, load_bundle, sha256_file
+from .bundle import FIRE_BUNDLE_KIND, FLOOD_BUNDLE_KIND, confined_bundle_path, load_bundle, sha256_file
 from .constants import (
+    FIRE_MEANS,
+    FIRE_MODEL_CHECKPOINT,
+    FIRE_MODEL_CHECKPOINT_SHA256,
+    FIRE_MODEL_CONFIG_SHA256,
+    FIRE_MODEL_ID,
+    FIRE_MODEL_REVISION,
+    FIRE_NATIVE_MODEL_ID,
+    FIRE_NATIVE_WEIGHTS_SHA256,
+    FIRE_STDS,
     FLOOD_MEANS,
     FLOOD_STDS,
     MODEL_CHECKPOINT,
@@ -37,6 +46,54 @@ FloatArray = NDArray[np.float32]
 
 
 @dataclass(frozen=True)
+class HazardSpec:
+    name: str
+    bundle_kind: str
+    model_id: str
+    model_revision: str
+    checkpoint: str
+    checkpoint_sha256: str
+    config_sha256: str
+    native_model_id: str
+    native_weights_sha256: str
+    means: dict[str, list[float]]
+    stds: dict[str, list[float]]
+    model_environment: str
+
+
+HAZARDS = {
+    "flood": HazardSpec(
+        name="flood",
+        bundle_kind=FLOOD_BUNDLE_KIND,
+        model_id=MODEL_ID,
+        model_revision=MODEL_REVISION,
+        checkpoint=MODEL_CHECKPOINT,
+        checkpoint_sha256=MODEL_CHECKPOINT_SHA256,
+        config_sha256=MODEL_CONFIG_SHA256,
+        native_model_id=NATIVE_MODEL_ID,
+        native_weights_sha256=NATIVE_WEIGHTS_SHA256,
+        means=FLOOD_MEANS,
+        stds=FLOOD_STDS,
+        model_environment="MERE_TERRAMIND_FLOOD_MODEL",
+    ),
+    "fire": HazardSpec(
+        name="fire",
+        bundle_kind=FIRE_BUNDLE_KIND,
+        model_id=FIRE_MODEL_ID,
+        model_revision=FIRE_MODEL_REVISION,
+        checkpoint=FIRE_MODEL_CHECKPOINT,
+        checkpoint_sha256=FIRE_MODEL_CHECKPOINT_SHA256,
+        config_sha256=FIRE_MODEL_CONFIG_SHA256,
+        native_model_id=FIRE_NATIVE_MODEL_ID,
+        native_weights_sha256=FIRE_NATIVE_WEIGHTS_SHA256,
+        means=FIRE_MEANS,
+        stds=FIRE_STDS,
+        model_environment="MERE_TERRAMIND_FIRE_MODEL",
+    ),
+}
+
+
+@dataclass(frozen=True)
 class FloodTile:
     batch: int
     y: slice
@@ -47,12 +104,30 @@ class FloodTile:
 def execute_candidate(
     bundle_root: pathlib.Path, locations: dict[str, pathlib.Path], requested_device: str
 ) -> CandidateResult:
+    return execute_hazard_candidate("flood", bundle_root, locations, requested_device)
+
+
+def execute_fire_candidate(
+    bundle_root: pathlib.Path, locations: dict[str, pathlib.Path], requested_device: str
+) -> CandidateResult:
+    return execute_hazard_candidate("fire", bundle_root, locations, requested_device)
+
+
+def execute_hazard_candidate(
+    hazard: str,
+    bundle_root: pathlib.Path,
+    locations: dict[str, pathlib.Path],
+    requested_device: str,
+) -> CandidateResult:
     import rasterio
     import zarr
     from PIL import Image
     from rasterio.transform import Affine
 
-    bundle = load_bundle(bundle_root)
+    spec = HAZARDS.get(hazard)
+    if spec is None:
+        raise GraphProviderError(f"unsupported TerraMind hazard: {hazard}")
+    bundle = load_bundle(bundle_root, expected_kinds={spec.bundle_kind})
     artifacts = as_map(bundle["artifacts"], "input artifacts")
     s2 = load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S2L2A")))
     s1 = load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S1RTC")))
@@ -60,23 +135,25 @@ def execute_candidate(
         dem = source.read().astype(np.float32)
 
     tensors = {
-        "S2L2A": normalized_array(s2.transpose(1, 0, 2, 3), FLOOD_MEANS["S2L2A"], FLOOD_STDS["S2L2A"]),
-        "S1RTC": normalized_array(s1.transpose(1, 0, 2, 3), FLOOD_MEANS["S1RTC"], FLOOD_STDS["S1RTC"]),
+        "S2L2A": normalized_array(s2.transpose(1, 0, 2, 3), spec.means["S2L2A"], spec.stds["S2L2A"]),
+        "S1RTC": normalized_array(s1.transpose(1, 0, 2, 3), spec.means["S1RTC"], spec.stds["S1RTC"]),
         "DEM": normalized_array(
             np.repeat(dem[:, None, :, :], 4, axis=1),
-            FLOOD_MEANS["DEM"],
-            FLOOD_STDS["DEM"],
+            spec.means["DEM"],
+            spec.stds["DEM"],
         ),
     }
     if requested_device not in {"auto", "metal"}:
-        raise GraphProviderError("TerraMind Flood executes through native mere.run Metal; use device=auto or device=metal")
+        raise GraphProviderError(
+            f"TerraMind {hazard.title()} executes through native mere.run Metal; use device=auto or device=metal"
+        )
     executable = resolve_mere_run_executable()
     if executable is None:
-        raise GraphProviderError("mere.run is required for native TerraMind Flood inference")
-    model_root = os.environ.get("MERE_TERRAMIND_FLOOD_MODEL")
+        raise GraphProviderError(f"mere.run is required for native TerraMind {hazard.title()} inference")
+    model_root = os.environ.get(spec.model_environment)
 
     started = time.monotonic()
-    logits, native_runs = tiled_native_inference(tensors, executable, model_root)
+    logits, native_runs = tiled_native_inference(tensors, executable, model_root, command=hazard)
     shifted = logits - logits.max(axis=1, keepdims=True)
     exponent = np.exp(shifted)
     probability = (exponent / exponent.sum(axis=1, keepdims=True))[0, 1].astype(np.float32)
@@ -94,7 +171,7 @@ def execute_candidate(
 
     ndvi = ndvi_comparison(np, s2, mask)
     pixel_area = float(grid["resolution_m"]) ** 2
-    flood_pixels = int(mask.sum())
+    candidate_pixels = int(mask.sum())
     total_pixels = int(mask.size)
     output_hashes = {
         "mask": sha256_file(locations["mask"]),
@@ -102,22 +179,22 @@ def execute_candidate(
         "preview": sha256_file(locations["preview"]),
     }
     manifest: JsonMap = {
-        "kind": "mere.geo/flood-candidate",
+        "kind": f"mere.geo/{hazard}-candidate",
         "version": 1,
         "evidence_class": "candidate-only",
         "promotion_policy": "Requires independent authoritative corroboration and local validation.",
         "model": {
-            "id": MODEL_ID,
-            "revision": MODEL_REVISION,
-            "checkpoint": MODEL_CHECKPOINT,
-            "checkpoint_sha256": MODEL_CHECKPOINT_SHA256,
-            "config_sha256": MODEL_CONFIG_SHA256,
-            "native_model_id": NATIVE_MODEL_ID,
-            "native_weights_sha256": NATIVE_WEIGHTS_SHA256,
+            "id": spec.model_id,
+            "revision": spec.model_revision,
+            "checkpoint": spec.checkpoint,
+            "checkpoint_sha256": spec.checkpoint_sha256,
+            "config_sha256": spec.config_sha256,
+            "native_model_id": spec.native_model_id,
+            "native_weights_sha256": spec.native_weights_sha256,
             "framework": "mere.run Swift/MLX",
             "decoder": "UNetDecoder",
             "precision": "float32",
-            "runtime_command": "mere.run geo flood",
+            "runtime_command": f"mere.run geo {hazard}",
         },
         "input": {
             "digest": bundle["input_digest"],
@@ -136,10 +213,10 @@ def execute_candidate(
             "threshold": 0.5,
         },
         "summary": {
-            "flood_pixels": flood_pixels,
+            f"{hazard}_pixels": candidate_pixels,
             "total_pixels": total_pixels,
-            "candidate_fraction": round(flood_pixels / total_pixels, 8),
-            "candidate_area_square_metres": round(flood_pixels * pixel_area, 3),
+            "candidate_fraction": round(candidate_pixels / total_pixels, 8),
+            "candidate_area_square_metres": round(candidate_pixels * pixel_area, 3),
         },
         "outputs": {
             name: {
@@ -152,7 +229,7 @@ def execute_candidate(
         },
         "comparison": {
             "local_ndvi_cue": ndvi,
-            "newer_backbone_challenger": {
+            **({"newer_backbone_challenger": {
                 "model_id": THOR_MODEL_ID,
                 "revision": THOR_REVISION,
                 "checkpoint_bytes": THOR_CHECKPOINT_BYTES,
@@ -163,13 +240,15 @@ def execute_candidate(
                 "local_mask_metric": None,
                 "status": "backbone-only",
                 "reason": "No pinned ImpactMesh flood head exists, so a local mask comparison would not be honest or reproducible.",
-            },
-            "interpretation": "Agreement is not accuracy; this demo has no pixel-level authoritative flood label.",
+            }} if hazard == "flood" else {}),
+            "interpretation": (
+                f"Agreement is not accuracy; this run has no pixel-level authoritative {hazard} label."
+            ),
         },
     }
     locations["manifest"].write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     metrics: JsonMap = {
-        "name": "candidate_flood_fraction",
+        "name": f"candidate_{hazard}_fraction",
         "value": manifest["summary"]["candidate_fraction"],
         "unit": "ratio",
         "evidence_class": "candidate-only",
@@ -214,6 +293,7 @@ def tiled_native_inference(
     tensors: dict[str, FloatArray],
     executable: str,
     model_root: str | None,
+    command: str = "flood",
 ) -> tuple[FloatArray, list[JsonMap]]:
     crop = 256
     stride = 208
@@ -265,7 +345,10 @@ def tiled_native_inference(
             name: np.ascontiguousarray(np.stack([tile.data[name] for tile in tile_batch], axis=0))
             for name in tensors
         }
-        native_logits, metadata = native_flood_forward(native_inputs, executable, model_root)
+        if command == "flood":
+            native_logits, metadata = native_flood_forward(native_inputs, executable, model_root)
+        else:
+            native_logits, metadata = native_hazard_forward(native_inputs, executable, model_root, command)
         if tuple(native_logits.shape) != (len(tile_batch), 2, crop, crop):
             raise GraphProviderError(
                 f"native TerraMind logits have invalid shape {tuple(native_logits.shape)}"
@@ -301,28 +384,34 @@ def blend_mask(crop: int, stride: int, delta: int) -> FloatArray:
 def native_flood_forward(
     inputs: dict[str, FloatArray], executable: str, model_root: str | None
 ) -> tuple[FloatArray, JsonMap]:
+    return native_hazard_forward(inputs, executable, model_root, "flood")
+
+
+def native_hazard_forward(
+    inputs: dict[str, FloatArray], executable: str, model_root: str | None, command_name: str
+) -> tuple[FloatArray, JsonMap]:
     from safetensors.numpy import load_file, save_file
 
     with tempfile.TemporaryDirectory(prefix="mere-terramind-native-") as raw_directory:
         directory = pathlib.Path(raw_directory)
         input_path = directory / "input.safetensors"
         output_path = directory / "logits.safetensors"
-        save_file(inputs, str(input_path), metadata={"format": "mere.run/terramind-flood-input-v1"})
-        command = [executable, "geo", "flood", str(input_path), "--output", str(output_path), "--json"]
+        save_file(inputs, str(input_path), metadata={"format": f"mere.run/terramind-{command_name}-input-v1"})
+        command = [executable, "geo", command_name, str(input_path), "--output", str(output_path), "--json"]
         if model_root:
             command.extend(["--model", model_root])
         result = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
         if result.returncode != 0:
             detail = result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"
-            raise GraphProviderError(f"native mere.run geo flood failed: {detail}")
+            raise GraphProviderError(f"native mere.run geo {command_name} failed: {detail}")
         try:
             payload = as_map(json.loads(result.stdout), "native geo flood result")
         except (json.JSONDecodeError, GraphProviderError) as exc:
-            raise GraphProviderError("native mere.run geo flood returned invalid JSON") from exc
+            raise GraphProviderError(f"native mere.run geo {command_name} returned invalid JSON") from exc
         arrays = load_file(str(output_path))
         logits = arrays.get("logits")
         if logits is None:
-            raise GraphProviderError("native mere.run geo flood did not emit logits")
+            raise GraphProviderError(f"native mere.run geo {command_name} did not emit logits")
         metadata: JsonMap = {
             key: payload[key]
             for key in ["status", "model_id", "batch_size", "device", "model_load_seconds", "inference_seconds"]
