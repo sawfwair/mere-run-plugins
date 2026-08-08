@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -120,22 +121,31 @@ class EmbeddingRuntimeTests(unittest.TestCase):
             "TIMESTAMPS": np.array([[[1, 0, 2026]]], dtype=np.int32),
             "S2L2A": np.zeros((1, 8, 8, 1, 12), dtype=np.float32),
         }
-        with mock.patch.object(embedding_runtime, "save_safetensors"), mock.patch.object(
-            embedding_runtime,
-            "run_native",
-            return_value={"status": "completed", "model_id": "vision-embed-olmoearth-v12-base"},
-        ) as run:
-            embedding_runtime.native_olmoearth_forward(
-                inputs,
-                pathlib.Path("/tmp/output.safetensors"),
-                "/tmp/mere.run",
-                "vision-embed-olmoearth-v12-base",
-                2,
-                10.0,
-                True,
-            )
+        def run_fixture(command: list[str], _name: str, timeout: int) -> dict[str, object]:
+            self.assertEqual(timeout, 3_600)
+            pathlib.Path(command[command.index("--output") + 1]).write_bytes(b"embeddings")
+            return {"status": "completed", "model_id": "vision-embed-olmoearth-v12-base"}
+
+        with tempfile.TemporaryDirectory() as raw_directory:
+            output_path = pathlib.Path(raw_directory) / "embeddings"
+            with mock.patch.object(embedding_runtime, "save_safetensors"), mock.patch.object(
+                embedding_runtime,
+                "run_native",
+                side_effect=run_fixture,
+            ) as run:
+                embedding_runtime.native_olmoearth_forward(
+                    inputs,
+                    output_path,
+                    "/tmp/mere.run",
+                    "vision-embed-olmoearth-v12-base",
+                    2,
+                    10.0,
+                    True,
+                )
+            self.assertEqual(output_path.read_bytes(), b"embeddings")
         command = run.call_args.args[0]
         self.assertEqual(command[command.index("--patch-size") + 1], "2")
+        self.assertTrue(command[command.index("--output") + 1].endswith(".safetensors"))
         self.assertIn("--include-tokens", command)
 
 

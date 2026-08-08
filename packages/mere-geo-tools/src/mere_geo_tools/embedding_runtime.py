@@ -325,8 +325,13 @@ def native_olmoearth_forward(
     input_resolution: float,
     include_tokens: bool,
 ) -> JsonMap:
-    with tempfile.TemporaryDirectory(prefix="mere-olmoearth-native-") as raw_directory:
-        input_path = pathlib.Path(raw_directory) / "input.safetensors"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="mere-olmoearth-native-", dir=output_path.parent
+    ) as raw_directory:
+        directory = pathlib.Path(raw_directory)
+        input_path = directory / "input.safetensors"
+        native_output_path = directory / "embeddings.safetensors"
         save_safetensors(inputs, input_path, {"format": "mere.geo/olmoearth-grid-v1"})
         command = [
             executable,
@@ -334,7 +339,7 @@ def native_olmoearth_forward(
             "olmoearth",
             str(input_path),
             "--output",
-            str(output_path),
+            str(native_output_path),
             "--patch-size",
             str(patch_size),
             "--input-resolution",
@@ -345,7 +350,9 @@ def native_olmoearth_forward(
             command.extend(["--model", model])
         if include_tokens:
             command.append("--include-tokens")
-        return native_metadata(run_native(command, "olmoearth", timeout=900))
+        payload = run_native(command, "olmoearth", timeout=3_600)
+        native_output_path.replace(output_path)
+        return native_metadata(payload)
 
 
 def run_native(command: list[str], name: str, timeout: int) -> JsonMap:
