@@ -80,6 +80,15 @@ modalities:
 }
 ```
 
+Sentinel-2 L2A and Sentinel-1 RTC recipes use their canonical STAC asset names
+and are exercised against the Planetary Computer catalog. Landsat is deliberately
+fail-closed: OlmoEarth expects raw unsigned 16-bit OLI/TIRS Level-1 DN values in
+the canonical `B8, B1, B2, B3, B4, B5, B6, B7, B9, B10, B11` order. Every
+Landsat item must declare `source_contract` as
+`landsat-oli-tirs-level1-dn-v1` and provide an explicit `assets` map for all
+eleven bands. Planetary Computer's `landsat-c2-l2` collection is not compatible
+because it lacks the required tensor and has different radiometry.
+
 Prepare and inspect any recipe with the same commands:
 
 ```bash

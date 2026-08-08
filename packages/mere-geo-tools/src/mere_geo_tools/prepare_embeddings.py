@@ -18,8 +18,8 @@ from .bundle import (
     sha256_file,
 )
 from .constants import (
-    OLMOEARTH_LANDSAT_ASSETS,
     OLMOEARTH_LANDSAT_BANDS,
+    OLMOEARTH_LANDSAT_SOURCE_CONTRACT,
     OLMOEARTH_S2_BANDS,
     S1_BANDS,
     TESSERA_S2_BANDS,
@@ -152,11 +152,11 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
         timesteps = as_list(recipe["timesteps"], "timesteps")
         timestamps = [timestamp_components(as_map(step, "timestep")["observed_at"]) for step in timesteps]
         modality_contracts = {
-            "S2L2A": (OLMOEARTH_S2_BANDS, "reflectance"),
-            "S1RTC": (S1_BANDS, "radar_db"),
-            "LANDSAT": (OLMOEARTH_LANDSAT_BANDS, "reflectance"),
+            "S2L2A": (OLMOEARTH_S2_BANDS, "reflectance", "surface_reflectance_dn"),
+            "S1RTC": (S1_BANDS, "radar_db", "gamma0_db"),
+            "LANDSAT": (OLMOEARTH_LANDSAT_BANDS, "landsat_level1_dn", "level1_dn"),
         }
-        for name, (bands, mode) in modality_contracts.items():
+        for name, (bands, mode, units) in modality_contracts.items():
             if name not in as_map(timesteps[0], "timestep"):
                 continue
             specs = [as_map(step, "timestep")[name] for step in timesteps]
@@ -170,14 +170,15 @@ def prepare_embedding_bundle(recipe_path: pathlib.Path, output_root: pathlib.Pat
                 np,
                 mode=mode,
                 include_scl=False,
-                default_assets=OLMOEARTH_LANDSAT_ASSETS if name == "LANDSAT" else None,
             )
             arrays[name] = values
             modalities[name] = {
                 "bands": bands,
                 "shape": list(values.shape),
-                "units": "gamma0_db" if name == "S1RTC" else "surface_reflectance_dn",
+                "units": units,
             }
+            if name == "LANDSAT":
+                modalities[name]["source_contract"] = OLMOEARTH_LANDSAT_SOURCE_CONTRACT
             provenance[name] = source_provenance
         manifest_extra["timestamps"] = timestamps
         model_family = {
@@ -255,7 +256,10 @@ def validate_embedding_recipe(recipe: JsonMap) -> None:
             if {name for name in ["S2L2A", "S1RTC", "LANDSAT"] if name in step} != modalities:
                 raise GraphProviderError("OlmoEarth modalities must be present at every timestep")
             for name in modalities:
-                validate_item_spec(as_map(step[name], name))
+                spec = as_map(step[name], name)
+                validate_item_spec(spec)
+                if name == "LANDSAT":
+                    validate_landsat_spec(spec)
 
 
 def validate_target(target: JsonMap) -> None:
@@ -295,6 +299,24 @@ def validate_item_spec(spec: JsonMap) -> None:
             raise GraphProviderError("source item assets must map canonical band names to STAC asset names")
 
 
+def validate_landsat_spec(spec: JsonMap) -> None:
+    if spec.get("collection") == "landsat-c2-l2":
+        raise GraphProviderError(
+            "Planetary Computer landsat-c2-l2 is incompatible with OlmoEarth LANDSAT: "
+            "the model requires the raw 11-band OLI/TIRS Level-1 DN tensor"
+        )
+    if spec.get("source_contract") != OLMOEARTH_LANDSAT_SOURCE_CONTRACT:
+        raise GraphProviderError(
+            f"OlmoEarth LANDSAT source_contract must be {OLMOEARTH_LANDSAT_SOURCE_CONTRACT}"
+        )
+    assets = as_map(spec.get("assets"), "OlmoEarth LANDSAT assets")
+    missing = [band for band in OLMOEARTH_LANDSAT_BANDS if band not in assets]
+    if missing:
+        raise GraphProviderError(
+            f"OlmoEarth LANDSAT assets are missing canonical bands: {', '.join(missing)}"
+        )
+
+
 def timestamp_components(value: object) -> list[int]:
     if not isinstance(value, str):
         raise GraphProviderError("OlmoEarth timestep observed_at is required")
@@ -318,7 +340,6 @@ def read_sequence(
     np: object,
     mode: str,
     include_scl: bool,
-    default_assets: dict[str, str] | None = None,
 ) -> tuple[object, object | None, list[int], list[JsonMap]]:
     specs = [as_map(value, "source item") for value in as_list(raw_specs, "source sequence")]
     values: list[object] = []
@@ -334,7 +355,7 @@ def read_sequence(
         source_bands: list[object] = []
         assets: list[JsonMap] = []
         for band in bands:
-            asset_name = asset_overrides.get(band, default_assets.get(band, band) if default_assets else band)
+            asset_name = asset_overrides.get(band, band)
             try:
                 unsigned_asset = unsigned.assets[asset_name]
                 signed_asset = signed.assets[asset_name]

@@ -256,6 +256,37 @@ class GeoProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(GraphProviderError, "include a timezone"):
             prepare_embeddings.validate_embedding_recipe(olmo)
 
+    def test_olmoearth_landsat_requires_compatible_level1_contract(self) -> None:
+        target = {"aoi": [32.67, 46.59, 32.78, 46.64], "crs": "EPSG:32636"}
+        landsat = {
+            "collection": "landsat-oli-tirs-level1",
+            "item": "landsat-a",
+            "source_contract": "landsat-oli-tirs-level1-dn-v1",
+            "assets": {band: band for band in prepare_embeddings.OLMOEARTH_LANDSAT_BANDS},
+        }
+        recipe = {
+            "kind": "mere.geo/olmoearth-v1.2-source-recipe",
+            "version": 1,
+            "sample_id": "landsat-context",
+            "target": target,
+            "timesteps": [{"observed_at": "2026-06-15T10:00:00Z", "LANDSAT": landsat}],
+        }
+        prepare_embeddings.validate_embedding_recipe(recipe)
+
+        del landsat["assets"]["B11"]
+        with self.assertRaisesRegex(GraphProviderError, "missing canonical bands: B11"):
+            prepare_embeddings.validate_embedding_recipe(recipe)
+
+        landsat["assets"]["B11"] = "B11"
+        landsat["source_contract"] = "surface-reflectance"
+        with self.assertRaisesRegex(GraphProviderError, "source_contract must be"):
+            prepare_embeddings.validate_embedding_recipe(recipe)
+
+        landsat["source_contract"] = "landsat-oli-tirs-level1-dn-v1"
+        landsat["collection"] = "landsat-c2-l2"
+        with self.assertRaisesRegex(GraphProviderError, "landsat-c2-l2 is incompatible"):
+            prepare_embeddings.validate_embedding_recipe(recipe)
+
     def test_embedding_bundles_are_typed_and_content_addressed(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             root = pathlib.Path(raw_root)
