@@ -26,7 +26,8 @@ dependencies and makes permissions, streams, failure, and upgrades explicit.
 [`plugins.mere.run`](https://plugins.mere.run/) is the visual catalog and public
 machine-readable catalog host. [`plugins-docs.mere.run`](https://plugins-docs.mere.run/)
 is this VitePress product guide and operator reference. Each has its own
-Cloudflare Worker and deploy command.
+deployment owner. This repository validates the catalog and builds the VitePress
+artifact; deployment configuration lives outside this checkout.
 
 ## Data flow
 

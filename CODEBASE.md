@@ -13,12 +13,20 @@ Key paths:
   first and clean up by default.
 - `packages/mere-image-tools/`: local image helpers around existing `mere.run`
   vision commands.
+- `packages/mere-face-tools/`: local face-library indexing, search, and review
+  exports.
 - `packages/mere-workflow-tools/`: document, media, dataset, transcript, image,
   and batch workflow CLIs.
+- `packages/mere-geo-tools/`: typed STAC preparation, portable Geo graph nodes,
+  and native `mere.run` hazard/embedding handoffs. It consumes graph contracts
+  from `mere-workflow-tools`; the reverse dependency is forbidden.
 - `packages/mere-animatic-tools/`: local Animatic production helpers.
 - `packages/mere-shotgrid-tools/`: ShotGrid / Flow Production Tracking publish
   and task-pull bridge.
-- `scripts/check.sh`: required readiness gate.
+- `packages/mere-perform/`: local realtime performance plans and stage UI.
+- `packages/mere-vfx-tools/`: local shot-oriented VFX workflows.
+- `scripts/check-fast.sh`: sub-ten-second developer/pre-commit gate.
+- `scripts/check.sh`: clean-environment release and CI gate.
 
 Do not turn plugins into hosted services, add live network tests to the default
 gate, write secrets into manifests/stdout, or change contract fields without

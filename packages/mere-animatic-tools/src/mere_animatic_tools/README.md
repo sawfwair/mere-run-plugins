@@ -10,6 +10,10 @@ Entry points:
 - `cli.py`: command parser, tool registry, request loading, artifact manifest
   helpers, local image/contact-sheet utilities, tool executors, resume, and
   cleanup commands.
+- `set_proxy.py`: USD set-proxy serialization and the explicit Blender process
+  boundary.
+- `blender_worker.py`: Blender-only scene construction, lighting receipts, and
+  plate rendering; unit tests inject a typed fake `bpy` backend.
 
 Important boundaries:
 

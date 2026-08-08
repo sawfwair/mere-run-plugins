@@ -28,7 +28,6 @@ select = [
   "UP",
 ]
 ignore = [
-  "ANN401",
   "E501",
   "UP022",
 ]
@@ -70,21 +69,18 @@ files = [
 ]
 
 [[tool.mypy.overrides]]
-module = "shotgun_api3"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "mere_animatic_tools.blender_worker"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
 module = [
-  "mere_geo_tools.prepare",
-  "mere_geo_tools.prepare_embeddings",
-  "mere_geo_tools.runtime",
-  "mere_geo_tools.embedding_runtime",
+  "bpy",
+  "planetary_computer",
+  "pystac_client",
+  "rasterio",
+  "rasterio.*",
+  "safetensors",
+  "safetensors.*",
+  "shotgun_api3",
+  "zarr",
 ]
-ignore_errors = true
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = [
@@ -105,7 +101,6 @@ show_missing = true
 skip_covered = false
 omit = [
   "*/__main__.py",
-  "*/blender_worker.py",
   "*/__init__.py",
   "*/batch_cli.py",
   "*/dataset_cli.py",
@@ -113,9 +108,4 @@ omit = [
   "*/image_compose_cli.py",
   "*/media_cli.py",
   "*/transcript_cli.py",
-  "*/mere_geo_tools/cli.py",
-  "*/mere_geo_tools/prepare.py",
-  "*/mere_geo_tools/prepare_embeddings.py",
-  "*/mere_geo_tools/runtime.py",
-  "*/mere_geo_tools/embedding_runtime.py",
 ]

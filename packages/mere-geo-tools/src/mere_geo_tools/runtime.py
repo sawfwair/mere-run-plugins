@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import cast
 
 import numpy as np
-from numpy.typing import NDArray
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_map
 
@@ -40,9 +39,8 @@ from .constants import (
     THOR_MODEL_ID,
     THOR_REVISION,
 )
+from .external_types import FloatArray, NumericArray, UInt8Array
 from .provider import CandidateResult
-
-FloatArray = NDArray[np.float32]
 
 
 @dataclass(frozen=True)
@@ -120,8 +118,6 @@ def execute_hazard_candidate(
     requested_device: str,
 ) -> CandidateResult:
     import rasterio
-    import zarr
-    from PIL import Image
     from rasterio.transform import Affine
 
     spec = HAZARDS.get(hazard)
@@ -129,8 +125,8 @@ def execute_hazard_candidate(
         raise GraphProviderError(f"unsupported TerraMind hazard: {hazard}")
     bundle = load_bundle(bundle_root, expected_kinds={spec.bundle_kind})
     artifacts = as_map(bundle["artifacts"], "input artifacts")
-    s2 = load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S2L2A")))
-    s1 = load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S1RTC")))
+    s2 = load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S2L2A")))
+    s1 = load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S1RTC")))
     with rasterio.open(confined_bundle_path(bundle_root, artifact_path(artifacts, "DEM"))) as source:
         dem = source.read().astype(np.float32)
 
@@ -158,19 +154,19 @@ def execute_hazard_candidate(
     exponent = np.exp(shifted)
     probability = (exponent / exponent.sum(axis=1, keepdims=True))[0, 1].astype(np.float32)
     elapsed = time.monotonic() - started
-    mask = (probability >= 0.5).astype(np.uint8)
+    mask = cast(UInt8Array, (probability >= 0.5).astype(np.uint8))
 
     grid = as_map(bundle["grid"], "grid")
     transform = Affine(*cast(list[float], grid["transform"]))
     crs = cast(str, grid["crs"])
-    write_cog(rasterio, locations["mask"], mask[None, :, :], crs, transform, "uint8", 255, "nearest")
+    write_cog(locations["mask"], mask[None, :, :], crs, transform, "uint8", 255, "nearest")
     write_cog(
-        rasterio, locations["probability"], probability[None, :, :], crs, transform, "float32", -9999.0, "average"
+        locations["probability"], probability[None, :, :], crs, transform, "float32", -9999.0, "average"
     )
-    write_preview(Image, np, locations["preview"], s2[2], mask)
+    write_preview(locations["preview"], s2[2], mask)
 
-    ndvi = ndvi_comparison(np, s2, mask)
-    pixel_area = float(grid["resolution_m"]) ** 2
+    ndvi = ndvi_comparison(s2, mask)
+    pixel_area = numeric_value(grid["resolution_m"], "grid resolution_m") ** 2
     candidate_pixels = int(mask.sum())
     total_pixels = int(mask.size)
     output_hashes = {
@@ -249,7 +245,7 @@ def execute_hazard_candidate(
     locations["manifest"].write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     metrics: JsonMap = {
         "name": f"candidate_{hazard}_fraction",
-        "value": manifest["summary"]["candidate_fraction"],
+        "value": round(candidate_pixels / total_pixels, 8),
         "unit": "ratio",
         "evidence_class": "candidate-only",
     }
@@ -263,20 +259,28 @@ def artifact_path(artifacts: JsonMap, name: str) -> str:
     return value
 
 
-def load_zarr(zarr_module: object, path: pathlib.Path) -> object:
-    store = zarr_module.ZipStore(str(path), mode="r")
+def load_zarr(path: pathlib.Path) -> FloatArray:
+    import zarr
+
+    store = zarr.ZipStore(str(path), mode="r")
     try:
-        root = zarr_module.open_consolidated(store, mode="r")
-        return root["bands"][...]
+        root = zarr.open_consolidated(store, mode="r")
+        return cast(FloatArray, root["bands"][...])
     finally:
         store.close()
+
+
+def numeric_value(value: object, label: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise GraphProviderError(f"{label} must be numeric")
+    return float(value)
 
 
 def normalized_array(value: object, means: list[float], stds: list[float]) -> FloatArray:
     tensor = np.asarray(value, dtype=np.float32)
     mean = np.asarray(means, dtype=np.float32)[:, None, None, None]
     std = np.asarray(stds, dtype=np.float32)[:, None, None, None]
-    return ((tensor - mean) / std)[None, ...]
+    return cast(FloatArray, ((tensor - mean) / std)[None, ...])
 
 
 def resolve_mere_run_executable() -> str | None:
@@ -408,7 +412,7 @@ def native_hazard_forward(
             payload = as_map(json.loads(result.stdout), "native geo flood result")
         except (json.JSONDecodeError, GraphProviderError) as exc:
             raise GraphProviderError(f"native mere.run geo {command_name} returned invalid JSON") from exc
-        arrays = load_file(str(output_path))
+        arrays = cast(dict[str, NumericArray], load_file(str(output_path)))
         logits = arrays.get("logits")
         if logits is None:
             raise GraphProviderError(f"native mere.run geo {command_name} did not emit logits")
@@ -417,12 +421,12 @@ def native_hazard_forward(
             for key in ["status", "model_id", "batch_size", "device", "model_load_seconds", "inference_seconds"]
             if key in payload
         }
-        return logits.astype("float32", copy=False), metadata
+        return cast(FloatArray, logits.astype("float32", copy=False)), metadata
 
 
-def ndvi_comparison(np: object, s2: object, mask: object) -> JsonMap:
-    pre = ndvi(np, s2[1, 7], s2[1, 3])
-    event = ndvi(np, s2[2, 7], s2[2, 3])
+def ndvi_comparison(s2: FloatArray, mask: UInt8Array) -> JsonMap:
+    pre = ndvi(s2[1, 7], s2[1, 3])
+    event = ndvi(s2[2, 7], s2[2, 3])
     change = event - pre
     cue = change <= -0.2
     intersection = int((cue & (mask == 1)).sum())
@@ -441,22 +445,31 @@ def ndvi_comparison(np: object, s2: object, mask: object) -> JsonMap:
     }
 
 
-def ndvi(np: object, nir: object, red: object) -> object:
+def ndvi(nir: FloatArray, red: FloatArray) -> FloatArray:
     denominator = nir + red
-    return np.divide(nir - red, denominator, out=np.zeros_like(denominator, dtype=np.float32), where=denominator != 0)
+    return cast(
+        FloatArray,
+        np.divide(
+            nir - red,
+            denominator,
+            out=np.zeros_like(denominator, dtype=np.float32),
+            where=denominator != 0,
+        ),
+    )
 
 
 def write_cog(
-    rasterio_module: object,
     path: pathlib.Path,
-    value: object,
+    value: NumericArray,
     crs: str,
     transform: object,
     dtype: str,
     nodata: float | int,
     overview_resampling: str,
 ) -> None:
-    with rasterio_module.open(
+    import rasterio
+
+    with rasterio.open(
         path,
         "w",
         driver="COG",
@@ -474,11 +487,13 @@ def write_cog(
         destination.write(value)
 
 
-def write_preview(image_module: object, np: object, path: pathlib.Path, event_s2: object, mask: object) -> None:
+def write_preview(path: pathlib.Path, event_s2: FloatArray, mask: UInt8Array) -> None:
+    from PIL import Image
+
     rgb = event_s2[[3, 2, 1]].transpose(1, 2, 0).astype(np.float32)
     low = np.percentile(rgb, 2, axis=(0, 1), keepdims=True)
     high = np.percentile(rgb, 98, axis=(0, 1), keepdims=True)
     rgb = np.clip((rgb - low) / np.maximum(high - low, 1), 0, 1)
     overlay = (rgb * 255).astype(np.uint8)
     overlay[mask == 1] = (0.45 * overlay[mask == 1] + 0.55 * np.array([255, 48, 48])).astype(np.uint8)
-    image_module.fromarray(overlay, mode="RGB").save(path)
+    Image.fromarray(overlay, mode="RGB").save(path)

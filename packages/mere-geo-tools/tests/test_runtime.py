@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
 import pathlib
+import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
 import numpy as np
 
 from mere_geo_tools import embedding_runtime, runtime
+from mere_geo_tools.constants import OLMOEARTH_MODELS, TESSERA_MODELS
+from mere_workflow_tools.graph_sdk import GraphProviderError
 
 
 class NativeTilingTests(unittest.TestCase):
@@ -58,6 +63,93 @@ class NativeTilingTests(unittest.TestCase):
         self.assertEqual(tuple(logits.shape), (1, 2, 256, 256))
         self.assertEqual(runs[0]["model_id"], "vision-fire-terramind-base")
         forward.assert_called_once()
+
+    def test_runtime_helpers_validate_boundaries_and_compute_local_cues(self) -> None:
+        self.assertEqual(runtime.artifact_path({"S2": {"path": "S2/input.zip"}}, "S2"), "S2/input.zip")
+        with self.assertRaises(GraphProviderError):
+            runtime.artifact_path({"S2": {"path": 42}}, "S2")
+        self.assertEqual(runtime.numeric_value(10, "resolution"), 10.0)
+        with self.assertRaises(GraphProviderError):
+            runtime.numeric_value(True, "resolution")
+
+        normalized = runtime.normalized_array(
+            np.ones((1, 1, 2, 2), dtype=np.float32), [1.0], [2.0]
+        )
+        self.assertEqual(tuple(normalized.shape), (1, 1, 1, 2, 2))
+        self.assertTrue(np.all(normalized == 0))
+        self.assertTrue(np.all(runtime.blend_mask(4, 4, 0) > 0))
+
+        s2 = np.zeros((3, 8, 2, 2), dtype=np.float32)
+        s2[1, 7] = 1.0
+        s2[1, 3] = 1.0
+        s2[2, 3] = 1.0
+        mask = np.array([[1, 0], [0, 0]], dtype=np.uint8)
+        cue = runtime.ndvi_comparison(s2, mask)
+        self.assertEqual(cue["cue_pixels"], 4)
+        self.assertEqual(cue["intersection_pixels"], 1)
+
+    def test_runtime_executable_override_is_confined_to_real_executables(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            executable = pathlib.Path(raw_root) / "mere.run"
+            executable.write_text("#!/bin/sh\n")
+            executable.chmod(0o755)
+            with mock.patch.dict("os.environ", {"MERE_RUN_EXECUTABLE": str(executable)}, clear=True):
+                self.assertEqual(runtime.resolve_mere_run_executable(), str(executable.resolve()))
+            with mock.patch.dict("os.environ", {"MERE_RUN_EXECUTABLE": str(executable) + "-missing"}, clear=True):
+                self.assertIsNone(runtime.resolve_mere_run_executable())
+            with mock.patch.dict("os.environ", {}, clear=True), mock.patch.object(
+                runtime.shutil, "which", return_value="/usr/local/bin/mere.run"
+            ):
+                self.assertEqual(runtime.resolve_mere_run_executable(), "/usr/local/bin/mere.run")
+
+    def test_tiling_rejects_invalid_input_and_native_shapes(self) -> None:
+        with self.assertRaisesRegex(GraphProviderError, "B,C,T,H,W"):
+            runtime.tiled_native_inference({}, "/tmp/mere.run", None)
+        mismatched = {
+            "S2L2A": np.zeros((1, 1, 1, 256, 256), dtype=np.float32),
+            "DEM": np.zeros((1, 1, 1, 256, 300), dtype=np.float32),
+        }
+        with self.assertRaisesRegex(GraphProviderError, "share batch"):
+            runtime.tiled_native_inference(mismatched, "/tmp/mere.run", None)
+        valid = {"S2L2A": np.zeros((1, 1, 1, 256, 256), dtype=np.float32)}
+        with mock.patch.object(
+            runtime,
+            "native_flood_forward",
+            return_value=(np.zeros((1, 1, 2, 2), dtype=np.float32), {}),
+        ), self.assertRaisesRegex(GraphProviderError, "invalid shape"):
+            runtime.tiled_native_inference(valid, "/tmp/mere.run", None)
+
+    def test_native_handoff_reports_process_and_payload_failures(self) -> None:
+        inputs = {"S2L2A": np.zeros((1, 1, 1, 2, 2), dtype=np.float32)}
+        safetensors_package = types.ModuleType("safetensors")
+        safetensors_numpy = types.ModuleType("safetensors.numpy")
+        safetensors_numpy.save_file = mock.Mock()
+        safetensors_numpy.load_file = mock.Mock(return_value={})
+        with mock.patch.dict(
+            sys.modules,
+            {"safetensors": safetensors_package, "safetensors.numpy": safetensors_numpy},
+        ):
+            failed = mock.Mock(returncode=2, stderr="native failed", stdout="")
+            with mock.patch.object(runtime.subprocess, "run", return_value=failed):
+                with self.assertRaisesRegex(GraphProviderError, "native failed"):
+                    runtime.native_hazard_forward(inputs, "/tmp/mere.run", None, "fire")
+
+            invalid = mock.Mock(returncode=0, stderr="", stdout="not-json")
+            with mock.patch.object(runtime.subprocess, "run", return_value=invalid):
+                with self.assertRaisesRegex(GraphProviderError, "invalid JSON"):
+                    runtime.native_hazard_forward(inputs, "/tmp/mere.run", None, "flood")
+
+            completed = mock.Mock(returncode=0, stderr="", stdout='{"status":"completed","device":"metal"}')
+            with mock.patch.object(runtime.subprocess, "run", return_value=completed):
+                with self.assertRaisesRegex(GraphProviderError, "did not emit logits"):
+                    runtime.native_hazard_forward(inputs, "/tmp/mere.run", "/models/flood", "flood")
+
+            logits = np.ones((1, 2, 2, 2), dtype=np.float64)
+            safetensors_numpy.load_file = mock.Mock(return_value={"logits": logits})
+            with mock.patch.object(runtime.subprocess, "run", return_value=completed):
+                output, metadata = runtime.native_flood_forward(inputs, "/tmp/mere.run", None)
+        self.assertEqual(output.dtype, np.float32)
+        self.assertEqual(metadata["device"], "metal")
 
 
 class EmbeddingRuntimeTests(unittest.TestCase):
@@ -147,6 +239,116 @@ class EmbeddingRuntimeTests(unittest.TestCase):
         self.assertEqual(command[command.index("--patch-size") + 1], "2")
         self.assertTrue(command[command.index("--output") + 1].endswith(".safetensors"))
         self.assertIn("--include-tokens", command)
+
+    def test_execute_tessera_embedding_builds_spatial_manifest(self) -> None:
+        model_id = str(TESSERA_MODELS["nano"]["id"])
+        bundle = {
+            "input_digest": "digest",
+            "sources": {},
+            "grid": {"height": 2, "width": 2, "crs": "EPSG:32617", "resolution_m": 10},
+            "artifacts": {
+                "S2": {"path": "S2/input.zip"},
+                "S2_VALID": {"path": "S2_VALID/input.zip"},
+                "S1_ASC": {"path": "S1_ASC/input.zip"},
+            },
+            "S2_DOY": [10, 20],
+            "S1_ASC_DOY": [11, 21],
+        }
+        s2 = np.ones((2, 10, 2, 2), dtype=np.float32)
+        valid = np.ones((2, 2, 2), dtype=np.uint8)
+        radar = np.ones((2, 2, 2, 2), dtype=np.float32)
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            locations = {"embeddings": root / "embeddings.safetensors", "manifest": root / "manifest.json"}
+
+            def save_fixture(
+                _arrays: dict[str, np.ndarray], path: pathlib.Path, _metadata: dict[str, str]
+            ) -> None:
+                path.write_bytes(b"embeddings")
+
+            with mock.patch.object(embedding_runtime, "load_bundle", return_value=bundle), mock.patch.object(
+                embedding_runtime, "load_zarr", side_effect=[s2, valid, radar]
+            ), mock.patch.object(embedding_runtime, "require_runtime", return_value="/tmp/mere.run"), mock.patch.object(
+                embedding_runtime,
+                "native_tessera_forward",
+                return_value=(np.ones((4, 16), dtype=np.float32), {"model_id": model_id}),
+            ), mock.patch.object(embedding_runtime, "save_safetensors", side_effect=save_fixture):
+                result = embedding_runtime.execute_tessera_embedding(root, locations, "metal", None, 16, 8)
+
+            manifest = json.loads(locations["manifest"].read_text())
+            self.assertEqual(manifest["summary"]["dimensions"], 16)
+            self.assertEqual(result.metrics["value"], 1.0)
+
+    def test_execute_olmoearth_embedding_builds_spatial_manifest(self) -> None:
+        model_id = str(OLMOEARTH_MODELS["base"]["id"])
+        bundle = {
+            "input_digest": "digest",
+            "sources": {},
+            "timestamps": [[1, 0, 2026]],
+            "grid": {"height": 4, "width": 4, "crs": "EPSG:32617", "resolution_m": 10},
+            "artifacts": {"S2L2A": {"path": "S2L2A/input.zip"}},
+        }
+        s2 = np.ones((1, 12, 4, 4), dtype=np.float32)
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            locations = {"embeddings": root / "embeddings.safetensors", "manifest": root / "manifest.json"}
+
+            def native_fixture(
+                _inputs: dict[str, np.ndarray],
+                output_path: pathlib.Path,
+                _executable: str,
+                _model: str | None,
+                _patch_size: int,
+                _resolution: float,
+                _include_tokens: bool,
+            ) -> dict[str, object]:
+                output_path.write_bytes(b"embeddings")
+                return {"status": "completed", "model_id": model_id}
+
+            with mock.patch.object(embedding_runtime, "load_bundle", return_value=bundle), mock.patch.object(
+                embedding_runtime, "load_zarr", return_value=s2
+            ), mock.patch.object(embedding_runtime, "require_runtime", return_value="/tmp/mere.run"), mock.patch.object(
+                embedding_runtime, "native_olmoearth_forward", side_effect=native_fixture
+            ), mock.patch.object(
+                embedding_runtime,
+                "load_safetensors",
+                return_value={"S2L2A_EMBEDDINGS": np.ones((1, 2, 2, 8), dtype=np.float32)},
+            ):
+                result = embedding_runtime.execute_olmoearth_embedding(
+                    root, locations, "auto", None, 2, None, True
+                )
+
+            manifest = json.loads(locations["manifest"].read_text())
+            self.assertEqual(manifest["summary"]["grid_height"], 2)
+            self.assertEqual(result.metrics["value"], 4)
+
+    def test_embedding_runtime_rejects_invalid_controls_and_native_results(self) -> None:
+        with self.assertRaises(GraphProviderError):
+            embedding_runtime.require_metal("cpu", "TESSERA")
+        with mock.patch.object(embedding_runtime, "resolve_mere_run_executable", return_value=None):
+            with self.assertRaises(GraphProviderError):
+                embedding_runtime.require_runtime("TESSERA")
+        self.assertEqual(embedding_runtime.sequence_bucket(999), 256)
+        self.assertEqual(
+            embedding_runtime.native_metadata({"status": "completed", "ignored": True}),
+            {"status": "completed"},
+        )
+        self.assertEqual(
+            embedding_runtime.model_manifest(TESSERA_MODELS, "missing")["native_model_id"],
+            "missing",
+        )
+
+        with mock.patch.object(embedding_runtime.subprocess, "run", side_effect=OSError("missing")):
+            with self.assertRaisesRegex(GraphProviderError, "missing"):
+                embedding_runtime.run_native(["mere.run"], "tessera", 1)
+        failed = mock.Mock(returncode=1, stderr="boom", stdout="")
+        with mock.patch.object(embedding_runtime.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(GraphProviderError, "boom"):
+                embedding_runtime.run_native(["mere.run"], "tessera", 1)
+        invalid = mock.Mock(returncode=0, stderr="", stdout="[]")
+        with mock.patch.object(embedding_runtime.subprocess, "run", return_value=invalid):
+            with self.assertRaisesRegex(GraphProviderError, "invalid JSON"):
+                embedding_runtime.run_native(["mere.run"], "tessera", 1)
 
 
 if __name__ == "__main__":

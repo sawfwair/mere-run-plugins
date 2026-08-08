@@ -35,31 +35,38 @@ def resolve_relative_import(module: str, level: int, package: str) -> str:
     return ".".join(prefix)
 
 
-def imported_modules(package_root: pathlib.Path, path: pathlib.Path) -> tuple[str, ...]:
-    package_name = package_root.name
+def imported_modules(
+    package_root: pathlib.Path,
+    path: pathlib.Path,
+    repository_packages: set[str],
+) -> tuple[str, ...]:
     current_module = module_name(package_root, path)
     tree = ast.parse(path.read_text(), filename=str(path))
     imports: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith(package_name + "."):
+                if alias.name.split(".", 1)[0] in repository_packages:
                     imports.add(alias.name)
         elif isinstance(node, ast.ImportFrom):
             if node.level:
                 target = resolve_relative_import(node.module or "", node.level, current_module)
             else:
                 target = node.module or ""
-            if target == package_name or target.startswith(package_name + "."):
+            if target.split(".", 1)[0] in repository_packages:
                 imports.add(target)
     return tuple(sorted(imports))
 
 
-def load_modules(package_root: pathlib.Path) -> dict[str, ModuleInfo]:
+def load_modules(package_root: pathlib.Path, repository_packages: set[str]) -> dict[str, ModuleInfo]:
     modules: dict[str, ModuleInfo] = {}
     for path in sorted(package_root.rglob("*.py")):
         name = module_name(package_root, path)
-        modules[name] = ModuleInfo(name=name, path=path, imports=imported_modules(package_root, path))
+        modules[name] = ModuleInfo(
+            name=name,
+            path=path,
+            imports=imported_modules(package_root, path, repository_packages),
+        )
     return modules
 
 
@@ -123,22 +130,34 @@ def check_package_readme(package_root: pathlib.Path) -> None:
         fail(f"{readme.relative_to(ROOT)} must stay under {MAX_README_WORDS} words")
 
 
-def check_package(package_root: pathlib.Path) -> None:
+def check_package(package_root: pathlib.Path, repository_packages: set[str]) -> dict[str, ModuleInfo]:
     if not (package_root / "py.typed").is_file():
         fail(f"{package_root.relative_to(ROOT)} is missing py.typed")
     check_package_readme(package_root)
-    modules = load_modules(package_root)
+    modules = load_modules(package_root, repository_packages)
     cycle = find_cycle(internal_edges(modules))
     if cycle:
         fail(f"internal import cycle in {package_root.name}: {' -> '.join(cycle)}")
+    return modules
 
 
 def main() -> int:
     if not PACKAGE_SRC_ROOTS:
         fail("no package source roots found")
-    for package_root in PACKAGE_SRC_ROOTS:
-        if package_root.is_dir() and not package_root.name.endswith(".egg-info"):
-            check_package(package_root)
+    package_roots = [
+        path
+        for path in PACKAGE_SRC_ROOTS
+        if path.is_dir() and not path.name.endswith(".egg-info")
+    ]
+    repository_packages = {path.name for path in package_roots}
+    repository_modules: dict[str, ModuleInfo] = {}
+    for package_root in package_roots:
+        repository_modules.update(check_package(package_root, repository_packages))
+    cycle = find_cycle(internal_edges(repository_modules))
+    if cycle:
+        fail(f"cross-package import cycle: {' -> '.join(cycle)}")
+    if "ignore_errors = true" in (ROOT / "pyproject.toml").read_text():
+        fail("pyproject.toml contains a whole-module mypy exemption")
     sys.stdout.write("check_structure: ok\n")
     return 0
 

@@ -7,7 +7,6 @@ import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
-from typing import Any
 from unittest import mock
 
 from mere_shotgrid_tools import cli
@@ -15,9 +14,9 @@ from mere_shotgrid_tools import cli
 
 class FakeShotGrid:
     def __init__(self) -> None:
-        self.created: list[tuple[str, dict[str, Any]]] = []
-        self.updated: list[tuple[str, int, dict[str, Any], dict[str, Any]]] = []
-        self.uploaded: list[tuple[str, int, str, dict[str, Any]]] = []
+        self.created: list[tuple[str, cli.JsonMap]] = []
+        self.updated: list[tuple[str, int, cli.JsonMap, dict[str, object]]] = []
+        self.uploaded: list[tuple[str, int, str, dict[str, object]]] = []
         self.thumbnails: list[tuple[str, int, str]] = []
         self.deleted: list[tuple[str, int]] = []
         self.next_id = 1000
@@ -26,7 +25,9 @@ class FakeShotGrid:
         self.next_id += 1
         return self.next_id
 
-    def find_one(self, entity_type: str, filters: list[list[Any]], _fields: list[str]) -> dict[str, Any] | None:
+    def find_one(
+        self, entity_type: str, filters: cli.ShotGridFilters, _fields: list[str]
+    ) -> cli.JsonMap | None:
         if entity_type == "Project":
             return {"type": "Project", "id": 123, "name": "Demo"}
         if entity_type == "Shot":
@@ -39,7 +40,9 @@ class FakeShotGrid:
             return {"type": "Version", "id": filters[0][2], "code": "shot010_v003", "sg_status_list": "rev"}
         return None
 
-    def find(self, entity_type: str, filters: list[list[Any]], fields: list[str], limit: int = 50) -> list[dict[str, Any]]:
+    def find(
+        self, entity_type: str, filters: cli.ShotGridFilters, fields: list[str], limit: int = 50
+    ) -> list[cli.JsonMap]:
         self.updated.append(("find", 0, {"entity_type": entity_type, "filters": filters, "fields": fields, "limit": limit}, {}))
         return [
             {
@@ -53,15 +56,17 @@ class FakeShotGrid:
             }
         ]
 
-    def create(self, entity_type: str, data: dict[str, Any]) -> dict[str, Any]:
+    def create(self, entity_type: str, data: cli.JsonMap) -> cli.JsonMap:
         self.created.append((entity_type, data))
         return {"type": entity_type, "id": self._id(), **({"code": data.get("code")} if data.get("code") else {})}
 
-    def update(self, entity_type: str, entity_id: int, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+    def update(
+        self, entity_type: str, entity_id: int, data: cli.JsonMap, **kwargs: object
+    ) -> cli.JsonMap:
         self.updated.append((entity_type, entity_id, data, kwargs))
         return {"type": entity_type, "id": entity_id, **data}
 
-    def upload(self, entity_type: str, entity_id: int, path: str, **kwargs: Any) -> int:
+    def upload(self, entity_type: str, entity_id: int, path: str, **kwargs: object) -> int:
         self.uploaded.append((entity_type, entity_id, path, kwargs))
         return self._id()
 
@@ -297,7 +302,9 @@ class MereShotGridToolsTests(unittest.TestCase):
                 super().__init__()
                 self.project_calls = 0
 
-            def find_one(self, entity_type: str, filters: list[list[Any]], _fields: list[str]) -> dict[str, Any] | None:
+            def find_one(
+                self, entity_type: str, filters: cli.ShotGridFilters, _fields: list[str]
+            ) -> cli.JsonMap | None:
                 if entity_type == "Project":
                     self.project_calls += 1
                     if filters[0][0] == "code":
@@ -325,7 +332,7 @@ class MereShotGridToolsTests(unittest.TestCase):
 
     def test_execute_manifest_wraps_unexpected_shotgrid_errors(self) -> None:
         class BrokenShotGrid(FakeShotGrid):
-            def create(self, _entity_type: str, _data: dict[str, Any]) -> dict[str, Any]:
+            def create(self, _entity_type: str, _data: cli.JsonMap) -> cli.JsonMap:
                 raise RuntimeError("provider exploded")
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -430,7 +437,7 @@ class MereShotGridToolsTests(unittest.TestCase):
                 super().__init__()
                 self.attempts = 0
 
-            def upload(self, entity_type: str, entity_id: int, path: str, **kwargs: Any) -> int:
+            def upload(self, entity_type: str, entity_id: int, path: str, **kwargs: object) -> int:
                 self.attempts += 1
                 if self.attempts == 1:
                     raise RuntimeError("transient")

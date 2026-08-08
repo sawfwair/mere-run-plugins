@@ -9,7 +9,6 @@ import time
 from typing import cast
 
 import numpy as np
-from numpy.typing import NDArray
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, as_map
 
@@ -21,10 +20,9 @@ from .bundle import (
     sha256_file,
 )
 from .constants import OLMOEARTH_MODELS, TESSERA_MODELS
+from .external_types import FloatArray, Int64Array, NumericArray, UInt8Array
 from .provider import CandidateResult
-from .runtime import artifact_path, load_zarr, resolve_mere_run_executable
-
-FloatArray = NDArray[np.float32]
+from .runtime import artifact_path, load_zarr, numeric_value, resolve_mere_run_executable
 
 
 def execute_tessera_embedding(
@@ -35,8 +33,6 @@ def execute_tessera_embedding(
     dimensions: int | None,
     batch_pixels: int,
 ) -> CandidateResult:
-    import zarr
-
     require_metal(requested_device, "TESSERA")
     if dimensions is not None and dimensions not in {16, 32, 64, 128, 1024}:
         raise GraphProviderError("TESSERA dimensions must be 16, 32, 64, 128, or 1024")
@@ -44,18 +40,27 @@ def execute_tessera_embedding(
         raise GraphProviderError("TESSERA batch_pixels must be positive")
     bundle = load_bundle(bundle_root, expected_kinds={TESSERA_BUNDLE_KIND})
     artifacts = as_map(bundle["artifacts"], "input artifacts")
-    s2 = np.asarray(
-        load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S2"))),
-        dtype=np.float32,
-    )
-    valid = np.asarray(
-        load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, "S2_VALID"))),
-        dtype=np.uint8,
-    )
-    radar = {
-        name: np.asarray(
-            load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, name))),
+    s2 = cast(
+        FloatArray,
+        np.asarray(
+            load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S2"))),
             dtype=np.float32,
+        ),
+    )
+    valid = cast(
+        UInt8Array,
+        np.asarray(
+            load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S2_VALID"))),
+            dtype=np.uint8,
+        ),
+    )
+    radar: dict[str, FloatArray] = {
+        name: cast(
+            FloatArray,
+            np.asarray(
+                load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, name))),
+                dtype=np.float32,
+            ),
         )
         for name in ["S1_ASC", "S1_DESC"]
         if name in artifacts
@@ -96,13 +101,13 @@ def execute_tessera_embedding(
         raise GraphProviderError("TESSERA bundle contains no cloud-valid Sentinel-2 pixels")
     spatial = output.reshape(height, width, output.shape[1])
     selected_model = native_runs[0].get("model_id") if native_runs else model
-    metadata = {
+    output_metadata: dict[str, str] = {
         "format": "mere.geo/tessera-v2-spatial-embeddings-v1",
         "model_id": str(selected_model),
         "dimensions": str(output.shape[1]),
         "crs": cast(str, grid["crs"]),
     }
-    save_safetensors({"embeddings": spatial}, locations["embeddings"], metadata)
+    save_safetensors({"embeddings": spatial}, locations["embeddings"], output_metadata)
     elapsed = time.monotonic() - started
     invalid_pixels = int((valid_counts == 0).sum())
     write_embedding_manifest(
@@ -152,14 +157,16 @@ def execute_olmoearth_embedding(
     input_resolution: float | None,
     include_tokens: bool,
 ) -> CandidateResult:
-    import zarr
-
     require_metal(requested_device, "OlmoEarth")
     if patch_size not in {1, 2, 4, 8}:
         raise GraphProviderError("OlmoEarth patch_size must be 1, 2, 4, or 8")
     bundle = load_bundle(bundle_root, expected_kinds={OLMOEARTH_BUNDLE_KIND})
     grid = as_map(bundle["grid"], "grid")
-    resolution = float(input_resolution if input_resolution is not None else grid["resolution_m"])
+    resolution = (
+        input_resolution
+        if input_resolution is not None
+        else numeric_value(grid["resolution_m"], "grid resolution_m")
+    )
     if resolution <= 0:
         raise GraphProviderError("OlmoEarth input_resolution must be positive")
     height = cast(int, grid["height"])
@@ -167,14 +174,14 @@ def execute_olmoearth_embedding(
     if height % patch_size or width % patch_size:
         raise GraphProviderError("OlmoEarth bundle dimensions must be divisible by patch_size")
     artifacts = as_map(bundle["artifacts"], "input artifacts")
-    inputs: dict[str, np.ndarray] = {
+    inputs: dict[str, NumericArray] = {
         "TIMESTAMPS": np.asarray(bundle["timestamps"], dtype=np.int32)[None, :, :]
     }
     for name in ["S2L2A", "S1RTC", "LANDSAT"]:
         if name not in artifacts:
             continue
         array = np.asarray(
-            load_zarr(zarr, confined_bundle_path(bundle_root, artifact_path(artifacts, name))),
+            load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, name))),
             dtype=np.float32,
         )
         inputs[name] = np.ascontiguousarray(array.transpose(2, 3, 0, 1)[None, ...])
@@ -264,11 +271,11 @@ def sequence_bucket(count: int) -> int | None:
 def tessera_pixel_batch(
     bundle: JsonMap,
     s2: FloatArray,
-    valid: NDArray[np.uint8],
+    valid: UInt8Array,
     radar: dict[str, FloatArray],
-    pixel_indices: NDArray[np.int64],
+    pixel_indices: Int64Array,
     sequence_length: int,
-) -> dict[str, np.ndarray]:
+) -> dict[str, NumericArray]:
     pixel_count = s2.shape[-2] * s2.shape[-1]
     s2_flat = s2.reshape(s2.shape[0], s2.shape[1], pixel_count)
     valid_flat = valid.reshape(valid.shape[0], pixel_count)
@@ -281,7 +288,7 @@ def tessera_pixel_batch(
         selected = available[positions]
         sampled_values[row] = s2_flat[selected, :, pixel]
         sampled_days[row] = s2_doy[selected]
-    inputs: dict[str, np.ndarray] = {"S2": sampled_values, "S2_DOY": sampled_days}
+    inputs: dict[str, NumericArray] = {"S2": sampled_values, "S2_DOY": sampled_days}
     for name, values in radar.items():
         flat = values.reshape(values.shape[0], values.shape[1], pixel_count)
         inputs[name] = np.ascontiguousarray(flat[:, :, pixel_indices].transpose(2, 0, 1))
@@ -293,7 +300,7 @@ def tessera_pixel_batch(
 
 
 def native_tessera_forward(
-    inputs: dict[str, np.ndarray],
+    inputs: dict[str, NumericArray],
     executable: str,
     model: str | None,
     dimensions: int | None,
@@ -317,7 +324,7 @@ def native_tessera_forward(
 
 
 def native_olmoearth_forward(
-    inputs: dict[str, np.ndarray],
+    inputs: dict[str, NumericArray],
     output_path: pathlib.Path,
     executable: str,
     model: str | None,
@@ -370,7 +377,7 @@ def run_native(command: list[str], name: str, timeout: int) -> JsonMap:
 
 
 def save_safetensors(
-    arrays: dict[str, np.ndarray],
+    arrays: dict[str, NumericArray],
     path: pathlib.Path,
     metadata: dict[str, str],
 ) -> None:
@@ -379,10 +386,10 @@ def save_safetensors(
     save_file(arrays, str(path), metadata=metadata)
 
 
-def load_safetensors(path: pathlib.Path) -> dict[str, np.ndarray]:
+def load_safetensors(path: pathlib.Path) -> dict[str, NumericArray]:
     from safetensors.numpy import load_file
 
-    return load_file(str(path))
+    return cast(dict[str, NumericArray], load_file(str(path)))
 
 
 def native_metadata(payload: JsonMap) -> JsonMap:
