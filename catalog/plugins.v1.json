@@ -1,12 +1,12 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-03T00:00:00Z",
+  "updatedAt": "2026-08-07T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
       "id": "mere-geo-tools",
       "name": "Geospatial Tools",
-      "description": "Run pinned geospatial candidate models with content-addressed raster provenance, including TerraMind flood segmentation.",
+      "description": "Run humanitarian geospatial candidates and Earth-observation embeddings with content-addressed raster provenance.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-geo-tools",
       "subdirectory": "packages/mere-geo-tools",
@@ -14,6 +14,8 @@
       "capabilities": [
         "geospatial",
         "flood-segmentation",
+        "fire-segmentation",
+        "earth-observation-embeddings",
         "graph-node-provider-v1",
         "provenance"
       ],

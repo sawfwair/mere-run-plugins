@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mere-geo-tools"
-version = "0.1.0"
-description = "Provenance-preserving geospatial graph providers for mere.run"
+version = "0.2.0"
+description = "Humanitarian geospatial candidates and embeddings for mere.run"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

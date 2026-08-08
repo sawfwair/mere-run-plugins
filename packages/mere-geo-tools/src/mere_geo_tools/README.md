@@ -1,30 +1,33 @@
 # mere_geo_tools Source Map
 
-`mere_geo_tools` is the provenance-preserving geospatial graph provider for
-`mere.run`. Its initial node prepares and executes TerraMind flood segmentation
-as a candidate-only analysis lane.
+`mere_geo_tools` owns the acquisition and provenance side of portable
+humanitarian geo workflows. Core `mere.run` owns the neural forwards and
+hardware-aware model selection.
 
 Entry points:
 
-- `cli.py`: operator commands for manifests, diagnostics, bundle preparation,
-  direct inspection, comparison, and graph-provider execution.
-- `provider.py`: the `mere.graph-provider/v1` catalog, preflight, and execute
-  boundary for `geo.flood.segment`.
-- `prepare.py`: schema-checked Planetary Computer discovery, reprojection,
-  temporal stacking, and content-addressed input bundle creation.
-- `runtime.py`: normalization, deterministic tiling, native `mere.run geo flood`
-  handoff, COG/preview writing, and candidate comparison metrics.
-- `bundle.py`: input-bundle parsing, ordering, path containment, and digest
-  verification.
-- `constants.py`: pinned model, checkpoint, modality, and normalization
-  contracts.
+- `cli.py`: machine-readable manifest, doctor, prepare, inspect, comparison,
+  and graph-provider commands.
+- `provider.py`: catalogs, preflights, and executes `geo.flood.segment`,
+  `geo.fire.segment`, `geo.tessera.embed`, and `geo.olmoearth.embed`.
+- `prepare.py`: shared four-timestep TerraMind Flood/Fire STAC preparation.
+- `prepare_embeddings.py`: TESSERA temporal and OlmoEarth multisensor STAC
+  preparation, band ordering, cloud masks, timestamps, and radar conversion.
+- `runtime.py`: TerraMind normalization, deterministic tiling, native hazard
+  handoff, COG writing, and review previews.
+- `embedding_runtime.py`: TESSERA cloud-valid pixel batching and OlmoEarth
+  spatial handoffs, then georeferenced safetensors manifests.
+- `bundle.py`: typed bundle parsing, modality validation, path containment, and
+  artifact digest verification.
+- `constants.py`: immutable upstream revisions, native weight hashes, band
+  orders, and hazard normalization contracts.
 
 Important boundaries:
 
-- Keep provider stdout JSON-only.
-- Treat STAC responses and bundles as untrusted until validated.
+- Keep stdout JSON-only and diagnostics on stderr.
+- Treat STAC responses and prepared bundles as untrusted until validated.
 - Preserve canonical source identities and SHA-256 provenance in every output.
-- Keep flood artifacts classified as `candidate-only`; this provider does not
-  author authoritative findings or ranked analyst briefs.
-- Keep neural inference native: the provider may prepare and reconstruct arrays,
-  but the TerraMind forward pass belongs to Swift/MLX on Apple Metal.
+- Keep hazard artifacts `candidate-only` and embeddings `derived-feature`.
+- Keep neural inference native; preparation and reconstruction live here, but
+  model execution belongs to Swift/MLX on Apple Metal.
+- Preserve OlmoEarth's upstream license notice in its output manifest.

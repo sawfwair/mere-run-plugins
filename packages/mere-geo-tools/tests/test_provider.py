@@ -6,9 +6,28 @@ import tempfile
 import unittest
 from unittest import mock
 
-from mere_geo_tools import cli, prepare, provider
-from mere_geo_tools.bundle import BUNDLE_KIND, BUNDLE_VERSION, canonical_digest, load_bundle, sha256_file
-from mere_geo_tools.constants import MODEL_ID, MODEL_REVISION, S1_BANDS, S2_BANDS, TEMPORAL_ROLES
+from mere_geo_tools import cli, prepare, prepare_embeddings, provider
+from mere_geo_tools.bundle import (
+    BUNDLE_KIND,
+    BUNDLE_VERSION,
+    FIRE_BUNDLE_KIND,
+    OLMOEARTH_BUNDLE_KIND,
+    TESSERA_BUNDLE_KIND,
+    canonical_digest,
+    load_bundle,
+    sha256_file,
+)
+from mere_geo_tools.constants import (
+    FIRE_MODEL_ID,
+    FIRE_MODEL_REVISION,
+    MODEL_ID,
+    MODEL_REVISION,
+    OLMOEARTH_S2_BANDS,
+    S1_BANDS,
+    S2_BANDS,
+    TEMPORAL_ROLES,
+    TESSERA_S2_BANDS,
+)
 from mere_workflow_tools.graph_sdk import (
     GraphProviderError,
     validate_catalog,
@@ -90,11 +109,76 @@ class GeoProviderTests(unittest.TestCase):
             },
         }
 
+    def make_embedding_bundle(self, root: pathlib.Path, family: str) -> pathlib.Path:
+        bundle = root / f"{family}-bundle"
+        bundle.mkdir(parents=True)
+        grid = {
+            "crs": "EPSG:32617",
+            "transform": [10, 0, 385000, 0, -10, 3924000],
+            "width": 16,
+            "height": 16,
+            "resolution_m": 10,
+        }
+        if family == "tessera":
+            kind = TESSERA_BUNDLE_KIND
+            modalities = {
+                "S2": {"bands": TESSERA_S2_BANDS, "shape": [2, 10, 16, 16], "doy": [10, 20]},
+                "S1_ASC": {"bands": S1_BANDS, "shape": [2, 2, 16, 16], "doy": [11, 21]},
+            }
+            names = ["S2", "S2_VALID", "S1_ASC"]
+            extra = {"S2_DOY": [10, 20], "S1_ASC_DOY": [11, 21]}
+        else:
+            kind = OLMOEARTH_BUNDLE_KIND
+            modalities = {
+                "S2L2A": {"bands": OLMOEARTH_S2_BANDS, "shape": [2, 12, 16, 16]},
+            }
+            names = ["S2L2A"]
+            extra = {"timestamps": [[1, 0, 2026], [1, 1, 2026]]}
+        artifacts = {}
+        entries = []
+        for name in names:
+            path = bundle / name / f"fixture_{name}.zarr.zip"
+            path.parent.mkdir()
+            path.write_bytes(f"fixture-{name}".encode())
+            digest = sha256_file(path)
+            relative = path.relative_to(bundle).as_posix()
+            artifacts[name] = {"path": relative, "bytes": path.stat().st_size, "sha256": digest}
+            entries.append({"name": name, "path": relative, "sha256": digest})
+        manifest = {
+            "kind": kind,
+            "version": BUNDLE_VERSION,
+            "sample_id": "fixture",
+            "model_family": {"name": family},
+            "grid": grid,
+            "modalities": modalities,
+            "sources": {},
+            "artifacts": artifacts,
+            "input_digest": canonical_digest(entries),
+            **extra,
+        }
+        (bundle / "manifest.json").write_text(json.dumps(manifest))
+        return bundle
+
+    def embedding_invocation(self, bundle: pathlib.Path, kind: str) -> dict[str, object]:
+        return {
+            "contract_version": "mere.run/plugin-graph-invocation.v1",
+            "kind": kind,
+            "arguments": {"input_bundle": str(bundle), "device": "auto"},
+            "outputs": {
+                "embeddings": {"type": "asset", "path": "artifacts/embeddings.safetensors"},
+                "manifest": {"type": "asset", "path": "artifacts/embeddings.json"},
+            },
+        }
+
     def test_catalog_and_plugin_manifest_expose_candidate_provider(self) -> None:
         value = provider.catalog()
         validate_catalog(value)
         self.assertEqual(value["provider_id"], "mere-geo-tools")
         self.assertEqual(value["nodes"][0]["kind"], "geo.flood.segment")
+        self.assertEqual(
+            {node["kind"] for node in value["nodes"]},
+            {"geo.flood.segment", "geo.fire.segment", "geo.tessera.embed", "geo.olmoearth.embed"},
+        )
         self.assertIn("metal", value["nodes"][0]["requirements"]["accelerator_backends"])
         self.assertEqual(
             value["nodes"][0]["requirements"]["model_ids"],
@@ -103,6 +187,8 @@ class GeoProviderTests(unittest.TestCase):
         manifest = cli.plugin_manifest()
         self.assertEqual(manifest["graphProvider"]["contractVersion"], "mere.run/plugin-graph-provider.v1")
         self.assertIn("flood-segmentation", manifest["capabilities"])
+        self.assertIn("fire-segmentation", manifest["capabilities"])
+        self.assertIn("earth-observation-embeddings", manifest["capabilities"])
 
     def test_doctor_requires_only_native_provider_dependencies(self) -> None:
         with mock.patch(
@@ -130,6 +216,69 @@ class GeoProviderTests(unittest.TestCase):
             prepare.validate_recipe(self.source_recipe("EPSG:4326"))
         with self.assertRaisesRegex(GraphProviderError, "target.crs is invalid"):
             prepare.validate_recipe(self.source_recipe("not-a-crs"))
+
+    def test_fire_recipe_uses_independent_bundle_and_model_pin(self) -> None:
+        recipe = self.source_recipe()
+        recipe["kind"] = "mere.geo/terramind-fire-source-recipe"
+        prepare.validate_recipe(recipe)
+        self.assertEqual(
+            prepare.hazard_contract(recipe["kind"]),
+            (FIRE_BUNDLE_KIND, FIRE_MODEL_ID, FIRE_MODEL_REVISION),
+        )
+
+    def test_embedding_recipes_require_real_temporal_inputs(self) -> None:
+        target = {"aoi": [32.67, 46.59, 32.78, 46.64], "crs": "EPSG:32636"}
+        tessera = {
+            "kind": "mere.geo/tessera-v2-source-recipe",
+            "version": 1,
+            "sample_id": "annual-history",
+            "target": target,
+            "observations": {
+                "S2": [{"collection": "sentinel-2-l2a", "item": "s2-a"}],
+                "S1_ASC": [{"collection": "sentinel-1-rtc", "item": "s1-a"}],
+            },
+        }
+        prepare_embeddings.validate_embedding_recipe(tessera)
+        olmo = {
+            "kind": "mere.geo/olmoearth-v1.2-source-recipe",
+            "version": 1,
+            "sample_id": "multisensor",
+            "target": target,
+            "timesteps": [
+                {
+                    "observed_at": "2026-06-15T10:00:00Z",
+                    "S2L2A": {"collection": "sentinel-2-l2a", "item": "s2-a"},
+                }
+            ],
+        }
+        prepare_embeddings.validate_embedding_recipe(olmo)
+        olmo["timesteps"][0]["observed_at"] = "2026-06-15"
+        with self.assertRaisesRegex(GraphProviderError, "include a timezone"):
+            prepare_embeddings.validate_embedding_recipe(olmo)
+
+    def test_embedding_bundles_are_typed_and_content_addressed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            tessera = load_bundle(self.make_embedding_bundle(root, "tessera"))
+            olmo = load_bundle(self.make_embedding_bundle(root, "olmoearth"))
+            self.assertEqual(tessera["kind"], TESSERA_BUNDLE_KIND)
+            self.assertEqual(olmo["kind"], OLMOEARTH_BUNDLE_KIND)
+
+    def test_embedding_preflight_probes_the_matching_native_command(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = pathlib.Path(raw_root)
+            invocation = self.embedding_invocation(
+                self.make_embedding_bundle(root, "tessera"), "geo.tessera.embed"
+            )
+            with mock.patch(
+                "mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"
+            ), mock.patch.object(provider, "probe_native_geo", return_value=None) as probe, mock.patch.object(
+                provider.platform, "system", return_value="Darwin"
+            ):
+                report = provider.preflight(invocation, root / "run")
+            validate_preflight(report)
+            self.assertEqual(report["status"], "ok")
+            probe.assert_called_once_with("/tmp/mere.run", "tessera")
 
     def test_bundle_rejects_wrong_temporal_order_and_hash_drift(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:

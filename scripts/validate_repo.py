@@ -371,8 +371,15 @@ def validate_graph_provider() -> None:
     if geo_catalog["provider_id"] != "mere-geo-tools":
         fail("geo graph provider reported the wrong provider id")
     geo_nodes = as_list(geo_catalog["nodes"], "geo graph nodes")
-    if len(geo_nodes) != 1 or as_map(geo_nodes[0], "geo graph node")["kind"] != "geo.flood.segment":
-        fail("geo graph provider must expose geo.flood.segment")
+    geo_kinds = {as_map(node, "geo graph node")["kind"] for node in geo_nodes}
+    expected_geo_kinds = {
+        "geo.flood.segment",
+        "geo.fire.segment",
+        "geo.tessera.embed",
+        "geo.olmoearth.embed",
+    }
+    if geo_kinds != expected_geo_kinds:
+        fail(f"geo graph provider must expose {sorted(expected_geo_kinds)}")
 
 
 def validate_runpod_plan() -> None:
