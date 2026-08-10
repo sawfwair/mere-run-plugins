@@ -10,6 +10,8 @@ Entry points:
   artifact tracking, resume, and cleanup commands.
 - `doc_cli.py`, `media_cli.py`, `dataset_cli.py`, `transcript_cli.py`,
   `image_compose_cli.py`, `batch_cli.py`: focused command wrappers.
+- `identity_cli.py`: generic identity graph-provider facade for a separately
+  installed local backend; product-specific identities never enter this repo.
 
 Important boundaries:
 
