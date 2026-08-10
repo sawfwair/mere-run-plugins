@@ -111,6 +111,7 @@ def catalog_node(
             "cacheable": False,
             "side_effects": "local",
             "supports_progress": True,
+            "supports_previews": False,
         },
     }
 

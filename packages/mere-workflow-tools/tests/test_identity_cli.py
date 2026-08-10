@@ -21,6 +21,9 @@ class IdentityCliTests(unittest.TestCase):
             sorted(node["kind"] for node in catalog["nodes"]),
             identity_cli.NODE_KINDS,
         )
+        self.assertTrue(
+            all(node["traits"]["supports_previews"] is False for node in catalog["nodes"])
+        )
         serialized = json.dumps({"manifest": manifest, "catalog": catalog}).lower()
         self.assertIn("identity", serialized)
         self.assertNotIn("product-specific", serialized)
