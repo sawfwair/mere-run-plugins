@@ -250,7 +250,12 @@ def main() -> int:
                 ]
             )
         if args.graph_command == "catalog":
-            return run_backend(["graph", "catalog", "--json"])
+            # The public facade owns the provider identity and version that
+            # mere.run validates and Relay uses for placement. Private
+            # backends may version independently, so their catalog identity
+            # must never leak through or invalidate the installed facade.
+            print_json(graph_catalog())
+            return 0
         flag = "--json" if args.graph_command == "preflight" else "--json-stream"
         return run_backend(
             [
