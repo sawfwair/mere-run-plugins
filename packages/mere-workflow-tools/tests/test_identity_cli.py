@@ -52,14 +52,19 @@ class IdentityCliTests(unittest.TestCase):
             check=False,
         )
 
-    def test_graph_catalog_fails_closed_through_the_configured_backend(self) -> None:
+    def test_graph_catalog_is_owned_by_the_public_facade(self) -> None:
+        output = io.StringIO()
         with (
             mock.patch("sys.argv", ["mere-identity-tools", "graph", "catalog", "--json"]),
-            mock.patch("mere_workflow_tools.identity_cli.run_backend", return_value=7) as run,
+            mock.patch("mere_workflow_tools.identity_cli.run_backend") as run,
+            redirect_stdout(output),
         ):
-            self.assertEqual(identity_cli.main(), 7)
+            self.assertEqual(identity_cli.main(), 0)
 
-        run.assert_called_once_with(["graph", "catalog", "--json"])
+        catalog = json.loads(output.getvalue())
+        self.assertEqual(catalog["provider_id"], identity_cli.PROVIDER_ID)
+        self.assertEqual(catalog["provider_version"], identity_cli.__version__)
+        run.assert_not_called()
 
     def test_stage_uses_neutral_registry_flag_and_forwards_backend_contract(self) -> None:
         with (
