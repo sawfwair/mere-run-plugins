@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-dialogue-qc.v1.schema.json",
+  "title": "mere.run Film Dialogue QC v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "createdAt", "sourceDigest", "verifier", "complete", "summary", "lines"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-dialogue-qc.v1"},
+    "projectId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "sourceDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "model", "profile"],
+      "properties": {
+        "command": {"const": "mere.run speech transcribe"},
+        "model": {"type": "string", "minLength": 1},
+        "profile": {"const": "asr-word-recall-0.6-v1"}
+      }
+    },
+    "complete": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "passed", "review"],
+      "properties": {
+        "lines": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "review": {"type": "integer", "minimum": 0}
+      }
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["jobId", "shotId", "speaker", "audio", "audioSha256", "expected", "transcript", "wordRecall", "decision"],
+        "properties": {
+          "jobId": {"type": "string", "minLength": 1},
+          "shotId": {"type": "string", "minLength": 1},
+          "speaker": {"type": "string", "minLength": 1},
+          "audio": {"type": "string", "minLength": 1},
+          "audioSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "expected": {"type": "string", "minLength": 1},
+          "transcript": {"type": "string"},
+          "wordRecall": {"type": "number", "minimum": 0, "maximum": 1},
+          "decision": {"enum": ["pass", "review"]}
+        }
+      }
+    }
+  }
+}

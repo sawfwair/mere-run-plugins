@@ -1,6 +1,6 @@
 # Official plugins
 
-The live catalog contains 15 official companion executables.
+The live catalog contains 16 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
@@ -11,6 +11,7 @@ The live catalog contains 15 official companion executables.
 | [Perform](/plugins/perform) | `mere-perform` | Realtime Magenta Heart performance | Local |
 | [Image Tools](/plugins/image-tools) | `mere-image-tools` | Subject knockout and matte cleanup | Local |
 | [Animatic Tools](/plugins/animatic-tools) | `mere-animatic-tools` | Animatic production kits and delivery prep | Local |
+| [Film Studio](/plugins/film-tools) | `mere-film-tools` | Pi-directed short-film development, local production, review, and delivery | Local plus user-selected Pi provider |
 | [ShotGrid Tools](/plugins/shotgrid-tools) | `mere-shotgrid-tools` | Production tracking and review publishing | User-controlled provider |
 | [RunPod Runner](/plugins/runpod) | `mere-runpod` | Ephemeral GPU recipe execution | User-controlled provider |
 | [Document Tools](/plugins/document-tools) | `mere-doc-tools` | OCR and PII redaction | Local |

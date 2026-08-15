@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-animatic-handoff.v1.schema.json",
+  "title": "Mere Film Animatic Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "exportedAt", "source", "project", "cast", "locations", "shots", "assets", "proof"],
+  "properties": {
+    "contractVersion": { "const": "mere.run/film-animatic-handoff.v1" },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "projectRoot", "runManifest", "projectContractVersion", "updatedAt"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "projectRoot": { "type": "string", "minLength": 1 },
+        "runManifest": { "$ref": "#/$defs/relativePath" },
+        "projectContractVersion": { "const": "mere.run/film-project.v1" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "idea", "logline", "synopsis", "theme", "durationMilliseconds", "fps", "aspectRatio", "width", "height"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "idea": { "type": "string", "minLength": 1 },
+        "logline": { "type": ["string", "null"] },
+        "synopsis": { "type": ["string", "null"] },
+        "theme": { "type": ["string", "null"] },
+        "durationMilliseconds": { "type": "integer", "minimum": 1 },
+        "fps": { "type": "integer", "minimum": 1 },
+        "aspectRatio": { "type": "string", "minLength": 1 },
+        "width": { "type": ["integer", "null"], "minimum": 1 },
+        "height": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "cast": { "type": "array", "items": { "$ref": "#/$defs/cast" } },
+    "locations": { "type": "array", "items": { "$ref": "#/$defs/location" } },
+    "shots": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/shot" } },
+    "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
+    "proof": { "$ref": "#/$defs/proof" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+    "relativePath": { "type": "string", "minLength": 1, "not": { "pattern": "^(?:/|.*(?:^|/)\\.\\.(?:/|$))" } },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "cast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "visual", "wardrobe", "voice"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "visual": { "type": "string", "minLength": 1 },
+        "wardrobe": { "type": "string", "minLength": 1 },
+        "voice": { "type": "string", "minLength": 1 },
+        "seed": { "type": "integer" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "visual", "ambience"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "visual": { "type": "string", "minLength": 1 },
+        "ambience": { "type": "string", "minLength": 1 },
+        "seed": { "type": "integer" }
+      }
+    },
+    "dialogue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speaker", "text", "startSeconds", "delivery"],
+      "properties": {
+        "speaker": { "$ref": "#/$defs/id" },
+        "text": { "type": "string", "minLength": 1 },
+        "startSeconds": { "type": "number", "minimum": 0 },
+        "delivery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "soundEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "startSeconds", "durationSeconds", "levelDb", "seed"],
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1 },
+        "startSeconds": { "type": "number", "minimum": 0 },
+        "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "levelDb": { "type": "number" },
+        "seed": { "type": "integer" }
+      }
+    },
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "order", "purpose", "prompt", "framePrompt", "timelineStartMilliseconds", "durationMilliseconds", "characterIds", "locationId", "transition", "take", "seed", "keyframeAssetId", "clipAssetId", "dialogue", "soundEffects"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "order": { "type": "integer", "minimum": 0 },
+        "purpose": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "framePrompt": { "type": "string", "minLength": 1 },
+        "timelineStartMilliseconds": { "type": "integer", "minimum": 0 },
+        "durationMilliseconds": { "type": "integer", "minimum": 1 },
+        "characterIds": { "type": "array", "items": { "$ref": "#/$defs/id" }, "uniqueItems": true },
+        "locationId": { "$ref": "#/$defs/id" },
+        "transition": { "type": "string", "minLength": 1 },
+        "take": { "type": "integer", "minimum": 1 },
+        "seed": { "type": "integer", "minimum": 0 },
+        "keyframeAssetId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "clipAssetId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "dialogue": { "type": "array", "items": { "$ref": "#/$defs/dialogue" } },
+        "soundEffects": { "type": "array", "items": { "$ref": "#/$defs/soundEffect" } }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "relativePath", "sha256", "bytes", "contentType", "source"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "minLength": 1 },
+        "relativePath": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "contentType": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["creation", "clips", "assembly", "dialogue", "sound", "captions", "inspection", "review", "humanReview", "delivery"],
+      "properties": {
+        "creation": { "type": "boolean" },
+        "clips": { "type": "boolean" },
+        "assembly": { "type": "boolean" },
+        "dialogue": { "type": "boolean" },
+        "sound": { "type": "boolean" },
+        "captions": { "type": "boolean" },
+        "inspection": { "type": "boolean" },
+        "review": { "type": "boolean" },
+        "humanReview": { "type": "boolean" },
+        "delivery": { "type": "boolean" }
+      }
+    }
+  }
+}

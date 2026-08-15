@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -29,11 +29,12 @@ if rg -n 'ignore_errors\s*=\s*true' pyproject.toml; then
   echo "Whole-module mypy exemptions are forbidden." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
 "$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-face-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-film-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-workflow-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-geo-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-animatic-tools/tests
@@ -48,6 +49,7 @@ unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-face-tools
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-film-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-workflow-tools
 if "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
   "$PYTHON" -m pip install -q --disable-pip-version-check --no-deps ./packages/mere-geo-tools
@@ -120,6 +122,57 @@ result = subprocess.run(
 )
 if '"runId": "installed-image-smoke"' not in result.stdout:
     raise SystemExit("installed image-tools smoke did not produce expected run manifest")
+
+film_cli = pathlib.Path(sys.executable).with_name("mere-film-tools")
+result = subprocess.run(
+    [
+        str(film_cli),
+        "plan",
+        "--idea",
+        "A lighthouse keeper receives a signal from a vanished ship.",
+        "--title",
+        "The Last Signal",
+        "--output-dir",
+        str(root / "film"),
+        "--run-id",
+        "installed-film-smoke",
+        "--audience",
+        "science-fiction viewers",
+        "--genre",
+        "science-fiction drama",
+        "--tone",
+        "tense then hopeful",
+        "--rating",
+        "PG",
+        "--reference",
+        "restrained maritime chamber drama",
+        "--usage",
+        "noncommercial",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"runId": "installed-film-smoke"' not in result.stdout:
+    raise SystemExit("installed film-tools smoke did not produce expected run manifest")
+agent = subprocess.run(
+    [
+        str(film_cli),
+        "agent",
+        "--run-manifest",
+        str(root / "film" / "run.json"),
+        "--print-command",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if 'film-studio.ts' not in agent.stdout or 'MERE_FILM_RUN_MANIFEST' not in agent.stdout:
+    raise SystemExit("installed film-tools smoke did not expose bundled Pi resources")
 
 face_cli = pathlib.Path(sys.executable).with_name("mere-face-tools")
 face_photos = root / "face-photos"

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-sound-qc.v1.schema.json",
+  "title": "mere.run Film Sound QC v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "createdAt", "sourceDigest", "verifier", "complete", "summary", "cues"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-sound-qc.v1"},
+    "projectId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "sourceDigest": {"$ref": "#/$defs/sha256"},
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "profile", "minimumPeakDbfs"],
+      "properties": {
+        "command": {"const": "ffprobe + ffmpeg volumedetect"},
+        "profile": {"const": "audio-stream-duration-peak-v2"},
+        "minimumPeakDbfs": {"const": -50.0}
+      }
+    },
+    "complete": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cues", "passed", "failed"],
+      "properties": {
+        "cues": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["jobId", "shotId", "audio", "audioSha256", "durationSeconds", "hasAudioStream", "peakDbfs", "audible", "passed"],
+        "properties": {
+          "jobId": {"type": "string", "minLength": 1},
+          "shotId": {"type": "string", "minLength": 1},
+          "audio": {"type": "string", "minLength": 1},
+          "audioSha256": {"$ref": "#/$defs/sha256"},
+          "durationSeconds": {"type": "number", "minimum": 0},
+          "hasAudioStream": {"type": "boolean"},
+          "peakDbfs": {"type": "number", "minimum": -200, "maximum": 0},
+          "audible": {"type": "boolean"},
+          "passed": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+  }
+}

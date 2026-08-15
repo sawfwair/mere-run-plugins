@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-brief.v1.schema.json",
+  "title": "mere.run Film Brief v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "title", "idea", "target", "creative", "openQuestions", "completeness"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-brief.v1"},
+    "title": {"type": "string", "minLength": 1},
+    "idea": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationSeconds", "width", "height", "fps", "aspectRatio", "audience", "rating", "language", "platform", "usage"],
+      "properties": {
+        "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+        "width": {"type": "integer", "minimum": 64},
+        "height": {"type": "integer", "minimum": 64},
+        "fps": {"type": "integer", "minimum": 1, "maximum": 120},
+        "aspectRatio": {"type": "string", "pattern": "^[0-9]+:[0-9]+$"},
+        "audience": {"type": "string"},
+        "rating": {"type": "string"},
+        "language": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1},
+        "usage": {"enum": ["unspecified", "personal", "noncommercial", "commercial"]}
+      }
+    },
+    "creative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["genre", "tone", "mustHaves", "exclusions", "references"],
+      "properties": {
+        "genre": {"type": "string"},
+        "tone": {"type": "string"},
+        "mustHaves": {"type": "array", "items": {"type": "string"}},
+        "exclusions": {"type": "array", "items": {"type": "string"}},
+        "references": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "openQuestions": {"type": "array", "items": {"type": "string"}},
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["readyForGreenlight", "resolvedFields", "totalFields"],
+      "properties": {
+        "readyForGreenlight": {"type": "boolean"},
+        "resolvedFields": {"type": "integer", "minimum": 0},
+        "totalFields": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

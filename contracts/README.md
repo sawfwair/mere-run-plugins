@@ -11,6 +11,33 @@ companion plugins.
 - `run-manifest.v1.schema.json`: durable execution record written before remote
   resources are created.
 - `artifact-bundle.v1.schema.json`: fetched result bundle inventory.
+- `film-brief.v1.schema.json`: user-confirmed story, audience, creative, and
+  delivery requirements held at the first approval gate.
+- `film-department-result.v1.schema.json`: read-only Pi department proposal
+  boundary.
+- `film-production-plan.v1.schema.json`: accepted cast, location, sound, and
+  shot plan used to derive deterministic local media jobs.
+- `film-production-readiness.v1.schema.json`: source-bound model readiness for
+  every media role required by the accepted plan, including runtime-managed roles.
+- `film-project.v1.schema.json`: durable film phases, approvals, work, proof,
+  issues, and artifact ledger.
+- `film-dialogue-qc.v1.schema.json`: source-bound TTS-to-ASR intelligibility
+  evidence for timed production dialogue.
+- `film-sound-qc.v1.schema.json`: source-bound stream, duration, and audibility
+  validation for generated, timed sound-effect cues.
+- `film-media-inspection.v1.schema.json`: per-shot local vision observations and
+  canon mismatch evidence bound to generated clips.
+- `film-take-selection.v1.schema.json`: local vision scores, hashes, and the
+  deterministic winning candidate for every multi-take shot.
+- `film-captions.v1.schema.json`: source-bound SRT and WebVTT sidecars derived
+  from the accepted dialogue timeline.
+- `film-human-review.v1.schema.json`: explicit approval or revision evidence
+  bound to the exact rough cut and automated review set.
+- `film-delivery.v1.schema.json`: checksum-backed master, caption sidecars,
+  poster, thumbnail, review package, and provenance handoff.
+- `film-animatic-handoff.v1.schema.json`: checksum-backed editorial handoff of
+  normalized cast, locations, shot timing, deterministic seeds, and verified
+  local media into Animatic.
 - `graph-node-provider.v1.schema.json`: versioned node catalog exposed by a
   graph-capable companion plugin.
 - `graph-node-invocation.v1.schema.json`: confined node request written by the

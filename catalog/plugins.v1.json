@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-10T00:00:00Z",
+  "updatedAt": "2026-08-14T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -213,6 +213,54 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-animatic-tools"
+        }
+      }
+    },
+    {
+      "id": "mere-film-tools",
+      "name": "Film Studio",
+      "description": "Turn one idea into a governed local short-film production with a Pi producer-director, crash-safe specialist agents, multi-take local media selection, captions and mastering, explicit human review, and verified delivery.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-film-tools",
+      "subdirectory": "packages/mere-film-tools",
+      "entrypoint": "mere-film-tools",
+      "capabilities": [
+        "film",
+        "short-film",
+        "pi-agent",
+        "multi-agent",
+        "creative-brief",
+        "screenplay",
+        "shot-planning",
+        "character-continuity",
+        "image",
+        "video",
+        "speech",
+        "sound-effects",
+        "transcription",
+        "music",
+        "assembly",
+        "generated-media-inspection",
+        "multi-take-selection",
+        "captions",
+        "loudness-mastering",
+        "model-readiness",
+        "usage-policy-gates",
+        "delivery-stills",
+        "human-review-package",
+        "human-review-decision",
+        "crash-recovery",
+        "review",
+        "delivery",
+        "animatic-handoff",
+        "resumable",
+        "provenance"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools"
         }
       }
     },

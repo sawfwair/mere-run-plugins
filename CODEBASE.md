@@ -21,6 +21,8 @@ Key paths:
   and native `mere.run` hazard/embedding handoffs. It consumes graph contracts
   from `mere-workflow-tools`; the reverse dependency is forbidden.
 - `packages/mere-animatic-tools/`: local Animatic production helpers.
+- `packages/mere-film-tools/`: Pi film-studio harness, governed creative state,
+  local media execution, review, rerolls, and delivery proof.
 - `packages/mere-shotgrid-tools/`: ShotGrid / Flow Production Tracking publish
   and task-pull bridge.
 - `packages/mere-perform/`: local realtime performance plans and stage UI.
