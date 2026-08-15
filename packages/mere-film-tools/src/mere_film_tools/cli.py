@@ -6,6 +6,7 @@ import json
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
 
 from . import __version__
@@ -162,6 +163,40 @@ def executable_detail(value: str) -> str:
     return shutil.which(value) or "not found"
 
 
+def managed_pi_command(mere_run_command: str) -> str | None:
+    if not command_exists(mere_run_command):
+        return None
+    try:
+        process = subprocess.run(
+            [executable_detail(mere_run_command), "agent", "status", "--json"],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if process.returncode != 0:
+        return None
+    try:
+        payload = as_map(json.loads(process.stdout), "mere.run agent status")
+        pi = as_map(payload.get("pi"), "mere.run agent status.pi")
+        path = as_string(pi.get("path"), "mere.run agent status.pi.path")
+    except (json.JSONDecodeError, PluginError):
+        return None
+    if pi.get("installed") is not True or not command_exists(path):
+        return None
+    return executable_detail(path)
+
+
+def resolved_pi_command(pi_command: str, mere_run_command: str) -> str:
+    if command_exists(pi_command):
+        return executable_detail(pi_command)
+    if pi_command == "pi":
+        return managed_pi_command(mere_run_command) or pi_command
+    return pi_command
+
+
 def command_manifest(args: argparse.Namespace) -> int:
     if not args.json:
         eprint("manifest output is JSON; pass --json to make that explicit")
@@ -170,9 +205,10 @@ def command_manifest(args: argparse.Namespace) -> int:
 
 
 def command_doctor(args: argparse.Namespace) -> int:
+    selected_pi = resolved_pi_command(args.pi_command, args.mere_run_command)
     checks: list[JsonMap] = []
     for name, command, required in (
-        ("pi", args.pi_command, True),
+        ("pi", selected_pi, True),
         ("mere.run", args.mere_run_command, True),
         ("ffmpeg", args.ffmpeg_command, True),
         ("ffprobe", args.ffprobe_command, True),
@@ -200,6 +236,8 @@ def command_doctor(args: argparse.Namespace) -> int:
 
 
 def production_defaults(args: argparse.Namespace) -> JsonMap:
+    mere_run_command = args.mere_run_command or os.environ.get("MERE_FILM_TOOLS_MERE_RUN", "mere.run")
+    pi_command = args.pi_command or os.environ.get("MERE_FILM_TOOLS_PI", "pi")
     return {
         "mode": args.production_mode,
         "takesPerShot": args.takes_per_shot,
@@ -209,8 +247,8 @@ def production_defaults(args: argparse.Namespace) -> JsonMap:
         "piTimeoutSeconds": args.pi_timeout,
         "mediaTimeoutSeconds": args.media_timeout,
         "commands": {
-            "pi": args.pi_command or os.environ.get("MERE_FILM_TOOLS_PI", "pi"),
-            "mereRun": args.mere_run_command or os.environ.get("MERE_FILM_TOOLS_MERE_RUN", "mere.run"),
+            "pi": resolved_pi_command(pi_command, mere_run_command),
+            "mereRun": mere_run_command,
             "ffmpeg": args.ffmpeg_command or os.environ.get("MERE_FILM_TOOLS_FFMPEG", "ffmpeg"),
             "ffprobe": args.ffprobe_command or os.environ.get("MERE_FILM_TOOLS_FFPROBE", "ffprobe"),
         },
