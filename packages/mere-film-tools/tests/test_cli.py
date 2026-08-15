@@ -797,6 +797,44 @@ class MereFilmToolsTests(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual({item["detail"] for item in payload["checks"] if item["required"] and not item["ok"]}, {"not found"})
 
+    def test_doctor_and_new_projects_resolve_mere_run_managed_pi(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pi = fake_pi(root / "managed-pi")
+            mere_run = write_executable(
+                root / "mere.run",
+                f'''\nimport json\n\nprint(json.dumps({{"pi": {{"installed": True, "managedInstall": True, "path": {str(pi)!r}, "version": "v0.84.2"}}}}))\n''',
+            )
+            ffmpeg = fake_ffmpeg(root / "ffmpeg")
+            ffprobe = fake_ffprobe(root / "ffprobe")
+            with patch("mere_film_tools.cli.shutil.which", return_value=None):
+                code, output, error = run_cli([
+                    "doctor",
+                    "--pi-command", "pi",
+                    "--mere-run-command", str(mere_run),
+                    "--ffmpeg-command", str(ffmpeg),
+                    "--ffprobe-command", str(ffprobe),
+                ])
+            self.assertEqual(code, 0, error)
+            payload = json.loads(output)
+            pi_check = next(item for item in payload["checks"] if item["name"] == "pi")
+            self.assertEqual(pi_check["detail"], str(pi.resolve()))
+
+            project_root = root / "film"
+            code, output, error = run_cli([
+                *complete_plan_arguments(project_root),
+                "--pi-command", "pi",
+                "--mere-run-command", str(mere_run),
+                "--ffmpeg-command", str(ffmpeg),
+                "--ffprobe-command", str(ffprobe),
+            ])
+            self.assertEqual(code, 0, error)
+            run_manifest = pathlib.Path(json.loads(output)["status"]["runManifest"])
+            project = load_json(run_manifest.parent / "film-project.json")
+            commands = project["production"]["commands"]
+            self.assertEqual(commands["pi"], str(pi.resolve()))
+            self.assertEqual(commands["mereRun"], str(mere_run))
+
     def test_missing_model_blocks_before_any_media_generation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
