@@ -199,6 +199,45 @@ mere-animatic-tools shot-kit \
 The plugin writes local artifacts and a durable `run.json`; it does not create
 paid resources.
 
+## Film Studio Plugin
+
+`mere-film-tools` turns one idea into a governed short-film project. Pi handles
+the producer-director conversation and isolated specialist departments;
+`mere-film-tools` owns the durable brief, canon, approvals, media jobs, review,
+rerolls, and checksum-backed delivery. Image, multi-take video selection, timed
+speech, transcription, timed sound effects, captions, music, loudness mastering, generated-shot
+inspection, and assembly remain local `mere.run` and FFmpeg work.
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools"
+mere-film-tools doctor
+mere-film-tools plan \
+  --idea "A lighthouse keeper receives a signal from a vanished ship" \
+  --title "The Last Signal" \
+  --output-dir ./the-last-signal
+mere-film-tools agent --run-manifest ./the-last-signal/run.json
+mere-film-tools export-animatic ./the-last-signal/run.json
+animatic production import-film \
+  ./the-last-signal/exports/animatic/film-animatic-handoff.json \
+  --output json
+```
+
+Production defaults to plan-only. The plugin does not invoke media generation
+until the user has approved the brief, treatment, and production plan and has
+explicitly selected `draft` or `final` mode. Pi departments are read-only and
+can propose work but cannot edit canon or bypass a gate.
+
+The project ledger is single-writer locked and crash-recoverable. Review is
+grounded in the assembled cut, per-shot local vision receipts, dialogue ASR and
+caption receipts, take-selection evidence, and an offline `reviews/index.html`
+picture-lock package. Picture lock additionally requires an explicit human
+decision bound to the exact master and review evidence hashes.
+
+The Animatic handoff independently re-verifies selected ledger assets and
+preserves exact shot timing, selected takes and seeds, canon, proof state, and
+checksums. Animatic verifies the source again before writing into its existing
+project, episode, scene, shot, and asset graph.
+
 ## ShotGrid Tools Plugin
 
 `mere-shotgrid-tools` publishes local `mere.run` artifacts into ShotGrid, now
@@ -337,6 +376,7 @@ packages/mere-image-tools/ local image-production plugin
 packages/mere-face-tools/  local face-library indexing and search plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
 packages/mere-animatic-tools/ local Animatic production helpers
+packages/mere-film-tools/    Pi-powered governed short-film studio
 packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
 packages/mere-perform/     realtime performance and stage UI plugin
 packages/mere-vfx-tools/   local shot-oriented VFX production plugin

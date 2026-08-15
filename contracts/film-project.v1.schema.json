@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-project.v1.schema.json",
+  "title": "mere.run Film Project v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "title", "idea", "createdAt", "updatedAt", "status", "phase", "brief", "approvals", "departments", "shots", "reviewRequests", "jobs", "production", "artifacts", "proof", "issues", "history"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-project.v1"},
+    "projectId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "title": {"type": "string", "minLength": 1},
+    "idea": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["planned", "awaiting-approval", "running", "revision-required", "failed", "completed"]},
+    "phase": {"enum": ["intake", "development", "preproduction", "production", "postproduction", "review", "delivery", "completed"]},
+    "brief": {"type": "object"},
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief", "treatment", "production", "picture-lock", "delivery"],
+      "properties": {
+        "brief": {"$ref": "#/$defs/approval"},
+        "treatment": {"$ref": "#/$defs/approval"},
+        "production": {"$ref": "#/$defs/approval"},
+        "picture-lock": {"$ref": "#/$defs/approval"},
+        "delivery": {"$ref": "#/$defs/approval"}
+      }
+    },
+    "departments": {"type": "array", "items": {"$ref": "#/$defs/task"}},
+    "shots": {"type": "array", "items": {"type": "object"}},
+    "reviewRequests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["shotId", "note", "status", "recordedAt"],
+        "properties": {
+          "shotId": {"type": "string", "minLength": 1},
+          "note": {"type": "string", "minLength": 1},
+          "status": {"enum": ["pending", "applied"]},
+          "recordedAt": {"type": "string", "format": "date-time"},
+          "appliedAt": {"type": "string", "format": "date-time"},
+          "archivedTake": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "jobs": {"type": "array", "items": {"type": "object"}},
+    "production": {
+      "type": "object",
+      "required": ["mode", "takesPerShot", "generateScore", "inspectGeneratedMedia", "maxParallelAgents", "piTimeoutSeconds", "mediaTimeoutSeconds", "commands", "models", "resourcePolicy"],
+      "properties": {
+        "mode": {"enum": ["plan", "draft", "final"]},
+        "takesPerShot": {"type": "integer", "minimum": 1, "maximum": 4},
+        "generateScore": {"type": "boolean"},
+        "inspectGeneratedMedia": {"type": "boolean"},
+        "maxParallelAgents": {"type": "integer", "minimum": 1, "maximum": 4},
+        "piTimeoutSeconds": {"type": "integer", "minimum": 1},
+        "mediaTimeoutSeconds": {"type": "integer", "minimum": 1},
+        "commands": {"type": "object"},
+        "models": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["imageMaster", "imageShot", "video", "visionInspector", "speechAsr", "speechTts", "sfx", "music"],
+          "properties": {
+            "imageMaster": {"type": "string", "minLength": 1},
+            "imageShot": {"type": "string", "minLength": 1},
+            "video": {"type": "string", "minLength": 1},
+            "visionInspector": {"type": "string", "minLength": 1},
+            "speechAsr": {"type": "string", "minLength": 1},
+            "speechTts": {"type": "string", "minLength": 1},
+            "sfx": {"type": "string", "minLength": 1},
+            "music": {"type": "string", "minLength": 1}
+          }
+        },
+        "resourcePolicy": {"type": "object"}
+      }
+    },
+    "artifacts": {"type": "array", "items": {"type": "object"}},
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["creation", "clips", "assembly", "dialogue", "sound", "captions", "inspection", "review", "humanReview", "delivery"],
+      "properties": {
+        "creation": {"type": "boolean"},
+        "clips": {"type": "boolean"},
+        "assembly": {"type": "boolean"},
+        "dialogue": {"type": "boolean"},
+        "sound": {"type": "boolean"},
+        "captions": {"type": "boolean"},
+        "inspection": {"type": "boolean"},
+        "review": {"type": "boolean"},
+        "humanReview": {"type": "boolean"},
+        "delivery": {"type": "boolean"}
+      }
+    },
+    "issues": {"type": "array", "items": {"type": "object"}},
+    "history": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "approval": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["blocked", "pending", "approved"]},
+        "summary": {"type": "string"},
+        "requestedAt": {"type": "string", "format": "date-time"},
+        "approvedAt": {"type": "string", "format": "date-time"},
+        "approvedBy": {"type": "string"},
+        "note": {"type": "string"},
+        "masterSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "reviewPackageSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "technicalReviewSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "dialogueQcSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "soundQcSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "captionsSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "mediaInspectionSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "creativeReviewSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "humanReviewSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "role", "phase", "dependsOn", "synthesis", "status", "attempts"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "role": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "phase": {"enum": ["development", "preproduction", "review"]},
+        "dependsOn": {"type": "array", "items": {"type": "string"}},
+        "synthesis": {"type": "boolean"},
+        "status": {"enum": ["blocked", "ready", "running", "succeeded", "accepted", "failed"]},
+        "attempts": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

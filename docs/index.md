@@ -10,16 +10,16 @@ hero:
       text: Install your first plugin
       link: /guide/getting-started
     - theme: alt
-      text: Browse all 13 plugins
+      text: Browse all 16 plugins
       link: /plugins/
     - theme: alt
       text: Read the contract
       link: /plugins/contract
 
 features:
-  - title: Create
-    details: Roto, mattes, clean plates, depth, geometry, image composition, character packs, and production-ready artifacts.
-    link: /plugins/vfx-tools
+  - title: Direct
+    details: Give Pi one idea, develop it with specialist departments, and produce a governed local short film with explicit approvals.
+    link: /plugins/film-tools
   - title: Perform
     details: Play Magenta Heart locally with MIDI, live prompt control, a stage UI, event logs, and WAV capture.
     link: /plugins/perform

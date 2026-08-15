@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-media-inspection.v1.schema.json",
+  "title": "mere.run Film Media Inspection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "createdAt", "sourceDigest", "inspector", "complete", "summary", "shots"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-media-inspection.v1"},
+    "projectId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "sourceDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "inspector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "model", "samplingProfile"],
+      "properties": {
+        "command": {"const": "mere.run vision inspect"},
+        "model": {"type": "string", "minLength": 1},
+        "samplingProfile": {"const": "early-mid-late-contact-sheet-v1"}
+      }
+    },
+    "complete": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shots", "passed", "review"],
+      "properties": {
+        "shots": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "review": {"type": "integer", "minimum": 0}
+      }
+    },
+    "shots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["shotId", "frame", "frameSha256", "decision", "observations", "mismatches", "confidence"],
+        "properties": {
+          "shotId": {"type": "string", "minLength": 1},
+          "frame": {"type": "string", "minLength": 1},
+          "frameSha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "decision": {"enum": ["pass", "review"]},
+          "observations": {"type": "array", "maxItems": 5, "items": {"type": "string"}},
+          "mismatches": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": ["code", "severity", "message"],
+              "properties": {
+                "code": {"type": "string", "minLength": 1},
+                "severity": {"type": "string", "minLength": 1},
+                "message": {"type": "string", "minLength": 1}
+              }
+            }
+          },
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    }
+  }
+}

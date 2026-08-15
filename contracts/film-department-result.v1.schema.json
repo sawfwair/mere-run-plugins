@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-department-result.v1.schema.json",
+  "title": "mere.run Film Department Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "taskId", "role", "phase", "summary", "decisions", "deliverables", "risks", "questions"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-department-result.v1"},
+    "taskId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "role": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "phase": {"enum": ["development", "preproduction", "review"]},
+    "summary": {"type": "string", "minLength": 1},
+    "decisions": {"type": "array", "items": {"type": "string"}},
+    "deliverables": {"type": "object"},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "questions": {"type": "array", "items": {"type": "string"}},
+    "recordedAt": {"type": "string", "format": "date-time"}
+  }
+}

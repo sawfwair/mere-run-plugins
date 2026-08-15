@@ -58,3 +58,50 @@ CI uses the full gate.
 Public docs use repo-relative commands and placeholders. Workstation paths,
 private pod IDs, credentials, local artifact bundles, and maintainer-only release
 helpers do not belong in this repo.
+
+## Pi Proposes, the Film Contract Governs
+
+The film studio uses Pi as its interactive harness and child-agent runtime, not
+as the durable source of truth. Specialist processes receive read-only tools and
+return versioned JSON proposals. Only `mere-film-tools` validates those
+proposals, advances approval gates, executes media, accepts canon, and records
+artifact hashes. This keeps provider choice in Pi while making interruption,
+rerolls, production cost, and delivery independently auditable.
+
+## Film Evidence Must Be Source-Bound
+
+Film automation does not infer success from a completed agent or a non-empty
+file. Media reuse requires a matching job-spec digest, recorded artifact hash,
+and current file hash. Dialogue is transcribed after synthesis, generated sound
+effects are stream-checked, captions are derived from the accepted timeline,
+and generated shot frames are inspected against canon. Every receipt is bound
+to source hashes before critics receive it. OS-backed single-writer locking protects the ledger;
+the next writer explicitly recovers work left `running` by a dead process.
+
+## Creative Search Preserves Every Candidate
+
+Multi-take film production never replaces evidence in place. Each candidate has
+its own deterministic seed, job digest, media hash, and early/mid/late contact
+sheet. A local vision selector scores candidates against accepted canon, copies
+the winner into the edit, and records the complete tournament. Candidate count
+is explicit because it directly multiplies local video compute.
+
+## Human Review Is a Bound Artifact
+
+The offline review page produces an approval or revision document bound to the
+rough-cut hash and the complete automated evidence digest. Picture lock requires
+that recorded human decision in addition to technical and AI review. The human
+gate is durable and tamper-evident without pretending an agent can approve on
+the user's behalf.
+
+## Film Production Resolves Models Before Media
+
+Every media role is explicit in project state, including defaults for video,
+vision inspection, ASR, TTS, SFX, and music. Draft and final execution resolve
+all catalog-managed roles required by the accepted plan through `mere.run model info` before
+the first generation job and write a source-bound readiness receipt. Missing
+models fail together as a revision request instead of surprising the studio
+after partial media generation. Usage gates remain separate: installed does not
+mean licensed for the brief's intended use. The default `vision inspect` Qwen3-VL
+runtime owns its own adapted cache and is recorded as runtime-managed; an
+explicit override must be a compatible local Qwen model root.

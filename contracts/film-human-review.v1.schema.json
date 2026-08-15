@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-human-review.v1.schema.json",
+  "title": "mere.run Film Human Review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "createdAt", "recordedAt", "reviewer", "decision", "notes", "rerolls", "masterSha256", "reviewEvidenceDigest", "evidence"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-human-review.v1"},
+    "projectId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "recordedAt": {"type": "string", "format": "date-time"},
+    "reviewer": {"type": "string", "minLength": 1},
+    "decision": {"enum": ["approve", "revise"]},
+    "notes": {"type": "string"},
+    "rerolls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["shotId", "note"],
+        "properties": {
+          "shotId": {"type": "string", "minLength": 1},
+          "note": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "masterSha256": {"$ref": "#/$defs/sha256"},
+    "reviewEvidenceDigest": {"$ref": "#/$defs/sha256"},
+    "evidence": {
+      "type": "object",
+      "minProperties": 5,
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "approve"}}},
+      "then": {"properties": {"rerolls": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"decision": {"const": "revise"}}},
+      "then": {
+        "anyOf": [
+          {"properties": {"notes": {"minLength": 1}}},
+          {"properties": {"rerolls": {"minItems": 1}}}
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+  }
+}

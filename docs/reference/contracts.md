@@ -11,6 +11,19 @@ plugins, recipes, and downstream automation.
 | [`eval-recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/eval-recipe.v1.schema.json) | Evaluation protocol |
 | [`run-manifest.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/run-manifest.v1.schema.json) | Durable execution state |
 | [`artifact-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/artifact-bundle.v1.schema.json) | Fetched result inventory |
+| [`film-brief.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-brief.v1.schema.json) | User-confirmed film requirements and greenlight readiness |
+| [`film-department-result.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-department-result.v1.schema.json) | Structured proposal returned by a read-only Pi department |
+| [`film-production-plan.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-production-plan.v1.schema.json) | Accepted cast, location, sound, and shot plan |
+| [`film-production-readiness.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-production-readiness.v1.schema.json) | Model readiness bound to the accepted plan, including runtime-managed roles |
+| [`film-project.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-project.v1.schema.json) | Durable film phases, approvals, work, proof, and artifact ledger |
+| [`film-dialogue-qc.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-dialogue-qc.v1.schema.json) | Source-bound dialogue synthesis and transcription evidence |
+| [`film-sound-qc.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-sound-qc.v1.schema.json) | Source-bound generated sound-effect stream, duration, and audibility evidence |
+| [`film-media-inspection.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-media-inspection.v1.schema.json) | Per-shot local generated-media inspection evidence |
+| [`film-take-selection.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-take-selection.v1.schema.json) | Evidence-backed selection across deterministic local shot candidates |
+| [`film-captions.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-captions.v1.schema.json) | Source-bound SRT and WebVTT dialogue captions |
+| [`film-human-review.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-human-review.v1.schema.json) | Explicit decision bound to an exact cut and review evidence set |
+| [`film-delivery.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-delivery.v1.schema.json) | Checksum-backed master, captions, marketing stills, review package, and provenance handoff |
+| [`film-animatic-handoff.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-animatic-handoff.v1.schema.json) | Verified cast, locations, shot timing, deterministic seeds, and media for native Animatic import |
 | [`workflow-graph.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-graph.v1.schema.json) | Portable executable graph |
 | [`graph-node-provider.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-provider.v1.schema.json) | Typed provider node catalog |
 | [`workflow-program.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-program.v1.schema.json) | Reusable composition and static expansion source |

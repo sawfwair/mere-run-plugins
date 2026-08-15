@@ -197,6 +197,7 @@ def plugin_env() -> dict[str, str]:
         ROOT / "packages" / "mere-runpod" / "src",
         ROOT / "packages" / "mere-image-tools" / "src",
         ROOT / "packages" / "mere-face-tools" / "src",
+        ROOT / "packages" / "mere-film-tools" / "src",
         ROOT / "packages" / "mere-workflow-tools" / "src",
         ROOT / "packages" / "mere-geo-tools" / "src",
         ROOT / "packages" / "mere-animatic-tools" / "src",
@@ -261,6 +262,14 @@ def validate_plugin_manifests() -> None:
         "mere_face_tools",
         "mere-face-tools",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup", "index", "search"},
+    )
+    validate_plugin_manifest(
+        "mere_film_tools",
+        "mere-film-tools",
+        {
+            "manifest", "doctor", "plan", "run", "resume", "cleanup", "status", "brief",
+            "approve", "configure", "delegate", "review", "review-decision", "reroll", "agent",
+        },
     )
     validate_plugin_manifest(
         "mere_animatic_tools",
@@ -508,6 +517,61 @@ def validate_face_tools_plan() -> None:
             fail("face-tools plan should count supported photos")
         if not (output / "run.json").is_file():
             fail("face-tools plan should write run.json")
+
+
+def validate_film_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp) / "film"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_film_tools",
+                "plan",
+                "--idea",
+                "A lighthouse keeper receives a signal from a vanished ship.",
+                "--title",
+                "The Last Signal",
+                "--output-dir",
+                str(root),
+                "--run-id",
+                "validate-film-tools",
+                "--duration",
+                "30",
+                "--audience",
+                "adult science-fiction viewers",
+                "--genre",
+                "science-fiction drama",
+                "--tone",
+                "tense then hopeful",
+                "--rating",
+                "PG",
+                "--platform",
+                "web",
+                "--usage",
+                "noncommercial",
+                "--reference",
+                "restrained maritime chamber drama",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        payload = as_map(json.loads(result.stdout), "mere-film-tools plan")
+        status = as_map(payload["status"], "mere-film-tools status")
+        if status["phase"] != "intake" or status["nextGate"] != "brief":
+            fail("film-tools plan must hold at the brief gate")
+        if as_list(status["openQuestions"], "film open questions"):
+            fail("film-tools complete plan should not retain open brief questions")
+        project_path = root / "film-project.json"
+        brief_path = root / "brief.json"
+        validate_schema(project_path, contract_schema("film-project.v1.schema.json"), load_json(project_path))
+        validate_schema(brief_path, contract_schema("film-brief.v1.schema.json"), load_json(brief_path))
+        if not (root / "run.json").is_file():
+            fail("film-tools plan should write run.json")
 
 
 def validate_workflow_tools_plans() -> None:
@@ -837,6 +901,7 @@ def main() -> int:
     validate_runpod_plan()
     validate_image_tools_plan()
     validate_face_tools_plan()
+    validate_film_tools_plan()
     validate_workflow_tools_plans()
     validate_animatic_tools_plan()
     validate_shotgrid_tools_plan()

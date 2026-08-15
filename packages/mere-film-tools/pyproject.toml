@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-film-tools"
+version = "0.1.0"
+description = "Pi-powered local film studio companion plugin for mere.run"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Sawfwair Inc. and mere.run contributors" }
+]
+dependencies = []
+
+[project.scripts]
+mere-film-tools = "mere_film_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mere_film_tools = [
+  "py.typed",
+  "resources/pi/package.json",
+  "resources/pi/extensions/*.ts",
+  "resources/pi/prompts/*.md",
+  "resources/pi/skills/*/*.md",
+  "resources/pi/agents/*.md",
+]

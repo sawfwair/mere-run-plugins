@@ -89,6 +89,7 @@ export default defineConfig({
             { text: 'Perform', link: '/plugins/perform' },
             { text: 'Image Tools', link: '/plugins/image-tools' },
             { text: 'Animatic Tools', link: '/plugins/animatic-tools' },
+            { text: 'Film Studio', link: '/plugins/film-tools' },
             { text: 'ShotGrid Tools', link: '/plugins/shotgrid-tools' },
             { text: 'RunPod Runner', link: '/plugins/runpod' },
             { text: 'Document Tools', link: '/plugins/document-tools' },

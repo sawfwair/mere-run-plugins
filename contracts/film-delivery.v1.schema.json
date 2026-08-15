@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-delivery.v1.schema.json",
+  "title": "mere.run Film Delivery v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "title", "createdAt", "master", "sourceCut", "captions", "marketingAssets", "projectManifest", "productionPlan", "reviews", "reviewPackage", "provenance"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-delivery.v1"},
+    "projectId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "title": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "master": {"$ref": "#/$defs/fileWithBytes"},
+    "sourceCut": {"$ref": "#/$defs/file"},
+    "captions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256", "bytes"],
+        "properties": {
+          "kind": {"enum": ["srt", "vtt"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "bytes": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "marketingAssets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "path", "sha256", "bytes", "sourceTimeSeconds"],
+        "properties": {
+          "kind": {"enum": ["poster", "thumbnail"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "bytes": {"type": "integer", "minimum": 1},
+          "sourceTimeSeconds": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "projectManifest": {"type": "string", "minLength": 1},
+    "productionPlan": {"type": "string", "minLength": 1},
+    "reviews": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "reviewPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactCount", "runManifest"],
+      "properties": {
+        "artifactCount": {"type": "integer", "minimum": 0},
+        "runManifest": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "fileWithBytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

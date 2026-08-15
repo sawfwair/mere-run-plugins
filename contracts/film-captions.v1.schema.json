@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-captions.v1.schema.json",
+  "title": "mere.run Film Captions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "projectId", "createdAt", "sourceDigest", "language", "profile", "complete", "summary", "files", "cues"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-captions.v1"},
+    "projectId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "sourceDigest": {"$ref": "#/$defs/sha256"},
+    "language": {"type": "string", "minLength": 1},
+    "profile": {"const": "dialogue-timeline-sidecar-v1"},
+    "complete": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cues"],
+      "properties": {"cues": {"type": "integer", "minimum": 0}}
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["srt", "vtt"],
+      "properties": {
+        "srt": {"$ref": "#/$defs/file"},
+        "vtt": {"$ref": "#/$defs/file"}
+      }
+    },
+    "cues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "jobId", "shotId", "speaker", "text", "startSeconds", "endSeconds"],
+        "properties": {
+          "index": {"type": "integer", "minimum": 1},
+          "jobId": {"type": "string", "minLength": 1},
+          "shotId": {"type": "string", "minLength": 1},
+          "speaker": {"type": "string", "minLength": 1},
+          "text": {"type": "string", "minLength": 1},
+          "startSeconds": {"type": "number", "minimum": 0},
+          "endSeconds": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
