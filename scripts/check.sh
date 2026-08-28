@@ -68,6 +68,13 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from importlib import resources
+
+source_notices = pathlib.Path("packages/mere-workflow-tools/src/mere_workflow_tools/THIRD_PARTY_NOTICES.txt")
+installed_notices = resources.files("mere_workflow_tools").joinpath("THIRD_PARTY_NOTICES.txt")
+if not installed_notices.is_file() or installed_notices.read_bytes() != source_notices.read_bytes():
+    raise SystemExit("installed workflow package omitted or changed third-party notices")
+print("installed workflow package: third-party notices preserved")
 
 root = pathlib.Path(tempfile.mkdtemp(prefix="mere-runpod-installed-smoke."))
 cli = pathlib.Path(sys.executable).with_name("mere-runpod")

@@ -157,3 +157,14 @@ No hosted API is used. AnyDoc is always called with `ocr="reject"`, even when
 local, but callers remain responsible for access control and review of
 redaction quality. See
 [Private workflows](/guide/private-workflows).
+
+## Third-party notices
+
+The package includes `mere_workflow_tools/THIRD_PARTY_NOTICES.txt` in its source
+distribution, wheel, and installed files. It preserves the full MIT notices for
+AnyDoc 0.2.4 and its pdf-inspector 1.14.2 component.
+
+If you bundle or redistribute dependencies, preserve their applicable license
+and copyright notices. This file supplements those notices; it isn't a complete
+inventory of transitive dependency licenses. Review the resolved dependency
+versions before redistribution.

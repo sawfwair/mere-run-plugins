@@ -133,3 +133,14 @@ provider is deterministic, emits a final `node_result`, confines declared
 outputs, and includes a catalog test. Full conformance additionally validates
 preflight requirements, contiguous event sequences, declared output names,
 and on-disk artifact paths.
+
+## Third-party notices
+
+The source distribution, wheel, and installed package include
+`mere_workflow_tools/THIRD_PARTY_NOTICES.txt`. This file preserves the full MIT
+notices for AnyDoc 0.2.4 and its pdf-inspector 1.14.2 component.
+
+If you bundle or redistribute dependencies, preserve their applicable license
+and copyright notices. The packaged notices cover these reviewed components;
+they aren't a complete inventory of transitive dependency licenses. Review the
+resolved dependency versions before redistribution.

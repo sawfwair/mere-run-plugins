@@ -37,4 +37,4 @@ mere-identity-tools = "mere_workflow_tools.identity_cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_workflow_tools = ["py.typed", "templates/*.json"]
+mere_workflow_tools = ["py.typed", "templates/*.json", "THIRD_PARTY_NOTICES.txt"]
