@@ -81,10 +81,15 @@
             "additionalProperties": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["manager", "spec"],
+              "required": [
+                "manager",
+                "spec"
+              ],
               "properties": {
                 "manager": {
-                  "enum": ["pipx"]
+                  "enum": [
+                    "pipx"
+                  ]
                 },
                 "spec": {
                   "type": "string",
@@ -93,6 +98,18 @@
                 "ref": {
                   "type": "string",
                   "pattern": "^[A-Za-z0-9_.-]+$"
+                },
+                "bundles": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "properties": {
+                    "macos-arm64": {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https://"
+                    }
+                  }
                 }
               }
             }

@@ -44,6 +44,7 @@ fi
 "$PYTHON" -m coverage report
 "$PYTHON" scripts/check_structure.py
 "$PYTHON" scripts/validate_repo.py
+"$PYTHON" scripts/check_plugin_bundles.py
 
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
