@@ -61,10 +61,20 @@ fi
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-perform
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-vfx-tools
 "$PYTHON" - <<'PY'
+import hashlib
+import json
 import pathlib
 import subprocess
 import sys
 import tempfile
+import zipfile
+from importlib import resources
+
+source_notices = pathlib.Path("packages/mere-workflow-tools/src/mere_workflow_tools/THIRD_PARTY_NOTICES.txt")
+installed_notices = resources.files("mere_workflow_tools").joinpath("THIRD_PARTY_NOTICES.txt")
+if not installed_notices.is_file() or installed_notices.read_bytes() != source_notices.read_bytes():
+    raise SystemExit("installed workflow package omitted or changed third-party notices")
+print("installed workflow package: third-party notices preserved")
 
 root = pathlib.Path(tempfile.mkdtemp(prefix="mere-runpod-installed-smoke."))
 cli = pathlib.Path(sys.executable).with_name("mere-runpod")
@@ -343,4 +353,78 @@ result = subprocess.run(
 )
 if '"status": "passed"' not in result.stdout or '"dataset.prepare"' not in result.stdout:
     raise SystemExit("installed graph provider conformance smoke failed")
+
+if sys.version_info >= (3, 10):
+    from unittest.mock import patch
+
+    from PIL import Image
+
+    from mere_workflow_tools import anydoc_backend
+
+    doc_cli = pathlib.Path(sys.executable).with_name("mere-doc-tools")
+    subprocess.run(
+        [str(doc_cli), "doctor", "--extractor", "anydoc", "--no-redact"],
+        cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    csv = root / "report.csv"
+    csv.write_text("item,quantity\nNotebook,3\n", encoding="utf-8")
+    rtf = root / "report.rtf"
+    rtf.write_text(r"{\rtf1\ansi Notebook document.}", encoding="utf-8")
+    docx = root / "report.docx"
+    with zipfile.ZipFile(docx, "w") as archive:
+        archive.writestr("[Content_Types].xml", (
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '</Types>'
+        ))
+        archive.writestr("word/document.xml", (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body><w:p><w:r><w:t>Notebook document.</w:t></w:r></w:p></w:body></w:document>'
+        ))
+    for source in (csv, rtf, docx):
+        output = root / f"anydoc-{source.suffix[1:]}"
+        result = subprocess.run(
+            [str(doc_cli), "process", "--extractor", "anydoc", "--input", str(source),
+             "--output-dir", str(output), "--no-redact", "--mere-run-command", "missing-mere-run"],
+            cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        )
+        manifest = json.loads(result.stdout)
+        markdown = output / "report.md"
+        expected_hash = "sha256:" + hashlib.sha256(markdown.read_bytes()).hexdigest()
+        if (manifest["status"] != "succeeded" or not manifest["tool"].get("backendVersion")
+                or manifest["artifacts"]["sha256"].get(str(markdown.resolve())) != expected_hash
+                or "Notebook" not in markdown.read_text(encoding="utf-8")):
+            raise SystemExit(f"installed AnyDoc conversion failed for {source.suffix}")
+    fixture = json.loads(pathlib.Path("examples/documents/convert.invocation.json").read_text())
+    fixture["arguments"]["input"] = str(csv)
+    invocation_path = root / "document.invocation.json"
+    invocation_path.write_text(json.dumps(fixture))
+    result = subprocess.run(
+        [str(conformance_cli), "--provider", str(doc_cli), "--invocation", str(invocation_path),
+         "--run-dir", str(root / "document-graph"), "--execute", "--json"],
+        cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    conformance = json.loads(result.stdout)
+    if conformance["status"] != "passed" or not conformance["fixture"]["executed"]:
+        raise SystemExit("installed document graph execution conformance smoke failed")
+    scanned = root / "scanned.pdf"
+    Image.new("RGB", (80, 60), (240, 240, 240)).save(scanned, "PDF")
+    with (
+        patch("urllib.request.urlopen", side_effect=AssertionError("hosted OCR must never run")),
+        patch.dict("os.environ", {
+            "FIRECRAWL_API_KEY": "synthetic-test-key",
+            "FIRECRAWL_API_URL": "https://must-not-upload.invalid",
+        }),
+    ):
+        try:
+            anydoc_backend.convert(scanned, root / "scanned.md")
+        except anydoc_backend.AnyDocError as error:
+            if "Hosted OCR is disabled" not in str(error):
+                raise
+        else:
+            raise SystemExit("installed AnyDoc accepted a scanned PDF instead of requiring local OCR")
+    if (root / "scanned.md").exists():
+        raise SystemExit("failed AnyDoc conversion left a Markdown artifact")
+    print("installed AnyDoc smoke: base dependency, CSV, RTF, DOCX, graph execution, hashes, and scanned-PDF rejection passed")
 PY

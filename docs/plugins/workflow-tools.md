@@ -32,6 +32,12 @@ or image-generation runtimes. It shells out to `mere.run` and records the exact
 planned steps. Override the executable with `MERE_WORKFLOW_TOOLS_MERE_RUN` or
 `--mere-run-command`.
 
+On Python 3.10+, the normal package includes local document-to-Markdown conversion
+through Firecrawl's AnyDoc library and the `document.convert` graph node. No
+extra or model is needed; Python 3.9 retains the native workflows. Redaction still
+uses native `mere.run`. Hosted OCR is never enabled. See
+[Document Tools](/plugins/document-tools) for installation and formats.
+
 ## Commands
 
 Document OCR plus redaction:

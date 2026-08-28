@@ -12,6 +12,8 @@ Entry points:
   `image_compose_cli.py`, `batch_cli.py`: focused command wrappers.
 - `identity_cli.py`: generic identity graph-provider facade for a separately
   installed local backend; product-specific identities never enter this repo.
+- `anydoc_backend.py`: typed Firecrawl AnyDoc boundary for local
+  document-to-Markdown conversion; hosted OCR is always rejected.
 
 Important boundaries:
 
@@ -20,6 +22,9 @@ Important boundaries:
 - Keep wrappers thin; shared run-manifest behavior belongs in `cli.py`.
 - Cleanup is local-state only unless a future provider-specific module documents
   otherwise.
+
+`doc_graph_provider.py` exposes local document conversion through the graph SDK,
+with confined artifacts and replayable run manifests.
 
 When adding a workflow surface, keep the command, manifest contract, package
 README, examples, and tests in the same change.

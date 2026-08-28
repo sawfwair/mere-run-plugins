@@ -1,0 +1,13 @@
+{
+  "contract_version": "mere.run/plugin-graph-invocation.v1",
+  "job_id": "b8d28f0b-2e31-4fde-9199-6fd1ec7df29e",
+  "node_id": "convert",
+  "kind": "document.convert",
+  "arguments": {"input": "examples/documents/report.csv"},
+  "outputs": {
+    "markdown": {"type": "asset", "path": "artifacts/document.md"},
+    "manifest": {"type": "asset", "path": "artifacts/run.json"},
+    "text": {"type": "string"},
+    "stats": {"type": "json"}
+  }
+}

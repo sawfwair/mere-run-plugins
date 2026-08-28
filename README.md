@@ -137,6 +137,7 @@ import:
 
 ```bash
 mere-doc-tools process --input ./scan.png --output-dir ./doc-out
+mere-doc-tools process --extractor anydoc --input ./report.docx --output-dir ./markdown-out --no-redact
 mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
 mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
 mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
@@ -164,6 +165,14 @@ These tools call existing `mere.run` surfaces such as `vision ocr`,
 `text anonymize`, `vision caption`, `speech transcribe`, and `image generate`.
 The plugin layer owns planning, artifact hashes, resumability, and local cleanup
 state.
+
+Document Tools also supports [AnyDoc](https://github.com/firecrawl/anydoc) for
+local office-document, CSV, EPUB, RTF, and text-PDF conversion to Markdown.
+The normal install includes AnyDoc on Python 3.10+ and exposes `document.convert`
+to native graphs, with Markdown, text, a run manifest, and provenance stats. See
+[Document Tools](https://plugins-docs.mere.run/plugins/document-tools) for setup
+and the `document-to-markdown` template. Conversion with `--no-redact` requires no model or `mere.run`
+executable. Hosted OCR is disabled; scanned PDFs require the local OCR path.
 
 ## VFX Tools Plugin
 

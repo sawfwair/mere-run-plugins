@@ -29,6 +29,12 @@ The gate:
 - installs every package;
 - smoke-tests manifests and planned workflows from installed executables.
 
+On Python 3.10+, the normal package installation must include AnyDoc without
+extras. The gate performs real CSV, RTF, and DOCX conversions with artifact-hash
+checks, then tests document graph catalog/preflight/execution conformance. A scanned-PDF
+case verifies that hosted OCR remains disabled. Python 3.9 runs the base
+package and mocked boundary tests without installing AnyDoc.
+
 ## Docs gate
 
 Run:

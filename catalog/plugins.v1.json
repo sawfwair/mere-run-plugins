@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-14T00:00:00Z",
+  "updatedAt": "2026-08-28T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -321,16 +321,20 @@
     {
       "id": "mere-doc-tools",
       "name": "Document Tools",
-      "description": "OCR local documents and remove PII with native mere.run models.",
+      "description": "Convert documents to Markdown with local AnyDoc, or OCR and redact PII with native mere.run models.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-workflow-tools",
       "subdirectory": "packages/mere-workflow-tools",
       "entrypoint": "mere-doc-tools",
       "capabilities": [
         "documents",
+        "document-conversion",
+        "markdown",
+        "anydoc",
         "ocr",
         "pii-redaction",
-        "privacy"
+        "privacy",
+        "graph-node-provider-v1"
       ],
       "channels": {
         "main": {

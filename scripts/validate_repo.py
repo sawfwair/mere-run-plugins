@@ -341,6 +341,21 @@ def validate_plugin_manifests() -> None:
 
 
 def validate_graph_provider() -> None:
+    doc_result = subprocess.run(
+        [sys.executable, "-m", "mere_workflow_tools.doc_cli", "graph", "catalog", "--json"],
+        cwd=ROOT, env=plugin_env(), text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    doc_catalog = as_map(json.loads(doc_result.stdout), "mere-doc-tools graph catalog")
+    validate_schema(pathlib.Path("mere-doc-tools graph catalog"), contract_schema("graph-node-provider.v1.schema.json"), doc_catalog)
+    if doc_catalog["provider_id"] != "mere-doc-tools":
+        fail("document graph provider reported the wrong provider id")
+    doc_nodes = as_list(doc_catalog["nodes"], "document graph nodes")
+    if len(doc_nodes) != 1 or as_map(doc_nodes[0], "document graph node")["kind"] != "document.convert":
+        fail("document graph provider must expose document.convert")
+    invocation_path = ROOT / "examples/documents/convert.invocation.json"
+    validate_schema(invocation_path, contract_schema("graph-node-invocation.v1.schema.json"), load_json(invocation_path))
+
     result = subprocess.run(
         [sys.executable, "-m", "mere_workflow_tools.dataset_cli", "graph", "catalog", "--json"],
         cwd=ROOT,
@@ -594,34 +609,50 @@ def validate_workflow_tools_plans() -> None:
                 "mere_workflow_tools.doc_cli",
                 "mere-doc-tools",
                 ["plan", "--input", str(image), "--output-dir", str(root / "doc")],
+                "mere.run",
+            ),
+            (
+                "mere_workflow_tools.doc_cli",
+                "mere-doc-tools",
+                [
+                    "plan", "--extractor", "anydoc", "--no-redact",
+                    "--input", str(ROOT / "examples/documents/report.csv"),
+                    "--output-dir", str(root / "markdown"),
+                ],
+                "anydoc",
             ),
             (
                 "mere_workflow_tools.media_cli",
                 "mere-media-scrub",
                 ["plan", "--input", str(frames), "--output-dir", str(root / "media")],
+                "mere.run",
             ),
             (
                 "mere_workflow_tools.dataset_cli",
                 "mere-dataset-tools",
                 ["plan", "--input", str(frames), "--output-dir", str(root / "dataset"), "--trigger-token", "STYLE"],
+                "mere.run",
             ),
             (
                 "mere_workflow_tools.transcript_cli",
                 "mere-transcript-tools",
                 ["plan", "--input", str(audio), "--output-dir", str(root / "transcript")],
+                "mere.run",
             ),
             (
                 "mere_workflow_tools.image_compose_cli",
                 "mere-image-compose",
                 ["plan", "--prompt", "a local image", "--output-dir", str(root / "image")],
+                "mere.run",
             ),
             (
                 "mere_workflow_tools.batch_cli",
                 "mere-batch-runner",
                 ["plan", "--jobs", str(jobs), "--output-dir", str(root / "batch")],
+                "mere.run",
             ),
         ]
-        for module, executable, args in cases:
+        for module, executable, args, backend in cases:
             result = subprocess.run(
                 [
                     sys.executable,
@@ -646,8 +677,8 @@ def validate_workflow_tools_plans() -> None:
                 fail(f"{executable} plan reported plugin {manifest['plugin']['name']}")
             if manifest["status"] != "planned":
                 fail(f"{executable} plan manifest should have status planned")
-            if manifest["tool"]["backend"] != "mere.run":
-                fail(f"{executable} plan should call mere.run")
+            if manifest["tool"]["backend"] != backend:
+                fail(f"{executable} plan should use {backend}")
             if not pathlib.Path(manifest["local"]["runManifest"]).is_file():
                 fail(f"{executable} plan should write run manifest")
 

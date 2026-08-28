@@ -64,6 +64,22 @@ companion plugins.
 Contracts should remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.
 
+Document Tools reuses the open `plugin-run.v1` extension fields for AnyDoc;
+no shared schema change is needed. `tool.backend` is `anydoc`, `tool.workflow`
+is `markdown-redact`, and `tool.redact` records whether native anonymization
+follows conversion. After conversion, `tool.backendVersion` records the
+installed `firecrawl-anydoc` version. The conversion step uses the existing
+local Python-step shape: `python: "anydoc-markdown"`, a one-element `inputs`
+array, and `outputs.markdown`. Hosted OCR is forbidden by the implementation,
+not configurable through the manifest. Generated plans are schema-validated by
+`scripts/validate_repo.py`; `examples/documents` shows how to create one.
+
+The `document.convert` node uses the existing graph invocation, preflight,
+catalog, and event contracts. It emits `markdown` and `manifest` assets, inline
+`text`, and JSON `stats`. Its manifest uses the same local run contract; graph
+conversion never enables redaction or hosted OCR. Both the invocation example
+and `document-to-markdown` template are schema-validated.
+
 Canonical cross-runtime examples live under `fixtures/`. The graph fixtures are
 copied byte-for-byte into the Swift runtime and Relay/Node test suites so Python,
 Swift, TypeScript, and Rust continuously agree on the same public JSON shape.
