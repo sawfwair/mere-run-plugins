@@ -3,8 +3,9 @@
 Local workflow companion tools for `mere.run`.
 
 This package installs six small commands. They do not ship model runtimes and do
-not call hosted APIs; each command writes a run manifest, shells out to the
-installed `mere.run` CLI, records artifacts, and marks cleanup as local-only.
+not call hosted APIs; each command writes a run manifest, records artifacts,
+and marks cleanup as local-only. Model operations use the installed `mere.run`
+CLI; AnyDoc conversion uses a local Rust library through Python.
 
 ## Commands
 
@@ -24,7 +25,7 @@ source-checkout binary.
 
 ## Tool Map
 
-- `mere-doc-tools`: `mere.run vision ocr` plus optional `mere.run text anonymize`
+- `mere-doc-tools`: local AnyDoc Markdown conversion or `mere.run vision ocr`, plus optional `mere.run text anonymize`
 - `mere-media-scrub`: OCR/redaction over image folders or single frames
 - `mere-dataset-tools`: `mere.run vision caption`, optional OCR sidecars, and a contact sheet
 - `mere-transcript-tools`: `mere.run speech transcribe` plus optional PII redaction
@@ -41,6 +42,46 @@ Every command supports:
 <tool> resume ./run.json
 <tool> cleanup ./run.json
 ```
+
+## AnyDoc document conversion
+
+The normal install includes AnyDoc on Python 3.10+. Python 3.9 remains supported
+for native OCR and the other tools. Catalog installation also registers the
+document graph provider:
+
+```bash
+mere.run plugin install mere-doc-tools --yes
+mere-doc-tools doctor --extractor anydoc --no-redact
+mere-doc-tools process --extractor anydoc --input ./report.docx --output-dir ./doc-out --no-redact
+```
+
+Existing pipx installations can run `pipx upgrade mere-workflow-tools`.
+Python 3.9 environments need `pipx reinstall --python python3.12 mere-workflow-tools`
+to enable conversion. The former `[anydoc]` extra remains a compatibility alias.
+AnyDoc converts office documents, RTF, EPUB, CSV, and text PDFs to Markdown
+without a model. Omit `--no-redact` to additionally produce redacted Markdown
+and PII JSON with `mere.run`; the raw Markdown is retained. The default
+`--extractor ocr` preserves existing image workflows.
+
+The plugin always disables hosted OCR. Scanned PDF pages fail with local OCR
+guidance, even if Firecrawl credentials are present. Planning needs neither
+AnyDoc nor a model; execution records the AnyDoc version and artifact hashes.
+See [Document Tools](https://plugins-docs.mere.run/plugins/document-tools) for
+formats, lifecycle, installation, and privacy details.
+
+`mere-doc-tools` exposes `document.convert` to native workflow graphs, with
+Markdown and run-manifest assets, inline unredacted text, and provenance stats:
+
+```bash
+mere-doc-tools graph catalog --json
+mere-doc-tools graph templates export document-to-markdown --output ./document.graph.json
+mere-graph-conformance --provider mere-doc-tools --json
+```
+
+The node is local, model-free, and has no hosted OCR fallback. Direct pipx
+installations can use `MERERUN_GRAPH_PROVIDERS=mere-doc-tools` for discovery;
+catalog installation registers the provider automatically. See the synthetic
+`examples/documents` fixture for executable conformance and native graph commands.
 
 `mere-dataset-tools` is also a portable graph-node provider. The fixed protocol
 keeps execution out of the core process:

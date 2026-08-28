@@ -16,7 +16,15 @@ from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-from . import __version__, comfy_bridge, graph_compiler, graph_provider, graph_templates
+from . import (
+    __version__,
+    anydoc_backend,
+    comfy_bridge,
+    doc_graph_provider,
+    graph_compiler,
+    graph_provider,
+    graph_templates,
+)
 from .graph_sdk import GraphProviderError
 
 DEFAULT_MERE_RUN = "mere.run"
@@ -50,11 +58,11 @@ TOOLS: dict[str, ToolSpec] = {
         kind="doc",
         plugin_name="mere-doc-tools",
         executable="mere-doc-tools",
-        description="OCR documents and redact PII with local mere.run models.",
-        capabilities=["documents", "ocr", "pii-redaction", "privacy"],
+        description="Convert documents to Markdown with local AnyDoc, or OCR and redact PII with mere.run.",
+        capabilities=["documents", "document-conversion", "markdown", "anydoc", "ocr", "pii-redaction", "privacy"],
         one_shot="process",
         recipe_id="doc-ocr-redact",
-        recipe_title="Document OCR and PII redaction",
+        recipe_title="Document extraction and PII redaction",
     ),
     "media": ToolSpec(
         kind="media",
@@ -246,8 +254,8 @@ def image_inputs(path: pathlib.Path) -> list[pathlib.Path]:
 def plugin_manifest(spec: ToolSpec) -> JsonMap:
     commands = [
         {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
-        {"name": "doctor", "description": "Check local readiness and mere.run availability.", "stdout": "json"},
-        {"name": "plan", "description": "Write a run manifest without executing mere.run.", "stdout": "json"},
+        {"name": "doctor", "description": "Check local workflow dependencies.", "stdout": "json"},
+        {"name": "plan", "description": "Write a run manifest without executing the workflow.", "stdout": "json"},
         {"name": "run", "description": "Execute a planned local workflow manifest.", "stdout": "json"},
         {"name": "resume", "description": "Inspect a recorded workflow manifest.", "stdout": "json"},
         {"name": "cleanup", "description": "Mark a local run as cleanup-skipped.", "stdout": "json"},
@@ -274,7 +282,7 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             "cleanupDefault": "none",
         },
     }
-    if spec.kind == "dataset":
+    if spec.kind in {"doc", "dataset"}:
         commands.append({"name": "graph", "description": "Expose portable graph nodes.", "stdout": "json"})
         capabilities.append("graph-node-provider-v1")
         manifest["graphProvider"] = {"contractVersion": graph_provider.CONTRACT_VERSION}
@@ -339,36 +347,63 @@ def add_step(manifest: JsonMap, name: str, argv: list[str], outputs: dict[str, s
 
 def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
     input_path = args.input
-    ensure_file(input_path, "input document image")
+    ensure_file(input_path, "input document")
     manifest = base_manifest(spec, args, [input_path])
     ocr_dir = args.output_dir / "ocr"
-    ocr_text = ocr_dir / f"{input_path.stem}.txt"
-    redacted_text = args.output_dir / f"{input_path.stem}.redacted.txt"
+    use_anydoc = args.extractor == "anydoc"
+    extracted_text = args.output_dir / f"{input_path.stem}.md" if use_anydoc else ocr_dir / f"{input_path.stem}.txt"
+    redacted_text = args.output_dir / f"{input_path.stem}.redacted.{'md' if use_anydoc else 'txt'}"
     spans_json = args.output_dir / f"{input_path.stem}.pii.json"
     manifest["command"] = one_shot_command(spec, args)
     manifest_local(manifest)["input"] = str(input_path)
-    manifest_tool(manifest).update({"workflow": "ocr-redact", "ocrBackend": args.ocr_backend, "redact": args.redact})
-    add_step(
-        manifest,
-        "ocr",
-        ["vision", "ocr", "--backend", args.ocr_backend, "--output-dir", str(ocr_dir), str(input_path)],
-        {"text": str(ocr_text)},
-    )
+    manifest_tool(manifest)["redact"] = args.redact
+    if use_anydoc:
+        manifest["recipe"] = {
+            "id": "doc-anydoc-markdown",
+            "family": "local-workflow",
+            "title": "Local document conversion with optional PII redaction",
+        }
+        manifest_tool(manifest).update({"workflow": "markdown-redact", "backend": "anydoc"})
+        manifest_steps(manifest).append({
+            "name": "convert-markdown",
+            "python": "anydoc-markdown",
+            "inputs": [str(input_path)],
+            "outputs": {"markdown": str(extracted_text)},
+        })
+    else:
+        manifest_tool(manifest).update({"workflow": "ocr-redact", "ocrBackend": args.ocr_backend})
+        add_step(
+            manifest,
+            "ocr",
+            ["vision", "ocr", "--backend", args.ocr_backend, "--output-dir", str(ocr_dir), str(input_path)],
+            {"text": str(extracted_text)},
+        )
     if args.redact:
         add_step(
             manifest,
             "redact-text",
             ["text", "anonymize", "--output", str(redacted_text), "--replacement", args.replacement],
             {"redactedText": str(redacted_text)},
-            stdin_path=str(ocr_text),
+            stdin_path=str(extracted_text),
         )
         add_step(
             manifest,
             "redact-json",
             ["text", "anonymize", "--json", "--pretty", "--output", str(spans_json), "--replacement", args.replacement],
             {"spans": str(spans_json)},
-            stdin_path=str(ocr_text),
+            stdin_path=str(extracted_text),
         )
+    output_paths = [pathlib.Path(str(manifest_local(manifest)["runManifest"]))]
+    for raw_step in manifest_steps(manifest):
+        step = as_map(raw_step, "step")
+        output_paths.extend(pathlib.Path(str(path)) for path in as_map(step["outputs"], "step.outputs").values())
+    if any(path.resolve() == input_path.resolve() or (path.exists() and path.samefile(input_path)) for path in output_paths):
+        raise PluginError("Document output and manifest paths must not overwrite the input document.", 2)
+    if len({path.resolve() for path in output_paths}) != len(output_paths) or any(
+        first.exists() and second.exists() and first.samefile(second)
+        for index, first in enumerate(output_paths) for second in output_paths[index + 1:]
+    ):
+        raise PluginError("Document output and manifest paths must be distinct.", 2)
     return manifest
 
 
@@ -554,12 +589,20 @@ def one_shot_command(spec: ToolSpec, args: argparse.Namespace) -> list[str]:
     for name in ("input", "jobs"):
         if hasattr(args, name):
             command.extend([f"--{name.replace('_', '-')}", str(getattr(args, name))])
+    if spec.kind == "doc":
+        command.extend([
+            "--extractor", args.extractor,
+            "--ocr-backend", args.ocr_backend,
+            "--redact" if args.redact else "--no-redact",
+            "--replacement", args.replacement,
+        ])
     return command
 
 
 def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
     output_dir = pathlib.Path(str(manifest_local(manifest)["outputDirectory"]))
     output_dir.mkdir(parents=True, exist_ok=True)
+    manifest.pop("error", None)
     update_manifest(manifest_path, manifest, status="running")
     try:
         for raw_step in manifest_steps(manifest):
@@ -570,6 +613,8 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
                     [pathlib.Path(item) for item in string_list(step["inputs"], "step.inputs")],
                     pathlib.Path(str(outputs["contactSheet"])),
                 )
+            elif step.get("python") == "anydoc-markdown":
+                run_anydoc_step(manifest, step)
             else:
                 run_mere_step(manifest, step)
         files = collect_artifacts(manifest)
@@ -588,6 +633,19 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
     return manifest
 
 
+def run_anydoc_step(manifest: JsonMap, step: JsonMap) -> None:
+    inputs = string_list(step["inputs"], "step.inputs")
+    outputs = as_map(step["outputs"], "step.outputs")
+    output = outputs.get("markdown")
+    if len(inputs) != 1 or not isinstance(output, str) or not output:
+        raise PluginError("AnyDoc steps require one input and a Markdown output path.", 2)
+    try:
+        installed_version = anydoc_backend.convert(pathlib.Path(inputs[0]), pathlib.Path(output))
+    except anydoc_backend.AnyDocError as exc:
+        raise PluginError(str(exc), exc.exit_code) from None
+    manifest_tool(manifest)["backendVersion"] = installed_version
+
+
 def run_mere_step(manifest: JsonMap, step: JsonMap) -> None:
     command = string_list(manifest_tool(manifest)["mereRunCommand"], "tool.mereRunCommand") + string_list(
         step["argv"],
@@ -600,7 +658,7 @@ def run_mere_step(manifest: JsonMap, step: JsonMap) -> None:
         stdin_path = pathlib.Path(str(step["stdinPath"]))
         if not stdin_path.is_file():
             raise PluginError(f"step input missing for {step['name']}: {stdin_path}", 1)
-        stdin_data = stdin_path.read_text()
+        stdin_data = stdin_path.read_text(encoding="utf-8")
     outputs = as_map(step.get("outputs", {}), "step.outputs")
     for output in outputs.values():
         pathlib.Path(str(output)).parent.mkdir(parents=True, exist_ok=True)
@@ -667,12 +725,19 @@ def command_manifest(spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
-def command_doctor(_spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_doctor(spec: ToolSpec, args: argparse.Namespace) -> int:
     mere_run_command = split_command(args.mere_run_command)
     checks = [
         {"name": "python", "ok": True, "detail": sys.version.split()[0]},
-        {"name": "mere.run", "ok": command_available(mere_run_command), "detail": shlex.join(mere_run_command)},
     ]
+    if spec.kind == "doc" and args.extractor == "anydoc":
+        try:
+            _, installed_version = anydoc_backend.load_backend()
+            checks.append({"name": "anydoc", "ok": True, "detail": f"firecrawl-anydoc {installed_version}; local only"})
+        except anydoc_backend.AnyDocError as exc:
+            checks.append({"name": "anydoc", "ok": False, "detail": str(exc)})
+    if spec.kind != "doc" or args.extractor == "ocr" or args.redact:
+        checks.append({"name": "mere.run", "ok": command_available(mere_run_command), "detail": shlex.join(mere_run_command)})
     ok = all(item["ok"] for item in checks)
     print_json({"ok": ok, "checks": checks})
     return 0 if ok else 3
@@ -731,28 +796,31 @@ def command_cleanup(_spec: ToolSpec, args: argparse.Namespace) -> int:
 
 
 def command_graph_catalog(spec: ToolSpec, _args: argparse.Namespace) -> int:
-    print_json(graph_provider.graph_catalog(spec.plugin_name, __version__))
+    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
+    print_json(provider.graph_catalog(spec.plugin_name, __version__))
     return 0
 
 
-def command_graph_preflight(_spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_graph_preflight(spec: ToolSpec, args: argparse.Namespace) -> int:
+    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
     try:
-        invocation = graph_provider.load_invocation(args.request)
-        print_json(graph_provider.graph_preflight(invocation, args.graph_run_dir))
+        invocation = provider.load_invocation(args.request)
+        print_json(provider.graph_preflight(invocation, args.graph_run_dir))
         return 0
     except GraphProviderError as exc:
         raise PluginError(str(exc), 2) from None
 
 
-def command_graph_execute(_spec: ToolSpec, args: argparse.Namespace) -> int:
+def command_graph_execute(spec: ToolSpec, args: argparse.Namespace) -> int:
+    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
     try:
-        invocation = graph_provider.load_invocation(args.request)
+        invocation = provider.load_invocation(args.request)
 
         def write_event(payload: JsonMap) -> None:
             sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
             sys.stdout.flush()
 
-        graph_provider.graph_execute(invocation, args.graph_run_dir, write_event)
+        provider.graph_execute(invocation, args.graph_run_dir, write_event)
         return 0
     except GraphProviderError as exc:
         raise PluginError(str(exc), 1) from None
@@ -852,6 +920,8 @@ def add_kind_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
         parser.add_argument("--ocr-backend", default="lighton", choices=["lighton", "glm", "infinity"])
         parser.add_argument("--redact", action=argparse.BooleanOptionalAction, default=True)
         parser.add_argument("--replacement", default="[{label}]")
+    if spec.kind == "doc":
+        add_document_extractor_arg(parser)
     if spec.kind == "dataset":
         parser.add_argument("--prompt")
         parser.add_argument("--focus", action="append", default=[])
@@ -878,6 +948,13 @@ def add_kind_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
     if spec.kind == "batch":
         parser.add_argument("--jobs", required=True, type=pathlib.Path)
         parser.add_argument("--continue-on-error", action="store_true")
+
+
+def add_document_extractor_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--extractor", default="ocr", choices=["ocr", "anydoc"],
+        help="Local extraction engine: native mere.run OCR (default) or AnyDoc document-to-Markdown conversion.",
+    )
 
 
 def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -917,6 +994,9 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
 
     doctor = sub.add_parser("doctor", help="Check local readiness.")
     doctor.add_argument("--mere-run-command", default="")
+    if spec.kind == "doc":
+        add_document_extractor_arg(doctor)
+        doctor.add_argument("--redact", action=argparse.BooleanOptionalAction, default=True)
     doctor.set_defaults(func=command_doctor)
 
     plan = sub.add_parser("plan", help="Create a local workflow plan.")
@@ -937,7 +1017,7 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     cleanup.add_argument("run_manifest", type=pathlib.Path)
     cleanup.set_defaults(func=command_cleanup)
 
-    if spec.kind == "dataset":
+    if spec.kind in {"doc", "dataset"}:
         graph = sub.add_parser("graph", help="Expose portable graph nodes.")
         graph_sub = graph.add_subparsers(dest="graph_command", required=True)
 

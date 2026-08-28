@@ -12,7 +12,7 @@ Start from the outcome, not the model.
 | Build shot, character, voice, or delivery kits | [`mere-animatic-tools`](/plugins/animatic-tools) | Animatic-specific artifact bundles |
 | Publish local artifacts for production review | [`mere-shotgrid-tools`](/plugins/shotgrid-tools) | Versions, uploads, Notes, Playlists, and task updates |
 | Train a Klein LoRA on rented GPUs | [`mere-runpod`](/plugins/runpod) | Planned user-owned pods, artifact fetch, cleanup by default |
-| OCR and redact a document | [`mere-doc-tools`](/plugins/document-tools) | Local OCR plus optional local anonymization |
+| Convert or OCR a document | [`mere-doc-tools`](/plugins/document-tools) | AnyDoc Markdown or local OCR, plus optional local anonymization |
 | Scrub text and PII across frames | [`mere-media-scrub`](/plugins/media-scrub) | Resumable frame-batch privacy workflow |
 | Caption a LoRA dataset | [`mere-dataset-tools`](/plugins/dataset-tools) | Captions, OCR sidecars, trigger tokens, contact sheet |
 | Transcribe and redact audio | [`mere-transcript-tools`](/plugins/transcript-tools) | Local ASR plus optional anonymization |

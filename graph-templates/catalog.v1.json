@@ -2,6 +2,13 @@
   "contract_version": "mere.run/graph-template-catalog.v1",
   "templates": [
     {
+      "id": "document-to-markdown",
+      "title": "Convert a document to Markdown",
+      "description": "Convert a local document with AnyDoc and preserve Markdown, reusable text, hashes, and a run manifest. No model or hosted OCR is used.",
+      "path": "document-to-markdown.json",
+      "tags": ["documents", "markdown", "local", "text"]
+    },
+    {
       "id": "creative-prompt-lab",
       "title": "Build a reusable creative prompt",
       "description": "Combine material values, a seeded format choice, and an explicit installed chat model into a reusable image prompt.",

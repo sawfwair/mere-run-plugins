@@ -3,6 +3,9 @@
 The privacy-oriented workflow tools keep source documents, frames, and audio on
 the machine that owns them. They shell out to native `mere.run` OCR, speech,
 captioning, and anonymization commands; they do not call hosted APIs.
+Document Tools can also convert office files and text PDFs locally with
+AnyDoc. Its hosted OCR option is always disabled, including when Firecrawl
+credentials are present in the environment.
 
 ## Documents
 

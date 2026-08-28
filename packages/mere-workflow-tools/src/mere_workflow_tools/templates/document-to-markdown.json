@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "document-to-markdown",
+  "inputs": {"document": {"type": "asset", "required": true}},
+  "nodes": [
+    {
+      "id": "convert",
+      "kind": "document.convert",
+      "provider": "mere-doc-tools",
+      "arguments": {"input": {"$ref": "inputs.document"}},
+      "execution": {"cache": "never", "max_attempts": 1, "timeout_seconds": 300}
+    }
+  ],
+  "outputs": {
+    "markdown": {"$ref": "nodes.convert.outputs.markdown"},
+    "manifest": {"$ref": "nodes.convert.outputs.manifest"},
+    "text": {"$ref": "nodes.convert.outputs.text"},
+    "stats": {"$ref": "nodes.convert.outputs.stats"}
+  },
+  "metadata": {"template_id": "document-to-markdown"}
+}

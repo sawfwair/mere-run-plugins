@@ -14,7 +14,7 @@ The live catalog contains 16 official companion executables.
 | [Film Studio](/plugins/film-tools) | `mere-film-tools` | Pi-directed short-film development, local production, review, and delivery | Local plus user-selected Pi provider |
 | [ShotGrid Tools](/plugins/shotgrid-tools) | `mere-shotgrid-tools` | Production tracking and review publishing | User-controlled provider |
 | [RunPod Runner](/plugins/runpod) | `mere-runpod` | Ephemeral GPU recipe execution | User-controlled provider |
-| [Document Tools](/plugins/document-tools) | `mere-doc-tools` | OCR and PII redaction | Local |
+| [Document Tools](/plugins/document-tools) | `mere-doc-tools` | Markdown conversion, OCR, and PII redaction | Local |
 | [Media Scrub](/plugins/media-scrub) | `mere-media-scrub` | Batch frame OCR and redaction | Local |
 | [Dataset Tools](/plugins/dataset-tools) | `mere-dataset-tools` | LoRA captions, OCR, and contact sheets | Local |
 | [Transcript Tools](/plugins/transcript-tools) | `mere-transcript-tools` | Speech transcription and redaction | Local |

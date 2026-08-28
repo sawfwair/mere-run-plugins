@@ -22,6 +22,19 @@ only letters, digits, `.`, `_`, or `-`.
 The local section records input paths, output paths, resolved commands, and
 workflow-specific controls needed to understand or reproduce the run.
 
+Document Tools AnyDoc plans use `tool.backend: "anydoc"` and a local
+`python: "anydoc-markdown"` step with one input and an `outputs.markdown` path.
+Completed conversions record `tool.backendVersion`. The `tool.redact` flag
+controls subsequent native anonymization; hosted OCR cannot be enabled by a
+manifest field. See [Document Tools](/plugins/document-tools).
+
+The `document.convert` graph node emits the same manifest as an output asset,
+with a source SHA-256 and a replayable conversion step. It records running state
+before conversion and success or failure afterward. The graph's Markdown and
+inline text are unredacted; `stats` includes input/output hashes and the backend
+version. Existing lifecycle commands can inspect, replay, or mark local cleanup
+for these graph receipts.
+
 ## Provider state
 
 Provider plugins record requested settings and the created resource identity.

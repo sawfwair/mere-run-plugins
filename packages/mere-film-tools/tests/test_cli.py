@@ -821,13 +821,15 @@ class MereFilmToolsTests(unittest.TestCase):
             self.assertEqual(pi_check["detail"], str(pi.resolve()))
 
             project_root = root / "film"
-            code, output, error = run_cli([
-                *complete_plan_arguments(project_root),
-                "--pi-command", "pi",
-                "--mere-run-command", str(mere_run),
-                "--ffmpeg-command", str(ffmpeg),
-                "--ffprobe-command", str(ffprobe),
-            ])
+            # Planning must use the same missing-PATH-Pi condition as doctor.
+            with patch("mere_film_tools.cli.shutil.which", return_value=None):
+                code, output, error = run_cli([
+                    *complete_plan_arguments(project_root),
+                    "--pi-command", "pi",
+                    "--mere-run-command", str(mere_run),
+                    "--ffmpeg-command", str(ffmpeg),
+                    "--ffprobe-command", str(ffprobe),
+                ])
             self.assertEqual(code, 0, error)
             run_manifest = pathlib.Path(json.loads(output)["status"]["runManifest"])
             project = load_json(run_manifest.parent / "film-project.json")
