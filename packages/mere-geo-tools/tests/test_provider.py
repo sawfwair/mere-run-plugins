@@ -210,10 +210,38 @@ class GeoProviderTests(unittest.TestCase):
         ):
             report = cli.doctor_report()
 
-        self.assertEqual(set(report["modules"]), {"numpy", "rasterio", "safetensors", "zarr"})
+        self.assertEqual(
+            set(report["modules"]),
+            {"numpy", "planetary_computer", "pystac_client", "rasterio", "safetensors", "zarr"},
+        )
         self.assertNotIn("impactmesh", report["modules"])
         self.assertEqual(report["native_runtime"]["command"], "mere.run geo flood")
         self.assertEqual(report["native_runtime"]["accelerator"], "metal")
+
+    def test_deep_doctor_requires_each_offline_runtime_check(self) -> None:
+        with mock.patch(
+            "mere_geo_tools.runtime.resolve_mere_run_executable", return_value="/tmp/mere.run"
+        ), mock.patch.object(cli.importlib.util, "find_spec", return_value=object()), mock.patch.object(
+            cli.platform, "system", return_value="Darwin"
+        ), mock.patch.object(
+            cli,
+            "_deep_runtime_checks",
+            return_value=(
+                {
+                    "numpy": True,
+                    "rasterio": True,
+                    "zarr": True,
+                    "safetensors": False,
+                    "stac_clients": True,
+                },
+                {"safetensors": "fixture failure"},
+            ),
+        ):
+            report = cli.doctor_report(deep=True)
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertFalse(report["deep_checks"]["safetensors"])
+        self.assertEqual(report["deep_errors"]["safetensors"], "fixture failure")
 
     def test_cli_routes_every_machine_readable_command(self) -> None:
         exit_code, stdout, _ = self.invoke_cli(["manifest", "--json"])
@@ -221,7 +249,7 @@ class GeoProviderTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout)["name"], provider.PROVIDER_ID)
 
         with mock.patch.object(cli, "doctor_report", return_value={"status": "blocked"}):
-            exit_code, _, _ = self.invoke_cli(["doctor", "--json"])
+            exit_code, _, _ = self.invoke_cli(["doctor", "--deep", "--json"])
         self.assertEqual(exit_code, 2)
 
         with tempfile.TemporaryDirectory() as raw_root:
