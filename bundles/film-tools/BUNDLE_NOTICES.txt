@@ -1,0 +1,14 @@
+Mere Film Tools bundle acknowledgments
+
+CPython and its native dependency notices are preserved in python-licenses.
+The plugin's MIT terms, including its bundled first-party Pi prompts, skills,
+agents, and extension sources, are preserved in LICENSE.txt.
+
+Pi and ffmpeg are runtime integrations and are not redistributed in this bundle.
+Pi owns its provider credentials; Mere Film Tools does not read or store them.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+License expressions in the build inventory do not replace the upstream terms.

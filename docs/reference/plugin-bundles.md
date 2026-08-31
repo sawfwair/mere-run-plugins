@@ -90,3 +90,8 @@ package-manager dependency, signature and artifact tamper rejection, and
 failed-update/rollback behavior. Optional programs such as Blender stay
 visible in `doctor`; they are not silently installed or treated as mandatory
 for unrelated local workflows. A valid signature alone is not a workflow test.
+
+Reviewed recipes currently cover Workflow, Image, Face, Animatic, VFX, Perform,
+and Film Studio tools. Film Studio bundles its first-party Pi prompts, skills,
+agents, and extension sources, but not Pi, provider credentials, or ffmpeg.
+Those runtime integrations remain visible in `doctor` and under user control.
