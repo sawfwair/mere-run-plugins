@@ -96,7 +96,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-image-tools/0.1.0-1/release.json"
+          }
         }
       }
     },
@@ -121,7 +124,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-face-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-face-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-face-tools/0.1.0-1/release.json"
+          }
         }
       }
     },
@@ -215,7 +221,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-animatic-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-animatic-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-animatic-tools/0.2.0-1/release.json"
+          }
         }
       }
     },
