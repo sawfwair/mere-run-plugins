@@ -1,8 +1,8 @@
 # Signed plugin bundles
 
-This reference is for plugin and CLI maintainers implementing the macOS Apple
-Silicon bundle pilot. The public catalog remains on source installation until
-a verified bundle and a compatible CLI release are published.
+This reference is for plugin and CLI maintainers implementing signed macOS
+Apple Silicon bundles. A catalog channel may retain source installation as a
+portable fallback while advertising a verified bundle to compatible clients.
 
 ## Distribution contract
 
@@ -84,7 +84,9 @@ inventory. Sign every Mach-O component, seal the app, notarize and staple it,
 then produce and sign the DMG. Sign the release metadata only after tests pass.
 Publish immutable artifacts before advertising their metadata in the catalog.
 
-Required checks include conversion with the bundled runtime, a relocated path
-containing spaces, no package-manager dependency, offline operation, signature
-and artifact tamper rejection, and failed-update/rollback behavior. A valid
-signature alone is not a launch or conversion test.
+Required checks include every declared manifest, a package-specific offline
+workflow with the bundled runtime, a relocated path containing spaces, no
+package-manager dependency, signature and artifact tamper rejection, and
+failed-update/rollback behavior. Optional programs such as Blender stay
+visible in `doctor`; they are not silently installed or treated as mandatory
+for unrelated local workflows. A valid signature alone is not a workflow test.
