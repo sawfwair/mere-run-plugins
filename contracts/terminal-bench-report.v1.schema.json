@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/terminal-bench-report.v1.schema.json",
+  "title": "mere.run Terminal-Bench Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "runId",
+    "createdAt",
+    "pins",
+    "dataset",
+    "comparisonSettings",
+    "arms",
+    "pairwise"
+  ],
+  "properties": {
+    "contractVersion": { "const": "mere.run/terminal-bench-report.v1" },
+    "runId": { "type": "string" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "pins": { "type": "object" },
+    "dataset": { "type": "object" },
+    "comparisonSettings": { "type": "object" },
+    "arms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["model", "status", "summary"],
+        "properties": {
+          "model": { "type": "string" },
+          "status": { "type": "string" },
+          "summary": { "type": ["object", "null"] }
+        }
+      }
+    },
+    "pairwise": {
+      "type": ["object", "null"]
+    }
+  }
+}

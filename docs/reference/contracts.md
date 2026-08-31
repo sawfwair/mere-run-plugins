@@ -9,6 +9,8 @@ plugins, recipes, and downstream automation.
 | [`catalog.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/catalog.v1.schema.json) | Published plugin catalog |
 | [`recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/recipe.v1.schema.json) | Executable workflow recipe |
 | [`eval-recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/eval-recipe.v1.schema.json) | Evaluation protocol |
+| [`terminal-bench-recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/terminal-bench-recipe.v1.schema.json) | Pinned Terminal-Bench comparison recipe |
+| [`terminal-bench-report.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/terminal-bench-report.v1.schema.json) | Matched Terminal-Bench results and pairwise outcomes |
 | [`run-manifest.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/run-manifest.v1.schema.json) | Durable execution state |
 | [`artifact-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/artifact-bundle.v1.schema.json) | Fetched result inventory |
 | [`film-brief.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-brief.v1.schema.json) | User-confirmed film requirements and greenlight readiness |

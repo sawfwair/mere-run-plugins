@@ -124,6 +124,32 @@ def validate_eval_recipes() -> None:
             fail(f"{path}: public eval recipe must not contain workstation paths")
 
 
+def validate_terminal_bench_recipes() -> None:
+    schema = contract_schema("terminal-bench-recipe.v1.schema.json")
+    paths = sorted((ROOT / "benchmark-recipes").glob("*.json"))
+    if not paths:
+        fail("benchmark-recipes: Terminal-Bench recipe is missing")
+    for path in paths:
+        recipe = load_json(path)
+        validate_schema(path, schema, recipe)
+        packaged_path = (
+            ROOT
+            / "packages"
+            / "mere-terminal-bench"
+            / "src"
+            / "mere_terminal_bench"
+            / "recipes"
+            / path.name
+        )
+        if not packaged_path.is_file():
+            fail(f"{packaged_path}: bundled Terminal-Bench recipe is missing")
+        if load_json(packaged_path) != recipe:
+            fail(f"{packaged_path}: bundled Terminal-Bench recipe does not match {path}")
+        dataset = as_map(recipe["dataset"], f"{path}: dataset")
+        if dataset["taskCount"] != 89:
+            fail(f"{path}: Terminal-Bench 2.1 must contain 89 tasks")
+
+
 def validate_graph_templates() -> None:
     root = ROOT / "graph-templates"
     catalog_path = root / "catalog.v1.json"
@@ -195,6 +221,7 @@ def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
         ROOT / "packages" / "mere-runpod" / "src",
+        ROOT / "packages" / "mere-terminal-bench" / "src",
         ROOT / "packages" / "mere-image-tools" / "src",
         ROOT / "packages" / "mere-face-tools" / "src",
         ROOT / "packages" / "mere-film-tools" / "src",
@@ -252,6 +279,11 @@ def validate_plugin_manifests() -> None:
         "mere_runpod",
         "mere-runpod",
         {"manifest", "doctor", "volume", "plan", "run", "resume", "cleanup"},
+    )
+    validate_plugin_manifest(
+        "mere_terminal_bench",
+        "mere-terminal-bench",
+        {"manifest", "doctor", "plan", "run", "resume", "report", "cleanup"},
     )
     validate_plugin_manifest(
         "mere_image_tools",
@@ -446,6 +478,74 @@ def validate_runpod_plan() -> None:
             fail("style recipe command should use the current Klein training preset")
         if "--sample-model" not in manifest["command"] or "image-klein-9b" not in manifest["command"]:
             fail("style recipe command should sample against image-klein-9b")
+
+
+def validate_terminal_bench_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        output = pathlib.Path(tmp) / "run"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_terminal_bench",
+                "plan",
+                "--output",
+                str(output),
+                "--run-id",
+                "validate-terminal-bench",
+                "--docker-context",
+                "validation-context",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = as_map(json.loads(result.stdout), "mere-terminal-bench plan")
+        validate_schema(
+            pathlib.Path("mere-terminal-bench plan"),
+            contract_schema("run-manifest.v1.schema.json"),
+            manifest,
+        )
+        runtime = as_map(manifest["runtime"], "mere-terminal-bench runtime")
+        if runtime["createsDockerRuntime"] is not False:
+            fail("mere-terminal-bench must not create a Docker runtime")
+        if runtime["maximumAdditionalStorageBytes"] != 64 * 1024**3:
+            fail("mere-terminal-bench must record the 64 GiB default storage limit")
+        dataset = as_map(manifest["dataset"], "mere-terminal-bench dataset")
+        if dataset["pairCount"] != 89:
+            fail("mere-terminal-bench must plan all 89 tasks by default")
+        if dataset["sha256"] != "sha256:7d7bdc1cbedad549fc1140404bd4dc45e5fd0ea7c4186773687d177ad3a0699a":
+            fail("mere-terminal-bench plan has the wrong dataset pin")
+        report_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_terminal_bench",
+                "report",
+                str(output / "run.json"),
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        report = as_map(json.loads(report_result.stdout), "mere-terminal-bench report")
+        validate_schema(
+            pathlib.Path("mere-terminal-bench report"),
+            contract_schema("terminal-bench-report.v1.schema.json"),
+            report,
+        )
+        bundle_path = output / "artifact-bundle.json"
+        validate_schema(
+            bundle_path,
+            contract_schema("artifact-bundle.v1.schema.json"),
+            load_json(bundle_path),
+        )
 
 
 def validate_image_tools_plan() -> None:
@@ -928,10 +1028,12 @@ def main() -> int:
     validate_schema(bundle_example, contract_schema("plugin-bundle.v1.schema.json"), load_json(bundle_example))
     validate_recipes()
     validate_eval_recipes()
+    validate_terminal_bench_recipes()
     validate_graph_templates()
     validate_plugin_manifests()
     validate_graph_provider()
     validate_runpod_plan()
+    validate_terminal_bench_plan()
     validate_image_tools_plan()
     validate_face_tools_plan()
     validate_film_tools_plan()

@@ -91,7 +91,11 @@ failed-update/rollback behavior. Optional programs such as Blender stay
 visible in `doctor`; they are not silently installed or treated as mandatory
 for unrelated local workflows. A valid signature alone is not a workflow test.
 
-Reviewed recipes currently cover Workflow, Image, Face, Animatic, VFX, Perform,
-and Film Studio tools. Film Studio bundles its first-party Pi prompts, skills,
-agents, and extension sources, but not Pi, provider credentials, or ffmpeg.
-Those runtime integrations remain visible in `doctor` and under user control.
+Reviewed recipes cover Workflow, Image, Face, Animatic, VFX, Perform, Film
+Studio, Geospatial, and Terminal-Bench tools. The Terminal-Bench recipe includes
+the pinned Harbor runtime and invokes it through the plugin's restricted frozen
+entrypoint. It doesn't include Docker, task images, task data, model weights,
+credentials, or benchmark results. Film Studio bundles its first-party Pi
+prompts, skills, agents, and extension sources, but not Pi, provider
+credentials, or ffmpeg. Those runtime integrations remain visible in `doctor`
+and under user control.

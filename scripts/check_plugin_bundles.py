@@ -22,6 +22,7 @@ class BundleContractTests(unittest.TestCase):
             "geo-tools",
             "image-tools",
             "perform",
+            "terminal-bench",
             "vfx-tools",
             "workflow-tools",
         }
@@ -74,6 +75,13 @@ class BundleContractTests(unittest.TestCase):
                     self.assertNotIn("pillow==", requirements, bundle)
                     self.assertNotIn("PIL", recipe.get("collectAll", []), bundle)
                     self.assertNotIn("pillow", recipe.get("copyMetadata", []), bundle)
+
+                if bundle == "terminal-bench":
+                    self.assertIn("harbor==0.22.0 \\", requirements)
+                    self.assertIn("harbor", recipe.get("collectAll", []))
+                    self.assertIn("litellm", recipe.get("collectAll", []))
+                    self.assertIn("harbor", recipe.get("copyMetadata", []))
+                    self.assertIn("litellm", recipe.get("copyMetadata", []))
 
                 if bundle == "geo-tools":
                     builder_requirements = (inputs / "builder-requirements.lock").read_text().lower()

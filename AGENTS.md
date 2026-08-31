@@ -23,8 +23,8 @@ Run the repo gate before opening a PR:
 ```
 
 The gate compiles the Python plugins, runs unit tests, validates JSON contracts
-and recipes, and smoke-tests the `mere-runpod` manifest and dry-run planning
-surface.
+and recipes, and smoke-tests installed packages. The Terminal-Bench smoke must
+remain plan-only and must prove that the plugin doesn't create a Docker runtime.
 
 ## Editing Rules
 

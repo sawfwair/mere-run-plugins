@@ -11,6 +11,9 @@ Key paths:
 - `catalog/plugins.v1.json`: public install catalog.
 - `packages/mere-runpod/`: RunPod remote runner. Paid-resource paths must plan
   first and clean up by default.
+- `packages/mere-terminal-bench/`: pinned Harbor and Terminal-Bench orchestration
+  for matched local text-model comparisons. It consumes an existing Docker
+  context and must never create or resize one.
 - `packages/mere-image-tools/`: local image helpers around existing `mere.run`
   vision commands.
 - `packages/mere-face-tools/`: local face-library indexing, search, and review

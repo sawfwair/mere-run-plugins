@@ -20,6 +20,27 @@ use the user's account, credentials, spending limits, and cleanup policy.
 - Provider-specific and local-production companion CLIs.
 - Test utilities that verify plugin manifests, plans, and run manifests.
 
+## Terminal-Bench plugin
+
+`mere-terminal-bench` compares local `mere.run` text models with the official
+Harbor harness and a pinned Terminal-Bench 2.1 dataset. The plugin uses a Docker
+context that you select. It doesn't create or resize a Docker runtime.
+
+```bash
+pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-terminal-bench"
+mere-terminal-bench doctor --docker-context BENCHMARK_CONTEXT
+mere-terminal-bench plan \
+  --output ./runs/ornith-terminal-bench \
+  --docker-context BENCHMARK_CONTEXT
+```
+
+The package requires Python 3.12 or later and installs the pinned Harbor
+runtime as a dependency.
+
+The default plan compares Ornith Q4 and Q8 with identical Terminus-2 settings.
+It records a 64 GiB additional-storage limit and `createsDockerRuntime: false`
+before the run starts.
+
 ## RunPod Plugin
 
 `mere-runpod` runs a normal `mere.run image train-lora` command on an ephemeral
@@ -381,7 +402,9 @@ docs/                      comprehensive VitePress guide, plugin, reference, and
 recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
 bundles/                   reviewed inputs for reproducible signed macOS plugin bundles
+benchmark-recipes/         pinned external benchmark protocols
 packages/mere-runpod/      first official provider plugin
+packages/mere-terminal-bench/ local Terminal-Bench orchestration plugin
 packages/mere-image-tools/ local image-production plugin
 packages/mere-face-tools/  local face-library indexing and search plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
