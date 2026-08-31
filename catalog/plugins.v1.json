@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-31T00:40:56Z",
+  "updatedAt": "2026-08-31T07:38:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -185,7 +185,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-vfx-tools/0.2.0-1/envelope.json"
+          }
         }
       }
     },
@@ -272,7 +275,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-film-tools/0.1.0-1/envelope.json"
+          }
         }
       }
     },
@@ -326,7 +332,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-perform/0.1.0-1/envelope.json"
+          }
         }
       }
     },
