@@ -30,6 +30,8 @@ plugins, recipes, and downstream automation.
 | [`workflow-module.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-module.v1.schema.json) | Reusable imported graph module |
 | [`workflow-editor-sidecar.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-editor-sidecar.v1.schema.json) | Non-executable canvas state |
 
+See [Signed plugin bundles](/reference/plugin-bundles) for installable code, publisher verification, and activation requirements.
+
 ## Versioning
 
 Contract identifiers carry an explicit version such as

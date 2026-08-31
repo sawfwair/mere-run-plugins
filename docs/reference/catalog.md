@@ -52,3 +52,8 @@ When adding or changing an entry:
 4. let the site catalog sync copy the validated source into the public build.
 
 The docs coverage check requires every catalog ID to have a first-class page.
+
+## Signed bundle channels
+
+Channels can advertise a platform-specific signed bundle while retaining their
+source install for older clients. See [Signed plugin bundles](/reference/plugin-bundles).

@@ -924,6 +924,8 @@ def validate_volume_dry_run() -> None:
 def main() -> int:
     validate_contracts()
     validate_catalog()
+    bundle_example = ROOT / "examples/plugin-bundles/document-tools.manifest.json"
+    validate_schema(bundle_example, contract_schema("plugin-bundle.v1.schema.json"), load_json(bundle_example))
     validate_recipes()
     validate_eval_recipes()
     validate_graph_templates()

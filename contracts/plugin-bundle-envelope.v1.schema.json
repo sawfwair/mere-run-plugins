@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/plugin-bundle-envelope.v1.schema.json",
+  "title": "mere.run Signed Plugin Bundle Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "keyID",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "mere.run/plugin-bundle-envelope.v1"
+    },
+    "keyID": {
+      "const": "mere-release-1"
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "maxLength": 43692
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
+  }
+}

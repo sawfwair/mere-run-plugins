@@ -1,0 +1,19 @@
+{
+  "package": "mere-workflow-tools",
+  "appBundle": "MereWorkflowTools.app",
+  "minimumOSVersion": "15.0",
+  "python": {
+    "version": "3.12.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.12.13%2B20260414-aarch64-apple-darwin-pgo%2Blto-full.tar.zst",
+    "sha256": "612b1af85f33fe57351c0e8e40677c95d9ef63774c1f13ae8054c59c785a84ca"
+  },
+  "entrypoints": {
+    "mere-doc-tools": "mere_workflow_tools.doc_cli",
+    "mere-media-scrub": "mere_workflow_tools.media_cli",
+    "mere-dataset-tools": "mere_workflow_tools.dataset_cli",
+    "mere-transcript-tools": "mere_workflow_tools.transcript_cli",
+    "mere-image-compose": "mere_workflow_tools.image_compose_cli",
+    "mere-batch-runner": "mere_workflow_tools.batch_cli",
+    "mere-identity-tools": "mere_workflow_tools.identity_cli"
+  }
+}

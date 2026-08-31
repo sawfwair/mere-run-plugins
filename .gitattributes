@@ -1,0 +1,2 @@
+# Preserve upstream license bytes, including original line endings and spacing.
+bundles/workflow-tools/anydoc-native-notices.txt -text -whitespace

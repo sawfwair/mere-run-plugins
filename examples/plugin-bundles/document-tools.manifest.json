@@ -1,0 +1,19 @@
+{
+  "contractVersion": "mere.run/plugin-bundle.v1",
+  "package": "mere-workflow-tools",
+  "version": "0.4.0",
+  "sequence": 1,
+  "sourceCommit": "89e103568db54554a25fc404755674233391133b",
+  "platform": "macos-arm64",
+  "minimumOSVersion": "15.0",
+  "expiresAt": "2027-08-28T00:00:00Z",
+  "appBundle": "MereWorkflowTools.app",
+  "entrypoints": {
+    "mere-doc-tools": "mere-doc-tools"
+  },
+  "artifact": {
+    "url": "https://example.com/releases/mere-workflow-tools-0.4.0-1.dmg",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "size": 1
+  }
+}
