@@ -1,9 +1,19 @@
 Mere Geo Tools bundle acknowledgments
 
 Rasterio's macOS wheel includes GDAL, PROJ, OpenSSL, cURL, NetCDF, HDF5,
-and other native libraries. Rasterio's BSD license is preserved in
-dependency-licenses. GDAL's consolidated end-user license and notices are
-preserved in the frozen application's rasterio/gdal_data/LICENSE.TXT.
+and other native libraries. The exact wheel dylib inventory, upstream source
+archives, versions, checksums, and license-text mappings are preserved in
+geo-native-inventory.json and geo-native-notices.txt. Rasterio's BSD license is
+also preserved in dependency-licenses. GDAL's consolidated end-user license
+and notices remain available in the frozen application's
+rasterio/gdal_data/LICENSE.TXT.
+
+Numcodecs compiles bundled c-blosc, LZ4, zlib, and Zstandard sources into its
+macOS extensions. Safetensors includes a Rust extension. Their reviewed source
+archives, Cargo lock, crate checksums, conservative non-development Cargo
+dependency closure, and license texts are recorded in the same Geo native
+inventory and notice files. The Cargo inventory includes build and target
+dependencies and can exceed the linked macOS runtime set.
 
 This software is based in part on the work of the Independent JPEG Group.
 Portions of this software are copyright The FreeType Project (www.freetype.org).

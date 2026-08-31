@@ -106,6 +106,66 @@ class BundleContractTests(unittest.TestCase):
                     ):
                         self.assertIn(requirement, requirements, bundle)
 
+                    inventory_path = inputs / "geo-native-inventory.json"
+                    notices_path = inputs / "geo-native-notices.txt"
+                    self.assertTrue(inventory_path.is_file())
+                    self.assertTrue(notices_path.is_file())
+                    inventory = json.loads(inventory_path.read_text())
+                    notices = notices_path.read_bytes()
+                    self.assertEqual(inventory["schemaVersion"], 1)
+                    self.assertEqual(inventory["target"], "aarch64-apple-darwin")
+                    self.assertEqual(hashlib.sha256(notices).hexdigest(), inventory["noticesSHA256"])
+                    self.assertEqual(inventory["rasterio"]["version"], "1.5.1")
+                    self.assertEqual(inventory["numcodecs"]["version"], "0.15.1")
+                    self.assertEqual(inventory["safetensors"]["version"], "0.8.0")
+                    self.assertEqual(
+                        inventory["rasterio"]["buildConfig"]["sha256"],
+                        "0c2d0df8b1a15b7a53b46c5674bbf8b55bc7437e841553e36a468c9113ff6d73",
+                    )
+                    for dependency in ("rasterio", "numcodecs", "safetensors"):
+                        self.assertIn(inventory[dependency]["wheel"]["sha256"], requirements)
+                    libraries = {
+                        library
+                        for component in inventory["rasterio"]["nativeComponents"]
+                        for library in component["libraries"]
+                    }
+                    self.assertEqual(
+                        libraries,
+                        {
+                            "libLerc.4.dylib", "libaec.0.1.7.dylib", "libblosc.1.21.6.dylib",
+                            "libcrypto.3.dylib", "libcurl.4.dylib", "libdeflate.0.dylib",
+                            "libgdal.38.3.12.4.dylib", "libgif.7.2.0.dylib",
+                            "libhdf5.320.1.1.dylib", "libhdf5_hl.320.0.2.dylib",
+                            "libjpeg.8.3.2.dylib", "libjson-c.5.4.0.dylib", "liblzma.5.dylib",
+                            "libnetcdf.22.dylib", "libnghttp2.14.dylib", "libopenjp2.2.5.4.dylib",
+                            "libpcre2-8.0.dylib", "libpng16.16.dylib", "libproj.25.9.8.1.dylib",
+                            "libsharpyuv.0.dylib", "libsqlite3.3.53.1.dylib", "libssl.3.dylib",
+                            "libsz.2.0.1.dylib", "libtiff.6.dylib", "libwebp.7.dylib",
+                            "libz.1.3.2.dylib", "libzstd.1.5.7.dylib",
+                        },
+                    )
+                    self.assertEqual(
+                        {item["name"] for item in inventory["numcodecs"]["embeddedComponents"]},
+                        {"c-blosc", "lz4", "zlib", "zstd"},
+                    )
+                    cargo_packages = inventory["safetensors"]["cargoPackages"]
+                    self.assertGreaterEqual(len(cargo_packages), 60)
+                    self.assertIn("safetensors-python", {item["name"] for item in cargo_packages})
+
+                    def assert_license_files(value: object, notice_bytes: bytes = notices) -> None:
+                        if isinstance(value, dict):
+                            if "licenseFiles" in value:
+                                self.assertTrue(value["licenseFiles"])
+                                for license_file in value["licenseFiles"]:
+                                    self.assertIn(license_file["sha256"].encode(), notice_bytes)
+                            for child in value.values():
+                                assert_license_files(child)
+                        elif isinstance(value, list):
+                            for child in value:
+                                assert_license_files(child)
+
+                    assert_license_files(inventory)
+
     def test_native_notices_match_the_pinned_anydoc_dependency(self) -> None:
         inputs = ROOT / "bundles/workflow-tools"
         inventory = json.loads((inputs / "anydoc-native-inventory.json").read_text())
