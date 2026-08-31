@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-31T07:38:00Z",
+  "updatedAt": "2026-08-31T08:51:42Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -50,7 +50,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-geo-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-geo-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-geo-tools/0.2.0-1/envelope.json"
+          }
         }
       }
     },
