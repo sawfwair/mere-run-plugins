@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-28T00:00:00Z",
+  "updatedAt": "2026-08-31T00:40:56Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -23,7 +23,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -340,7 +343,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -362,7 +368,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -384,7 +393,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -406,7 +418,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -428,7 +443,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     },
@@ -449,7 +467,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.0-3/release.json"
+          }
         }
       }
     }
