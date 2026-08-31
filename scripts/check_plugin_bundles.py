@@ -15,7 +15,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class BundleContractTests(unittest.TestCase):
     def test_distribution_recipes_match_their_packages(self) -> None:
-        expected = {"animatic-tools", "face-tools", "image-tools", "workflow-tools"}
+        expected = {
+            "animatic-tools",
+            "face-tools",
+            "film-tools",
+            "image-tools",
+            "perform",
+            "vfx-tools",
+            "workflow-tools",
+        }
+        pillow_bundles = {"animatic-tools", "face-tools", "image-tools", "vfx-tools"}
         recipes = {path.parent.name: path for path in ROOT.glob("bundles/*/recipe.json")}
         self.assertEqual(set(recipes), expected)
         for bundle, path in sorted(recipes.items()):
@@ -31,15 +40,32 @@ class BundleContractTests(unittest.TestCase):
                              f"run.mere.plugins.{recipe['package']}")
             self.assertRegex(recipe["python"]["sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue(recipe["entrypoints"])
+            module_roots = set()
             for executable, module in recipe["entrypoints"].items():
                 self.assertRegex(executable, r"^mere-[a-z0-9-]+$")
                 self.assertRegex(module, r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+                module_roots.add(module.split(".", 1)[0])
             if bundle != "workflow-tools":
                 inputs = path.parent
-                self.assertIn("pillow==12.3.0 \\", (inputs / "requirements.lock").read_text())
-                for required in ("BUNDLE_NOTICES.txt", "build-constraints.txt", "builder-requirements.lock",
-                                 "frozen_entrypoint.py", "launcher.c", "requirements.lock"):
+                for required in ("BUNDLE_NOTICES.txt", "build-constraints.txt", "builder-requirements.in",
+                                 "builder-requirements.lock", "frozen_entrypoint.py", "launcher.c",
+                                 "requirements.lock"):
                     self.assertTrue((inputs / required).is_file(), f"{bundle}: {required}")
+                self.assertTrue(module_roots.issubset(set(recipe.get("collectAll", []))), bundle)
+                self.assertIn(recipe["package"], recipe.get("copyMetadata", []), bundle)
+                self.assertIn("pyinstaller", recipe.get("copyMetadata", []), bundle)
+                frozen = (inputs / "frozen_entrypoint.py").read_text()
+                for module in recipe["entrypoints"].values():
+                    self.assertIn(f'"{module}"', frozen, bundle)
+                requirements = (inputs / "requirements.lock").read_text().lower()
+                if bundle in pillow_bundles:
+                    self.assertIn("pillow==12.3.0 \\", requirements, bundle)
+                    self.assertIn("PIL", recipe.get("collectAll", []), bundle)
+                    self.assertIn("pillow", recipe.get("copyMetadata", []), bundle)
+                else:
+                    self.assertNotIn("pillow==", requirements, bundle)
+                    self.assertNotIn("PIL", recipe.get("collectAll", []), bundle)
+                    self.assertNotIn("pillow", recipe.get("copyMetadata", []), bundle)
 
     def test_native_notices_match_the_pinned_anydoc_dependency(self) -> None:
         inputs = ROOT / "bundles/workflow-tools"

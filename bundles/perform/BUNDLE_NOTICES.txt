@@ -1,0 +1,11 @@
+Mere Perform bundle acknowledgments
+
+CPython and its native dependency notices are preserved in python-licenses.
+The plugin's MIT terms are preserved in LICENSE.txt. mere.run is a runtime
+integration and is not redistributed in this bundle.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+License expressions in the build inventory do not replace the upstream terms.

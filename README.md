@@ -380,6 +380,7 @@ catalog/                   live install catalog for official plugins
 docs/                      comprehensive VitePress guide, plugin, reference, and operations docs
 recipes/                   canonical machine-readable recipe files
 eval-recipes/              canonical machine-readable eval protocols
+bundles/                   reviewed inputs for reproducible signed macOS plugin bundles
 packages/mere-runpod/      first official provider plugin
 packages/mere-image-tools/ local image-production plugin
 packages/mere-face-tools/  local face-library indexing and search plugin
