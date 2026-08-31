@@ -1,0 +1,36 @@
+{
+  "contractVersion": "mere.run/terminal-bench-recipe.v1",
+  "id": "terminal-bench-2-1",
+  "harness": {
+    "name": "harbor",
+    "version": "0.22.0"
+  },
+  "dataset": {
+    "name": "terminal-bench/terminal-bench-2-1",
+    "ref": "sha256:7d7bdc1cbedad549fc1140404bd4dc45e5fd0ea7c4186773687d177ad3a0699a",
+    "sourceRepo": "https://github.com/harbor-framework/terminal-bench-2-1",
+    "sourceCommit": "7131e4375048a0e408a8fb404b5f499d726b695b",
+    "taskCount": 89
+  },
+  "agent": {
+    "name": "terminus-2",
+    "temperature": 0.7,
+    "summarization": true
+  },
+  "inference": {
+    "engine": "text-chat-q36",
+    "memoryGuard": "balanced",
+    "contextSize": 131072,
+    "maxOutputTokens": 32768,
+    "maxActiveRequests": 1
+  },
+  "defaults": {
+    "attemptsPerTask": 1,
+    "concurrency": 1,
+    "maximumAdditionalStorageGiB": 64
+  },
+  "models": [
+    "text-agent-ornith-35b-mlx-4bit",
+    "text-agent-ornith-35b-mlx-8bit"
+  ]
+}

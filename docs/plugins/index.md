@@ -1,6 +1,6 @@
 # Official plugins
 
-The live catalog contains 16 official companion executables.
+The live catalog contains 17 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
@@ -14,6 +14,7 @@ The live catalog contains 16 official companion executables.
 | [Film Studio](/plugins/film-tools) | `mere-film-tools` | Pi-directed short-film development, local production, review, and delivery | Local plus user-selected Pi provider |
 | [ShotGrid Tools](/plugins/shotgrid-tools) | `mere-shotgrid-tools` | Production tracking and review publishing | User-controlled provider |
 | [RunPod Runner](/plugins/runpod) | `mere-runpod` | Ephemeral GPU recipe execution | User-controlled provider |
+| [Terminal-Bench](/plugins/terminal-bench) | `mere-terminal-bench` | Pinned, resource-bounded local agent evaluation | Local Docker and `mere.run` |
 | [Document Tools](/plugins/document-tools) | `mere-doc-tools` | Markdown conversion, OCR, and PII redaction | Local |
 | [Media Scrub](/plugins/media-scrub) | `mere-media-scrub` | Batch frame OCR and redaction | Local |
 | [Dataset Tools](/plugins/dataset-tools) | `mere-dataset-tools` | LoRA captions, OCR, and contact sheets | Local |

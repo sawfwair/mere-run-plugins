@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -29,9 +29,10 @@ if rg -n 'ignore_errors\s*=\s*true' pyproject.toml; then
   echo "Whole-module mypy exemptions are forbidden." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-terminal-bench/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
 "$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-terminal-bench/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-face-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-film-tools/tests
@@ -48,6 +49,7 @@ fi
 
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-terminal-bench
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-face-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-film-tools
@@ -107,6 +109,54 @@ result = subprocess.run(
 )
 if '"runId": "installed-smoke"' not in result.stdout:
     raise SystemExit("installed smoke did not produce expected run manifest")
+
+terminal_source_notices = pathlib.Path(
+    "packages/mere-terminal-bench/src/mere_terminal_bench/THIRD_PARTY_NOTICES.txt"
+)
+terminal_installed_notices = resources.files("mere_terminal_bench").joinpath("THIRD_PARTY_NOTICES.txt")
+if (
+    not terminal_installed_notices.is_file()
+    or terminal_installed_notices.read_bytes() != terminal_source_notices.read_bytes()
+):
+    raise SystemExit("installed Terminal-Bench package omitted or changed third-party notices")
+
+terminal_source_recipe = pathlib.Path("benchmark-recipes/terminal-bench-2-1.json")
+terminal_installed_recipe = resources.files("mere_terminal_bench").joinpath(
+    "recipes/terminal-bench-2-1.json"
+)
+if (
+    not terminal_installed_recipe.is_file()
+    or terminal_installed_recipe.read_bytes() != terminal_source_recipe.read_bytes()
+):
+    raise SystemExit("installed Terminal-Bench package omitted or changed its pinned recipe")
+
+terminal_cli = pathlib.Path(sys.executable).with_name("mere-terminal-bench")
+terminal_output = root / "terminal-bench"
+result = subprocess.run(
+    [
+        str(terminal_cli),
+        "plan",
+        "--output",
+        str(terminal_output),
+        "--run-id",
+        "installed-terminal-bench",
+        "--docker-context",
+        "validation-context",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+terminal_manifest = json.loads(result.stdout)
+terminal_runtime = terminal_manifest["runtime"]
+if terminal_manifest["runId"] != "installed-terminal-bench":
+    raise SystemExit("installed Terminal-Bench smoke reported the wrong run id")
+if terminal_runtime["createsDockerRuntime"] is not False:
+    raise SystemExit("installed Terminal-Bench smoke attempted to create a Docker runtime")
+if terminal_runtime["maximumAdditionalStorageBytes"] != 64 * 1024**3:
+    raise SystemExit("installed Terminal-Bench smoke reported the wrong storage limit")
 
 image_cli = pathlib.Path(sys.executable).with_name("mere-image-tools")
 source = root / "frame.png"

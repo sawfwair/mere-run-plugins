@@ -4,13 +4,13 @@ layout: home
 hero:
   name: 'mere.run plugins'
   text: 'Local AI, wired into real production.'
-  tagline: Official companion executables for VFX, live performance, production tracking, private media workflows, automation, and user-owned GPU training.
+  tagline: Official companion executables for VFX, local evaluation, live performance, production tracking, private media workflows, automation, and user-owned GPU training.
   actions:
     - theme: brand
       text: Install your first plugin
       link: /guide/getting-started
     - theme: alt
-      text: Browse all 16 plugins
+      text: Browse all 17 plugins
       link: /plugins/
     - theme: alt
       text: Read the contract
@@ -33,8 +33,8 @@ features:
     details: Run resumable JSONL batches locally or canonical LoRA recipes on user-owned ephemeral RunPod GPUs.
     link: /guide/runpod-lora
   - title: Verify
-    details: Every run has a durable manifest, explicit artifacts, machine-readable output, and cleanup semantics.
-    link: /guide/artifacts-and-runs
+    details: Compare local text models with a pinned Terminal-Bench dataset, bounded Docker storage, and durable receipts.
+    link: /plugins/terminal-bench
 ---
 
 ## The plugin boundary

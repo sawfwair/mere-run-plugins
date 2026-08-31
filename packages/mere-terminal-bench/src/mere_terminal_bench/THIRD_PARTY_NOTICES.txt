@@ -1,0 +1,13 @@
+Harbor
+Copyright Harbor contributors
+License: Apache License 2.0
+Source: https://github.com/harbor-framework/harbor
+
+Terminal-Bench 2.1
+Copyright Terminal-Bench contributors
+License: Apache License 2.0
+Source: https://github.com/harbor-framework/terminal-bench-2-1
+
+These projects are external runtime dependencies. They are not bundled into
+mere-terminal-bench. The plugin records the selected Harbor version, dataset
+digest, and Terminal-Bench source commit in every run manifest.

@@ -8,6 +8,10 @@ companion plugins.
 - `catalog.v1.schema.json`: live plugin catalog consumed by `mere.run plugin`.
 - `recipe.v1.schema.json`: machine-readable workflow recipes.
 - `eval-recipe.v1.schema.json`: machine-readable evaluation protocols.
+- `terminal-bench-recipe.v1.schema.json`: pinned Harbor, dataset, agent,
+  inference, and resource defaults for Terminal-Bench comparisons.
+- `terminal-bench-report.v1.schema.json`: matched per-model Terminal-Bench
+  results and pairwise task outcomes.
 - `run-manifest.v1.schema.json`: durable execution record written before remote
   resources are created.
 - `artifact-bundle.v1.schema.json`: fetched result bundle inventory.

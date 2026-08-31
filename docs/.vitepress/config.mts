@@ -92,6 +92,7 @@ export default defineConfig({
             { text: 'Film Studio', link: '/plugins/film-tools' },
             { text: 'ShotGrid Tools', link: '/plugins/shotgrid-tools' },
             { text: 'RunPod Runner', link: '/plugins/runpod' },
+            { text: 'Terminal-Bench', link: '/plugins/terminal-bench' },
             { text: 'Document Tools', link: '/plugins/document-tools' },
             { text: 'Media Scrub', link: '/plugins/media-scrub' },
             { text: 'Dataset Tools', link: '/plugins/dataset-tools' },
