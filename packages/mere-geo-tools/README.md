@@ -47,11 +47,17 @@ coexist in one OlmoEarth timeline.
 ```bash
 mere-geo-tools manifest --json
 mere-geo-tools doctor --json
+mere-geo-tools doctor --deep --json
 mere-geo-tools prepare --recipe sources.json --output prepared-inputs --json
 mere-geo-tools inspect prepared-inputs --json
 mere-geo-tools graph catalog --json
 mere-graph-conformance --provider mere-geo-tools --json
 ```
+
+`doctor --deep` stays offline. It exercises NumPy, an in-memory Rasterio GeoTIFF,
+a temporary Zarr/Numcodecs store, a temporary Safetensors file, and both STAC
+client imports. It also verifies that core `mere.run` is installed, but does not
+download imagery, contact a STAC API, pull a model, or run inference.
 
 TESSERA and OlmoEarth default to core's hardware-aware model selection. A graph
 can instead pin any managed tier, including the 2.064B TESSERA Teacher or

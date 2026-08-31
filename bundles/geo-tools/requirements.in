@@ -1,0 +1,8 @@
+numpy>=1.26,<3
+Pillow>=10,<13
+planetary-computer>=1,<2
+pystac-client>=0.8,<1
+rasterio>=1.4,<2
+safetensors>=0.5,<1
+zarr==2.18.0
+numcodecs==0.15.1

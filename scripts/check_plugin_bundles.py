@@ -19,12 +19,13 @@ class BundleContractTests(unittest.TestCase):
             "animatic-tools",
             "face-tools",
             "film-tools",
+            "geo-tools",
             "image-tools",
             "perform",
             "vfx-tools",
             "workflow-tools",
         }
-        pillow_bundles = {"animatic-tools", "face-tools", "image-tools", "vfx-tools"}
+        pillow_bundles = {"animatic-tools", "face-tools", "geo-tools", "image-tools", "vfx-tools"}
         recipes = {path.parent.name: path for path in ROOT.glob("bundles/*/recipe.json")}
         self.assertEqual(set(recipes), expected)
         for bundle, path in sorted(recipes.items()):
@@ -39,6 +40,13 @@ class BundleContractTests(unittest.TestCase):
             self.assertEqual(recipe.get("bundleIdentifier", f"run.mere.plugins.{recipe['package']}"),
                              f"run.mere.plugins.{recipe['package']}")
             self.assertRegex(recipe["python"]["sha256"], r"^[0-9a-f]{64}$")
+            for support in recipe.get("supportPackages", []):
+                support_path = ROOT / support["packagePath"]
+                self.assertTrue(support_path.is_dir(), f"{bundle}: {support['packagePath']}")
+                support_project = (support_path / "pyproject.toml").read_text()
+                support_name = re.search(r'^name = "([^"]+)"$', support_project, re.MULTILINE)
+                self.assertIsNotNone(support_name, bundle)
+                self.assertEqual(support_name.group(1), support["package"], bundle)
             self.assertTrue(recipe["entrypoints"])
             module_roots = set()
             for executable, module in recipe["entrypoints"].items():
@@ -66,6 +74,34 @@ class BundleContractTests(unittest.TestCase):
                     self.assertNotIn("pillow==", requirements, bundle)
                     self.assertNotIn("PIL", recipe.get("collectAll", []), bundle)
                     self.assertNotIn("pillow", recipe.get("copyMetadata", []), bundle)
+
+                if bundle == "geo-tools":
+                    source_builds = recipe.get("sourceBuilds", [])
+                    self.assertEqual(
+                        source_builds,
+                        [
+                            {
+                                "name": "asciitree",
+                                "version": "0.3.3",
+                                "url": "https://files.pythonhosted.org/packages/2d/6a/885bc91484e1aa8f618f6f0228d76d0e67000b0fdd6090673b777e311913/asciitree-0.3.3.tar.gz",
+                                "sha256": "4aa4b9b649f85e3fcb343363d97564aa1fb62e249677f2e18a96765145cc0f6e",
+                                "license": "MIT",
+                                "licenseFile": "LICENSE",
+                            }
+                        ],
+                    )
+                    self.assertNotIn("asciitree==", requirements)
+                    for requirement in (
+                        "numcodecs==0.15.1 \\",
+                        "numpy==2.5.2 \\",
+                        "pillow==12.3.0 \\",
+                        "planetary-computer==1.0.0 \\",
+                        "pystac-client==0.9.0 \\",
+                        "rasterio==1.5.1 \\",
+                        "safetensors==0.8.0 \\",
+                        "zarr==2.18.0 \\",
+                    ):
+                        self.assertIn(requirement, requirements, bundle)
 
     def test_native_notices_match_the_pinned_anydoc_dependency(self) -> None:
         inputs = ROOT / "bundles/workflow-tools"

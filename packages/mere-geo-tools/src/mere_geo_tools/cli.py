@@ -6,6 +6,7 @@ import json
 import pathlib
 import platform
 import sys
+import tempfile
 from typing import cast
 
 from mere_workflow_tools.graph_sdk import GraphProviderError, JsonMap, validate_preflight
@@ -55,16 +56,99 @@ def plugin_manifest() -> JsonMap:
     }
 
 
-def doctor_report() -> JsonMap:
+def _deep_runtime_checks() -> tuple[dict[str, bool], dict[str, str]]:
+    checks: dict[str, bool] = {}
+    errors: dict[str, str] = {}
+
+    try:
+        import numpy as np
+
+        checks["numpy"] = bool(np.array([1, 2, 3], dtype=np.uint8).sum() == 6)
+    except Exception as exc:
+        checks["numpy"] = False
+        errors["numpy"] = str(exc)
+
+    try:
+        import numpy as np
+        from rasterio.io import MemoryFile
+        from rasterio.transform import from_origin
+
+        pixels = np.arange(4, dtype=np.uint8).reshape((1, 2, 2))
+        with MemoryFile() as memory_file:
+            with memory_file.open(
+                driver="GTiff",
+                width=2,
+                height=2,
+                count=1,
+                dtype="uint8",
+                crs="EPSG:32617",
+                transform=from_origin(500_000, 4_000_000, 10, 10),
+            ) as dataset:
+                dataset.write(pixels)
+            with memory_file.open() as dataset:
+                checks["rasterio"] = bool(np.array_equal(dataset.read(), pixels))
+    except Exception as exc:
+        checks["rasterio"] = False
+        errors["rasterio"] = str(exc)
+
+    try:
+        import numpy as np
+        import zarr
+        from numcodecs import Blosc
+
+        with tempfile.TemporaryDirectory(prefix="mere-geo-doctor-zarr.") as raw_root:
+            root = zarr.open_array(
+                str(pathlib.Path(raw_root) / "check.zarr"),
+                mode="w",
+                shape=(2, 2),
+                chunks=(1, 2),
+                dtype="u1",
+                compressor=Blosc(cname="zstd", clevel=1),
+            )
+            root[:] = np.array([[1, 2], [3, 4]], dtype=np.uint8)
+            checks["zarr"] = bool(int(root[:].sum()) == 10)
+    except Exception as exc:
+        checks["zarr"] = False
+        errors["zarr"] = str(exc)
+
+    try:
+        import numpy as np
+        from safetensors.numpy import load_file, save_file
+
+        with tempfile.TemporaryDirectory(prefix="mere-geo-doctor-safetensors.") as raw_root:
+            path = pathlib.Path(raw_root) / "check.safetensors"
+            save_file({"check": np.array([[1.0, 2.0]], dtype=np.float32)}, path)
+            checks["safetensors"] = bool(float(load_file(path)["check"].sum()) == 3.0)
+    except Exception as exc:
+        checks["safetensors"] = False
+        errors["safetensors"] = str(exc)
+
+    try:
+        import planetary_computer
+        import pystac_client
+
+        checks["stac_clients"] = bool(planetary_computer and pystac_client)
+    except Exception as exc:
+        checks["stac_clients"] = False
+        errors["stac_clients"] = str(exc)
+
+    return checks, errors
+
+
+def doctor_report(*, deep: bool = False) -> JsonMap:
     from .runtime import resolve_mere_run_executable
 
-    required = ["numpy", "rasterio", "safetensors", "zarr"]
+    required = ["numpy", "planetary_computer", "pystac_client", "rasterio", "safetensors", "zarr"]
     modules = {name: importlib.util.find_spec(name) is not None for name in required}
     compatible_python = sys.version_info >= (3, 10)
     executable = resolve_mere_run_executable()
     native_platform = platform.system() == "Darwin"
-    return {
-        "status": "ready" if compatible_python and native_platform and executable and all(modules.values()) else "blocked",
+    deep_checks, deep_errors = _deep_runtime_checks() if deep else ({}, {})
+    ready = compatible_python and native_platform and bool(executable) and all(modules.values())
+    if deep:
+        ready = ready and all(deep_checks.values())
+    report: JsonMap = {
+        "status": "ready" if ready else "blocked",
         "python": platform.python_version(),
         "platform": platform.platform(),
         "modules": modules,
@@ -80,6 +164,10 @@ def doctor_report() -> JsonMap:
             "accelerator": "metal",
         },
     }
+    if deep:
+        report["deep_checks"] = deep_checks
+        report["deep_errors"] = deep_errors
+    return report
 
 
 def parser() -> argparse.ArgumentParser:
@@ -88,6 +176,8 @@ def parser() -> argparse.ArgumentParser:
     for name in ["manifest", "doctor"]:
         command = commands.add_parser(name)
         command.add_argument("--json", action="store_true")
+        if name == "doctor":
+            command.add_argument("--deep", action="store_true")
     prepare_command = commands.add_parser("prepare")
     prepare_command.add_argument("--recipe", required=True, type=pathlib.Path)
     prepare_command.add_argument("--output", required=True, type=pathlib.Path)
@@ -119,7 +209,7 @@ def main() -> int:
         if args.command == "manifest":
             print_json(plugin_manifest())
         elif args.command == "doctor":
-            report = doctor_report()
+            report = doctor_report(deep=args.deep)
             print_json(report)
             return 0 if report["status"] == "ready" else 2
         elif args.command == "prepare":

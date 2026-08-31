@@ -1,0 +1,30 @@
+Mere Geo Tools bundle acknowledgments
+
+Rasterio's macOS wheel includes GDAL, PROJ, OpenSSL, cURL, NetCDF, HDF5,
+and other native libraries. Rasterio's BSD license is preserved in
+dependency-licenses. GDAL's consolidated end-user license and notices are
+preserved in the frozen application's rasterio/gdal_data/LICENSE.TXT.
+
+This software is based in part on the work of the Independent JPEG Group.
+Portions of this software are copyright The FreeType Project (www.freetype.org).
+All rights reserved. Pillow's full license file, including its native library
+notices, is preserved in dependency-licenses.
+
+The reviewed asciitree 0.3.3 source archive is fetched by immutable URL and
+SHA-256, built with the pinned builder toolchain, and its MIT license is
+preserved in dependency-licenses. All other Python runtime dependencies are
+installed from hash-locked binary wheels only. Their supplied license files are
+preserved in dependency-licenses. CPython and its native dependency notices are
+preserved in python-licenses. The plugin and support package MIT terms are
+preserved in LICENSE.txt and dependency-licenses.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+No Earth-observation source data, model weights, AWS credentials, requester-pays
+credentials, or STAC credentials are redistributed in this bundle. OlmoEarth
+model artifacts and their use restrictions remain an upstream core-runtime
+concern. User-initiated requester-pays access may incur provider charges.
+
+License expressions in the build inventory do not replace the upstream terms.
