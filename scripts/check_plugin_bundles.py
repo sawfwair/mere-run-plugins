@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BundleContractTests(unittest.TestCase):
+    def test_distribution_recipes_match_their_packages(self) -> None:
+        expected = {"animatic-tools", "face-tools", "image-tools", "workflow-tools"}
+        recipes = {path.parent.name: path for path in ROOT.glob("bundles/*/recipe.json")}
+        self.assertEqual(set(recipes), expected)
+        for bundle, path in sorted(recipes.items()):
+            recipe = json.loads(path.read_text())
+            package_path = ROOT / recipe.get("packagePath", f"packages/{recipe['package']}")
+            project = (package_path / "pyproject.toml").read_text()
+            name = re.search(r'^name = "([^"]+)"$', project, re.MULTILINE)
+            self.assertIsNotNone(name, bundle)
+            self.assertEqual(name.group(1), recipe["package"], bundle)
+            self.assertRegex(recipe["appBundle"], r"^[A-Za-z0-9]+\.app$")
+            self.assertRegex(recipe.get("appExecutable", recipe["appBundle"][:-4]), r"^[A-Za-z0-9]+$")
+            self.assertEqual(recipe.get("bundleIdentifier", f"run.mere.plugins.{recipe['package']}"),
+                             f"run.mere.plugins.{recipe['package']}")
+            self.assertRegex(recipe["python"]["sha256"], r"^[0-9a-f]{64}$")
+            self.assertTrue(recipe["entrypoints"])
+            for executable, module in recipe["entrypoints"].items():
+                self.assertRegex(executable, r"^mere-[a-z0-9-]+$")
+                self.assertRegex(module, r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+            if bundle != "workflow-tools":
+                inputs = path.parent
+                self.assertIn("pillow==12.3.0 \\", (inputs / "requirements.lock").read_text())
+                for required in ("BUNDLE_NOTICES.txt", "build-constraints.txt", "builder-requirements.lock",
+                                 "frozen_entrypoint.py", "launcher.c", "requirements.lock"):
+                    self.assertTrue((inputs / required).is_file(), f"{bundle}: {required}")
+
     def test_native_notices_match_the_pinned_anydoc_dependency(self) -> None:
         inputs = ROOT / "bundles/workflow-tools"
         inventory = json.loads((inputs / "anydoc-native-inventory.json").read_text())

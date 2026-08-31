@@ -1,0 +1,20 @@
+{
+  "package": "mere-image-tools",
+  "packagePath": "packages/mere-image-tools",
+  "appBundle": "MereImageTools.app",
+  "appExecutable": "MereImageTools",
+  "bundleIdentifier": "run.mere.plugins.mere-image-tools",
+  "volumeName": "MereImageTools",
+  "minimumOSVersion": "15.0",
+  "python": {
+    "version": "3.12.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.12.13%2B20260414-aarch64-apple-darwin-pgo%2Blto-full.tar.zst",
+    "sha256": "612b1af85f33fe57351c0e8e40677c95d9ef63774c1f13ae8054c59c785a84ca"
+  },
+  "entrypoints": {
+    "mere-image-tools": "mere_image_tools.cli"
+  },
+  "collectAll": ["mere_image_tools", "PIL"],
+  "copyMetadata": ["mere-image-tools", "pillow", "pyinstaller"],
+  "smokeProfile": "image-tools"
+}

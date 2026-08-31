@@ -1,0 +1,15 @@
+Mere Image Tools bundle acknowledgments
+
+This software is based in part on the work of the Independent JPEG Group.
+Portions of this software are copyright The FreeType Project (www.freetype.org).
+All rights reserved.
+
+Pillow's full license file, including its native library notices, is preserved
+in dependency-licenses. CPython and its native dependency notices are preserved
+in python-licenses. The plugin's MIT terms are preserved in LICENSE.txt.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+License expressions in the build inventory do not replace the upstream terms.
