@@ -76,6 +76,9 @@ class BundleContractTests(unittest.TestCase):
                     self.assertNotIn("pillow", recipe.get("copyMetadata", []), bundle)
 
                 if bundle == "geo-tools":
+                    builder_requirements = (inputs / "builder-requirements.lock").read_text().lower()
+                    self.assertIn("setuptools==84.0.0 \\", builder_requirements)
+                    self.assertIn("wheel==0.48.0 \\", builder_requirements)
                     source_builds = recipe.get("sourceBuilds", [])
                     self.assertEqual(
                         source_builds,
