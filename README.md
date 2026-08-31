@@ -28,12 +28,14 @@ context that you select. It doesn't create or resize a Docker runtime.
 
 ```bash
 pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-terminal-bench"
-uv tool install "harbor==0.22.0"
 mere-terminal-bench doctor --docker-context BENCHMARK_CONTEXT
 mere-terminal-bench plan \
   --output ./runs/ornith-terminal-bench \
   --docker-context BENCHMARK_CONTEXT
 ```
+
+The package requires Python 3.12 or later and installs the pinned Harbor
+runtime as a dependency.
 
 The default plan compares Ornith Q4 and Q8 with identical Terminus-2 settings.
 It records a 64 GiB additional-storage limit and `createsDockerRuntime: false`

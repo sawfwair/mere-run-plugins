@@ -4,6 +4,8 @@ import argparse
 import contextlib
 import datetime as dt
 import hashlib
+import importlib
+import importlib.metadata
 import json
 import os
 import pathlib
@@ -17,7 +19,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import TextIO, cast
 
 from . import __version__
@@ -41,8 +43,10 @@ DEFAULT_CONTEXT_SIZE = 131_072
 DEFAULT_MAX_OUTPUT_TOKENS = 32_768
 DEFAULT_PORT = 18_080
 DEFAULT_STORAGE_GIB = 64.0
+HARBOR_LOCAL_API_KEY = "mere-terminal-bench-local"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 SIZE_PATTERN = re.compile(r"^([0-9]+(?:\.[0-9]+)?)\s*([kmgtpe]?i?b)$", re.IGNORECASE)
+TASK_GLOB_PATTERN = re.compile(r"[*?[]")
 
 
 class PluginError(RuntimeError):
@@ -147,6 +151,25 @@ def executable_path(requested: str) -> str | None:
     return shutil.which(requested)
 
 
+def internal_harbor_command() -> list[str] | None:
+    try:
+        version = importlib.metadata.version("harbor")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    if version != HARBOR_VERSION:
+        return None
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "mere_terminal_bench.cli", "_harbor"]
+    return [sys.executable, "-m", "mere_terminal_bench", "_harbor"]
+
+
+def harbor_command(requested: str) -> list[str] | None:
+    path = executable_path(requested)
+    if path is not None:
+        return [path]
+    return internal_harbor_command() if requested == "harbor" else None
+
+
 def capture(
     argv: list[str],
     *,
@@ -171,6 +194,14 @@ def docker_environment(context: str | None) -> dict[str, str]:
     environment = os.environ.copy()
     if context:
         environment["DOCKER_CONTEXT"] = context
+    return environment
+
+
+def harbor_environment(context: str | None) -> dict[str, str]:
+    environment = docker_environment(context)
+    environment["OPENAI_API_KEY"] = HARBOR_LOCAL_API_KEY
+    for name in ("OPENAI_ORG_ID", "OPENAI_ORGANIZATION", "OPENAI_PROJECT"):
+        environment.pop(name, None)
     return environment
 
 
@@ -342,24 +373,25 @@ def validate_docker_bind_mount(
 
 
 def harbor_inspection(harbor: str) -> JsonMap:
-    path = executable_path(harbor)
-    if path is None:
+    command = harbor_command(harbor)
+    install_command = "mere.run plugin install mere-terminal-bench --source --yes"
+    if command is None:
         return {
             "ready": False,
             "requested": harbor,
             "requiredVersion": HARBOR_VERSION,
-            "installCommand": f'uv tool install "harbor=={HARBOR_VERSION}"',
+            "installCommand": install_command,
             "error": "Harbor executable not found",
         }
-    completed = capture([path, "--version"])
+    completed = capture([*command, "--version"])
     version = completed.stdout.strip() or completed.stderr.strip()
     ready = completed.returncode == 0 and version == HARBOR_VERSION
     return {
         "ready": ready,
-        "path": path,
+        "command": command,
         "version": version,
         "requiredVersion": HARBOR_VERSION,
-        "installCommand": f'uv tool install "harbor=={HARBOR_VERSION}"',
+        "installCommand": install_command,
         **({} if ready else {"error": "Harbor version does not match the pinned benchmark version"}),
     }
 
@@ -469,6 +501,13 @@ def planned_manifest(args: argparse.Namespace) -> JsonMap:
     jobs_dir = output / "harbor-jobs"
     endpoint = f"http://127.0.0.1:{args.port}"
     include_tasks = [terminal_bench_task_name(value) for value in (args.include_tasks or [])]
+    if len(set(include_tasks)) != len(include_tasks):
+        raise PluginError("--include-task values must be unique", 2)
+    includes_glob = any(TASK_GLOB_PATTERN.search(value) for value in include_tasks)
+    if includes_glob and args.n_tasks is None:
+        raise PluginError("--n-tasks is required when --include-task contains a glob", 2)
+    if include_tasks and not includes_glob and args.n_tasks is not None and args.n_tasks != len(include_tasks):
+        raise PluginError("--n-tasks must match the number of exact --include-task values", 2)
     selected_task_count = args.n_tasks if args.n_tasks is not None else (len(include_tasks) or EXPECTED_TASK_COUNT)
     if selected_task_count < 1 or selected_task_count > EXPECTED_TASK_COUNT:
         raise PluginError(f"--n-tasks must be between 1 and {EXPECTED_TASK_COUNT}", 2)
@@ -526,7 +565,6 @@ def planned_manifest(args: argparse.Namespace) -> JsonMap:
             "timeoutMultiplier": args.timeout_multiplier,
             "contextSize": args.context_size,
             "maxOutputTokens": args.max_output_tokens,
-            "leaderboardEligible": args.attempts >= 5 and selected_task_count == EXPECTED_TASK_COUNT,
         },
         "runtime": {
             "createsDockerRuntime": False,
@@ -795,15 +833,14 @@ def run_harbor(
     harbor = as_map(manifest.get("harbor"), "manifest.harbor")
     runtime = as_map(manifest.get("runtime"), "manifest.runtime")
     executable = string_field(harbor, "executable", "manifest.harbor")
-    harbor_path = executable_path(executable)
-    if harbor_path is None:
+    harbor_argv = harbor_command(executable)
+    if harbor_argv is None:
         raise PluginError(f"Harbor executable not found: {executable}", 3)
     config_path = pathlib.Path(string_field(arm, "configPath", "manifest.arm"))
-    argv = [harbor_path, "run", "--config", str(config_path), "--yes"]
+    argv = [*harbor_argv, "run", "--config", str(config_path), "--yes"]
     context_value = runtime.get("dockerContext")
     context = context_value if isinstance(context_value, str) else None
-    environment = docker_environment(context)
-    environment.setdefault("OPENAI_API_KEY", "mere-terminal-bench-local")
+    environment = harbor_environment(context)
     log(f"Starting Harbor job {string_field(arm, 'jobName', 'manifest.arm')}")
     try:
         process = subprocess.Popen(
@@ -939,7 +976,12 @@ def summarize_job(job_dir: pathlib.Path) -> JsonMap:
     }
 
 
-def incomplete_job_error(summary: JsonMap) -> str | None:
+def incomplete_job_error(
+    summary: JsonMap,
+    *,
+    expected_task_count: int | None = None,
+    attempts_per_task: int | None = None,
+) -> str | None:
     total = summary.get("totalTrials")
     completed = summary.get("completedTrials")
     errored = summary.get("erroredTrials")
@@ -960,12 +1002,42 @@ def incomplete_job_error(summary: JsonMap) -> str | None:
         return "Harbor result did not contain complete integer trial counts"
     if total < 1:
         return "Harbor result contained no trials"
+    if expected_task_count is not None and attempts_per_task is not None:
+        expected_trials = expected_task_count * attempts_per_task
+        if total != expected_trials:
+            return f"Harbor planned {expected_trials} trials but reported {total}"
     if completed != total or cancelled != 0 or scored != total:
         return (
             "Harbor did not produce a valid score for every trial "
             f"(total={total}, completed={completed}, scored={scored}, errored={errored}, cancelled={cancelled})"
         )
+    if expected_task_count is not None and attempts_per_task is not None:
+        trials = as_list(summary.get("trials", []), "summary.trials")
+        task_counts: Counter[str] = Counter()
+        for value in trials:
+            trial = as_map(value, "summary.trial")
+            task = trial.get("task")
+            if not isinstance(task, str) or not task:
+                return "Harbor produced a scored trial without a task name"
+            task_counts[task] += 1
+        if len(task_counts) != expected_task_count:
+            return f"Harbor planned {expected_task_count} tasks but produced {len(task_counts)} unique tasks"
+        wrong_attempts = sorted(task for task, count in task_counts.items() if count != attempts_per_task)
+        if wrong_attempts:
+            return (
+                f"Harbor did not produce exactly {attempts_per_task} attempts for every task "
+                f"({len(wrong_attempts)} tasks had a different count)"
+            )
     return None
+
+
+def planned_trial_counts(manifest: JsonMap) -> tuple[int, int]:
+    dataset = as_map(manifest.get("dataset"), "manifest.dataset")
+    comparison = as_map(manifest.get("comparison"), "manifest.comparison")
+    return (
+        int_field(dataset, "pairCount", "manifest.dataset"),
+        int_field(comparison, "attemptsPerTask", "manifest.comparison"),
+    )
 
 
 def model_task_rewards(summary: JsonMap) -> dict[str, float]:
@@ -1153,7 +1225,12 @@ def execute_arm(manifest_path: pathlib.Path, manifest: JsonMap, arm: JsonMap) ->
                 raise PluginError(f"Harbor exited with status {return_code}; see {harbor_log_path}", 4)
             summary = summarize_job(job_dir)
             arm["summary"] = summary
-            incomplete = incomplete_job_error(summary)
+            expected_task_count, attempts_per_task = planned_trial_counts(manifest)
+            incomplete = incomplete_job_error(
+                summary,
+                expected_task_count=expected_task_count,
+                attempts_per_task=attempts_per_task,
+            )
             if incomplete is not None:
                 raise PluginError(f"{incomplete}; see {job_dir / 'result.json'}", 4)
             arm["status"] = "succeeded"
@@ -1172,12 +1249,12 @@ def execute_manifest(path: pathlib.Path, *, resume: bool) -> JsonMap:
     status = manifest.get("status")
     if status == "succeeded" and not resume:
         raise PluginError("run already succeeded; use report to inspect it", 2)
-    validate_execution_preflight(manifest, path.parent)
-    manifest["status"] = "running"
-    manifest.pop("error", None)
-    update_manifest(path, manifest)
     arms = [as_map(value, "manifest.arm") for value in as_list(manifest.get("arms", []), "manifest.arms")]
     try:
+        validate_execution_preflight(manifest, path.parent)
+        manifest["status"] = "running"
+        manifest.pop("error", None)
+        update_manifest(path, manifest)
         for arm in arms:
             if arm.get("status") == "succeeded":
                 continue
@@ -1196,6 +1273,7 @@ def execute_manifest(path: pathlib.Path, *, resume: bool) -> JsonMap:
         report = comparison_report(manifest)
         report_path = pathlib.Path(string_field(as_map(manifest["artifacts"], "manifest.artifacts"), "report", "manifest.artifacts"))
         write_json(report_path, report)
+        write_artifact_bundle(path, manifest)
         raise
     manifest.pop("error", None)
     update_manifest(path, manifest)
@@ -1221,13 +1299,18 @@ def command_resume(args: argparse.Namespace) -> int:
 def command_report(args: argparse.Namespace) -> int:
     path = args.run_manifest.expanduser().resolve()
     manifest = load_json(path, "run manifest")
+    expected_task_count, attempts_per_task = planned_trial_counts(manifest)
     for value in as_list(manifest.get("arms", []), "manifest.arms"):
         arm = as_map(value, "manifest.arm")
         job_dir = pathlib.Path(string_field(arm, "jobDirectory", "manifest.arm"))
         if (job_dir / "result.json").is_file():
             summary = summarize_job(job_dir)
             arm["summary"] = summary
-            incomplete = incomplete_job_error(summary)
+            incomplete = incomplete_job_error(
+                summary,
+                expected_task_count=expected_task_count,
+                attempts_per_task=attempts_per_task,
+            )
             if arm.get("status") == "succeeded" and incomplete is not None:
                 arm["status"] = "failed"
                 arm["error"] = incomplete
@@ -1264,6 +1347,18 @@ def command_cleanup(args: argparse.Namespace) -> int:
     update_manifest(path, manifest)
     print_json(manifest)
     return 0
+
+
+def command_internal_harbor(args: argparse.Namespace) -> int:
+    try:
+        import harbor.cli.main as harbor_cli
+    except ImportError as error:
+        raise PluginError(f"the pinned Harbor runtime is unavailable: {error}; reinstall the plugin", 3) from error
+    app = cast(object, getattr(harbor_cli, "app", None))
+    if not callable(app):
+        raise PluginError("the pinned Harbor runtime has no CLI entrypoint", 3)
+    result = app(args=args.harbor_args, prog_name="harbor", standalone_mode=False)
+    return result if isinstance(result, int) else 0
 
 
 def add_shared_runtime_args(parser: argparse.ArgumentParser) -> None:
@@ -1324,13 +1419,17 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup = sub.add_parser("cleanup", help="Stop only the server process recorded by the run.")
     cleanup.add_argument("run_manifest", type=pathlib.Path)
     cleanup.set_defaults(func=command_cleanup)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
-        args = parser.parse_args(argv)
+        arguments = list(sys.argv[1:] if argv is None else argv)
+        if arguments[:1] == ["_harbor"]:
+            return command_internal_harbor(argparse.Namespace(harbor_args=arguments[1:]))
+        args = parser.parse_args(arguments)
         func = cast(object, args.func)
         if not callable(func):
             raise PluginError("command handler is unavailable", 2)

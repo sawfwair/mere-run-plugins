@@ -49,7 +49,12 @@ fi
 
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
-"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-terminal-bench
+if "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
+  "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-terminal-bench
+else
+  "$PYTHON" -m pip install -q --disable-pip-version-check --no-deps --ignore-requires-python \
+    ./packages/mere-terminal-bench
+fi
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-image-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-face-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-film-tools

@@ -77,6 +77,8 @@ files = [
 [[tool.mypy.overrides]]
 module = [
   "bpy",
+  "harbor",
+  "harbor.*",
   "numcodecs",
   "numcodecs.*",
   "planetary_computer",

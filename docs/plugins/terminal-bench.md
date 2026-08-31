@@ -26,8 +26,10 @@ Install the plugin and its pinned Harbor dependency:
 
 ```bash
 mere.run plugin install mere-terminal-bench --yes
-uv tool install "harbor==0.22.0"
 ```
+
+The source package requires Python 3.12 or later. The installation includes
+Harbor 0.22.0, so you don't need to install a second Python tool.
 
 ## Verify local readiness
 
@@ -74,9 +76,10 @@ The generated `run.json` file records the following controls:
 - A 64 GiB maximum increase in Docker-reported storage
 - `createsDockerRuntime: false`
 
-One attempt per task supports internal model selection. A leaderboard-eligible
-run requires five attempts per task and additional review requirements from the
-Terminal-Bench project.
+One attempt per task supports internal model selection. Five attempts per task
+consume substantially more runtime but don't make a run eligible for the
+Terminal-Bench leaderboard. The plugin produces local evidence and doesn't
+upload results or claim leaderboard eligibility.
 
 ## Run or resume the comparison
 
@@ -87,7 +90,9 @@ mere-terminal-bench run RUN_DIRECTORY/run.json
 ```
 
 Task filters accept either `regex-log` or the fully qualified
-`terminal-bench/regex-log` package name. If a model arm stops, resume the run:
+`terminal-bench/regex-log` package name. If a filter contains a glob, pass
+`--n-tasks` with the expected match count. The plugin fails the run if Harbor
+doesn't return that exact count. If a model arm stops, resume the run:
 
 ```bash
 mere-terminal-bench resume RUN_DIRECTORY/run.json
@@ -112,10 +117,12 @@ setup and verifier time. The `artifact-bundle.json` file records SHA-256 hashes
 for the run manifest, report, model configurations, server logs, and Harbor job
 results.
 
-The plugin fails closed when Harbor doesn't complete every trial, cancels a
-trial, or omits a numeric verifier score. Harbor error counts remain in the
-report. A scored exception, including a timeout, doesn't invalidate an arm.
-A successful Harbor process exit doesn't replace these completeness checks.
+The plugin fails closed when Harbor doesn't return the planned number of unique
+tasks and attempts, doesn't complete every trial, cancels a trial, or omits a
+numeric verifier score. Harbor error counts remain in the report. A scored
+exception, including a timeout, doesn't invalidate an arm. A successful Harbor
+process exit doesn't replace these completeness checks. Successful and failed
+runs both produce a hashed artifact bundle.
 
 ## Stop a recorded server
 

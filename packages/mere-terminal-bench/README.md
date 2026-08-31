@@ -12,8 +12,10 @@ model endpoint; Harbor owns task execution and verification.
 
 ```bash
 mere.run plugin install mere-terminal-bench --yes
-uv tool install "harbor==0.22.0"
 ```
+
+The source package requires Python 3.12 or later. The installation includes
+Harbor 0.22.0, so you don't need to install a second Python tool.
 
 Docker must be available. Select a non-default engine explicitly with
 `--docker-context`. The plugin never creates or resizes a Colima or Docker
@@ -46,13 +48,16 @@ The default matched comparison is:
 - One attempt per task and one concurrent trial
 - A maximum of 64 GiB of additional Docker storage during the run
 
-One attempt per task is an internal model-selection pass, not a qualifying
-Terminal-Bench leaderboard submission. Use `--attempts 5` only when the
-additional runtime is intentional.
+One attempt per task is an internal model-selection pass. Five attempts per
+task consume substantially more runtime but don't make a run eligible for the
+Terminal-Bench leaderboard. The plugin produces local evidence and doesn't
+upload results or claim leaderboard eligibility.
 
-Use `--include-task <name>` or `--n-tasks 1` for smoke runs. Short task names
-are normalized to the `terminal-bench/` package namespace. `resume` skips
-completed model arms and continues interrupted or failed arms:
+Use `--include-task TASK_NAME` or `--n-tasks 1` for smoke runs. Short task names
+are normalized to the `terminal-bench/` package namespace. If a task filter
+contains a glob, you must also pass `--n-tasks` with the expected match count.
+The plugin fails the run if Harbor doesn't return that exact count. `resume`
+skips completed model arms and continues interrupted or failed arms:
 
 ```bash
 mere-terminal-bench resume ./run.json
@@ -69,11 +74,12 @@ containers by default. The plugin stops only the `mere.run` server process it
 started; it does not prune shared images, delete Docker contexts, or remove run
 artifacts.
 
-An arm succeeds only when Harbor completes every trial, every trial has a
-numeric verifier score, and no trial is cancelled. Harbor error counts remain
-in the report. A scored timeout doesn't invalidate an arm because the verifier
-score remains comparison evidence. A zero Harbor process exit alone isn't
-treated as a valid evaluation result.
+An arm succeeds only when Harbor returns the planned number of unique tasks and
+attempts, completes every trial, gives every trial a numeric verifier score,
+and cancels no trials. Harbor error counts remain in the report. A scored
+timeout doesn't invalidate an arm because the verifier score remains comparison
+evidence. A zero Harbor process exit alone isn't a valid evaluation result.
+Successful and failed runs both produce a hashed artifact bundle.
 
 ## Reproducibility pins
 

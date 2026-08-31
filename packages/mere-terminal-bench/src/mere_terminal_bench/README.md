@@ -21,5 +21,9 @@ Important boundaries:
   prune shared Docker state automatically.
 - Accept a completed trial when it has a numeric verifier score, even if Harbor
   records an exception. Preserve exception counts in the report.
+- Require the exact planned task and attempt counts before an arm succeeds.
+- Replace local OpenAI-compatible credentials with a non-secret placeholder
+  before Harbor starts.
+- Write reports and hashed artifact bundles for successful and failed runs.
 - Keep model loading and inference in the installed `mere.run` executable.
 - Do not upload results or publish leaderboard submissions.

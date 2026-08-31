@@ -7,12 +7,14 @@ name = "mere-terminal-bench"
 version = "0.1.0"
 description = "Terminal-Bench companion plugin for local mere.run models"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
   { name = "Sawfwair Inc. and mere.run contributors" }
 ]
-dependencies = []
+dependencies = [
+  "harbor==0.22.0"
+]
 
 [project.scripts]
 mere-terminal-bench = "mere_terminal_bench.cli:main"

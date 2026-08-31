@@ -1,0 +1,18 @@
+Mere Terminal-Bench bundle acknowledgments
+
+Harbor 0.22.0 and Terminal-Bench 2.1 are Apache-2.0 projects. The pinned
+Terminal-Bench dataset remains remote and is not redistributed in this bundle.
+Harbor and all Python runtime dependencies are installed from the reviewed,
+hash-locked dependency set. Their supplied license files are preserved in
+dependency-licenses.
+
+CPython and its native dependency notices are preserved in python-licenses.
+The plugin's MIT terms are preserved in LICENSE.txt. Docker task images,
+Terminal-Bench task data, model weights, user credentials, benchmark results,
+and local artifacts are not redistributed in this bundle.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+License expressions in the build inventory do not replace the upstream terms.

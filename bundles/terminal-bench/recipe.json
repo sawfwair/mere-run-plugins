@@ -1,0 +1,29 @@
+{
+  "package": "mere-terminal-bench",
+  "packagePath": "packages/mere-terminal-bench",
+  "appBundle": "MereTerminalBench.app",
+  "appExecutable": "MereTerminalBench",
+  "bundleIdentifier": "run.mere.plugins.mere-terminal-bench",
+  "volumeName": "MereTerminalBench",
+  "minimumOSVersion": "15.0",
+  "python": {
+    "version": "3.12.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.12.13%2B20260414-aarch64-apple-darwin-pgo%2Blto-full.tar.zst",
+    "sha256": "612b1af85f33fe57351c0e8e40677c95d9ef63774c1f13ae8054c59c785a84ca"
+  },
+  "entrypoints": {
+    "mere-terminal-bench": "mere_terminal_bench.cli"
+  },
+  "collectAll": [
+    "mere_terminal_bench",
+    "harbor",
+    "litellm"
+  ],
+  "copyMetadata": [
+    "mere-terminal-bench",
+    "harbor",
+    "litellm",
+    "pyinstaller"
+  ],
+  "smokeProfile": "terminal-bench"
+}

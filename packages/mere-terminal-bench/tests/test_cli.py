@@ -5,6 +5,7 @@ import json
 import pathlib
 import subprocess
 import tempfile
+import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -150,9 +151,9 @@ class MereTerminalBenchTests(unittest.TestCase):
             self.assertEqual(manifest["runtime"]["maximumAdditionalStorageBytes"], 64 * 1024**3)
             self.assertEqual(manifest["models"], list(cli.DEFAULT_MODELS))
             self.assertEqual(manifest["server"]["memoryGuard"], "balanced")
-            self.assertFalse(manifest["comparison"]["leaderboardEligible"])
+            self.assertNotIn("leaderboardEligible", manifest["comparison"])
 
-    def test_plan_supports_bounded_smoke_and_leaderboard_eligibility(self) -> None:
+    def test_plan_supports_bounded_smoke_without_claiming_leaderboard_eligibility(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = plan_args(pathlib.Path(tmp) / "run")
             args.n_tasks = 1
@@ -165,8 +166,18 @@ class MereTerminalBenchTests(unittest.TestCase):
             args.n_tasks = 89
             args.include_tasks = None
             args.attempts = 5
-            eligible = cli.planned_manifest(args)
-            self.assertTrue(eligible["comparison"]["leaderboardEligible"])
+            full_run = cli.planned_manifest(args)
+            self.assertNotIn("leaderboardEligible", full_run["comparison"])
+
+    def test_plan_requires_an_explicit_count_for_task_globs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = plan_args(pathlib.Path(tmp) / "run")
+            args.include_tasks = ["regex-*"]
+            with self.assertRaisesRegex(cli.PluginError, "--n-tasks is required"):
+                cli.planned_manifest(args)
+            args.n_tasks = 3
+            manifest = cli.planned_manifest(args)
+            self.assertEqual(manifest["dataset"]["pairCount"], 3)
 
     def test_task_filter_preserves_fully_qualified_names(self) -> None:
         self.assertEqual(
@@ -265,6 +276,24 @@ class MereTerminalBenchTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertFalse(report["mutated"])
 
+    def test_internal_harbor_forwards_options_without_exposing_a_public_command(self) -> None:
+        app = mock.Mock(return_value=None)
+        harbor = types.ModuleType("harbor")
+        harbor.__path__ = []
+        harbor_cli = types.ModuleType("harbor.cli")
+        harbor_cli.__path__ = []
+        module = types.ModuleType("harbor.cli.main")
+        module.app = app
+        harbor.cli = harbor_cli
+        harbor_cli.main = module
+        with mock.patch.dict(
+            "mere_terminal_bench.cli.sys.modules",
+            {"harbor": harbor, "harbor.cli": harbor_cli, "harbor.cli.main": module},
+        ):
+            self.assertEqual(cli.main(["_harbor", "--version"]), 0)
+        app.assert_called_once_with(args=["--version"], prog_name="harbor", standalone_mode=False)
+        self.assertNotIn("_harbor", cli.build_parser().format_help())
+
     def test_harbor_config_is_typed_and_pinned(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = plan_args(pathlib.Path(tmp) / "run")
@@ -356,6 +385,22 @@ class MereTerminalBenchTests(unittest.TestCase):
         message = cli.incomplete_job_error(summary)
         self.assertIsNotNone(message)
         self.assertIn("cancelled=1", message or "")
+
+    def test_harbor_job_must_match_the_planned_task_and_attempt_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            job_dir = pathlib.Path(tmp) / "job"
+            write_job_result(job_dir, rewards={"task-a": 1, "task-b": 0})
+            summary = cli.summarize_job(job_dir)
+            message = cli.incomplete_job_error(summary, expected_task_count=3, attempts_per_task=1)
+            self.assertEqual(message, "Harbor planned 3 trials but reported 2")
+
+            second_trial = job_dir / "trial-1" / "result.json"
+            result = json.loads(second_trial.read_text())
+            result["task_name"] = "task-a"
+            second_trial.write_text(json.dumps(result))
+            summary = cli.summarize_job(job_dir)
+            message = cli.incomplete_job_error(summary, expected_task_count=2, attempts_per_task=1)
+            self.assertEqual(message, "Harbor planned 2 tasks but produced 1 unique tasks")
 
     def test_artifact_bundle_hashes_only_existing_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -512,6 +557,65 @@ class MereTerminalBenchTests(unittest.TestCase):
                 )
         self.assertEqual(usage.call_count, 3)
         terminate.assert_called_once_with(process)
+
+    def test_harbor_never_inherits_a_user_openai_credential(self) -> None:
+        process = FakeProcess()
+        manifest = {
+            "harbor": {"executable": "harbor"},
+            "runtime": {
+                "dockerExecutable": "docker",
+                "dockerContext": "bench",
+                "baselineDockerUsageBytes": 100,
+                "maximumAdditionalStorageBytes": 10,
+            },
+        }
+        arm = {"configPath": "/tmp/config.json", "jobName": "job"}
+        with (
+            mock.patch.dict(
+                "mere_terminal_bench.cli.os.environ",
+                {"OPENAI_API_KEY": "user-configured-credential", "OPENAI_PROJECT": "private-project"},
+                clear=True,
+            ),
+            mock.patch("mere_terminal_bench.cli.executable_path", side_effect=lambda value: f"/bin/{value}"),
+            mock.patch("mere_terminal_bench.cli.subprocess.Popen", return_value=process) as popen,
+            mock.patch("mere_terminal_bench.cli.time.sleep"),
+            mock.patch("mere_terminal_bench.cli.docker_usage_bytes", return_value=100),
+            mock.patch("mere_terminal_bench.cli.update_manifest"),
+            mock.patch("mere_terminal_bench.cli.terminate_process"),
+        ):
+            self.assertEqual(
+                cli.run_harbor(
+                    pathlib.Path("/tmp/run.json"),
+                    manifest,
+                    arm,
+                    log_stream=StringIO(),
+                    check_interval=0,
+                ),
+                0,
+            )
+        environment = popen.call_args.kwargs["env"]
+        self.assertEqual(environment["OPENAI_API_KEY"], cli.HARBOR_LOCAL_API_KEY)
+        self.assertNotIn("OPENAI_PROJECT", environment)
+
+    def test_preflight_failure_writes_report_and_artifact_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            manifest = cli.planned_manifest(plan_args(root))
+            run_path = root / "run.json"
+            cli.write_json(run_path, manifest)
+            with mock.patch(
+                "mere_terminal_bench.cli.validate_execution_preflight",
+                side_effect=cli.PluginError("Docker unavailable", 3),
+            ):
+                with self.assertRaisesRegex(cli.PluginError, "Docker unavailable"):
+                    cli.execute_manifest(run_path, resume=False)
+            failed = json.loads(run_path.read_text())
+            self.assertEqual(failed["status"], "failed")
+            self.assertTrue((root / "report.json").is_file())
+            bundle = json.loads((root / "artifact-bundle.json").read_text())
+            bundled_paths = {entry["path"] for entry in bundle["files"]}
+            self.assertIn(str(run_path), bundled_paths)
+            self.assertIn(str((root / "report.json").resolve()), bundled_paths)
 
     def test_command_report_refreshes_existing_jobs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
