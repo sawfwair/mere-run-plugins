@@ -82,6 +82,38 @@ class BundleContractTests(unittest.TestCase):
                     self.assertIn("litellm", recipe.get("collectAll", []))
                     self.assertIn("harbor", recipe.get("copyMetadata", []))
                     self.assertIn("litellm", recipe.get("copyMetadata", []))
+                    notices = (inputs / "BUNDLE_NOTICES.txt").read_text()
+                    self.assertIn(
+                        "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+                        notices,
+                    )
+                    self.assertIn(
+                        "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+                        notices,
+                    )
+                    self.assertIn("Copyright (c) 2020 Supabase", notices)
+                    self.assertIn("Version 2.0, January 2004", notices)
+                    supabase_terms = (
+                        notices.split(
+                            "SHA-256: 334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+                            1,
+                        )[1]
+                        .split("\n\n---\n", 1)[0]
+                        .lstrip("\n")
+                        + "\n"
+                    )
+                    tokenizers_terms = notices.split(
+                        "SHA-256: c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+                        1,
+                    )[1].lstrip("\n")
+                    self.assertEqual(
+                        hashlib.sha256(supabase_terms.encode()).hexdigest(),
+                        "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936",
+                    )
+                    self.assertEqual(
+                        hashlib.sha256(tokenizers_terms.encode()).hexdigest(),
+                        "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+                    )
 
                 if bundle == "geo-tools":
                     builder_requirements = (inputs / "builder-requirements.lock").read_text().lower()

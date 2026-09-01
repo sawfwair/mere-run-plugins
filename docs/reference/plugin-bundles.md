@@ -95,7 +95,9 @@ Reviewed recipes cover Workflow, Image, Face, Animatic, VFX, Perform, Film
 Studio, Geospatial, and Terminal-Bench tools. The Terminal-Bench recipe includes
 the pinned Harbor runtime and invokes it through the plugin's restricted frozen
 entrypoint. It doesn't include Docker, task images, task data, model weights,
-credentials, or benchmark results. Film Studio bundles its first-party Pi
+credentials, or benchmark results. Its bundle notice also preserves the exact
+tagged Supabase MIT and Tokenizers Apache-2.0 terms omitted from six upstream
+wheels. Film Studio bundles its first-party Pi
 prompts, skills, agents, and extension sources, but not Pi, provider
 credentials, or ffmpeg. Those runtime integrations remain visible in `doctor`
 and under user control.
