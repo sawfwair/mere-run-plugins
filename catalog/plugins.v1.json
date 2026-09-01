@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-08-31T08:51:42Z",
+  "updatedAt": "2026-09-01T01:35:13Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -100,7 +100,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-terminal-bench"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-terminal-bench",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-terminal-bench/0.1.0-1/envelope.json"
+          }
         }
       }
     },
