@@ -27,15 +27,18 @@ Harbor harness and a pinned Terminal-Bench 2.1 dataset. The plugin uses a Docker
 context that you select. It doesn't create or resize a Docker runtime.
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-terminal-bench"
+mere.run plugin install mere-terminal-bench --yes
 mere-terminal-bench doctor --docker-context BENCHMARK_CONTEXT
+mere-terminal-bench doctor --deep --docker-context BENCHMARK_CONTEXT
 mere-terminal-bench plan \
   --output ./runs/ornith-terminal-bench \
   --docker-context BENCHMARK_CONTEXT
 ```
 
 The package requires Python 3.12 or later and installs the pinned Harbor
-runtime as a dependency.
+runtime as a dependency. The first doctor command is a quick dependency check.
+The explicit deep check also inspects Docker storage and preflights the default
+models, so it can take several minutes.
 
 The default plan compares Ornith Q4 and Q8 with identical Terminus-2 settings.
 It records a 64 GiB additional-storage limit and `createsDockerRuntime: false`

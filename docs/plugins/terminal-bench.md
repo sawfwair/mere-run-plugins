@@ -31,18 +31,28 @@ mere.run plugin install mere-terminal-bench --yes
 The source package requires Python 3.12 or later. The installation includes
 Harbor 0.22.0, so you don't need to install a second Python tool.
 
-## Verify local readiness
+## Check local readiness
 
-To verify the selected Docker context and both default Ornith models, run the
-following command:
+Run a quick dependency check first:
 
 ```bash
 mere-terminal-bench doctor --docker-context BENCHMARK_CONTEXT
 ```
 
 Replace `BENCHMARK_CONTEXT` with the name of a running Docker context. The
-command reports readiness without creating containers, virtual machines, or
-storage.
+command checks the pinned Harbor runtime, the selected Docker engine, and the
+`mere.run` executable. It doesn't inspect Docker storage, start containers, or
+preflight models.
+
+Before a long evaluation, run the deep readiness check:
+
+```bash
+mere-terminal-bench doctor --deep --docker-context BENCHMARK_CONTEXT
+```
+
+The deep check also reads Docker's reported storage use and preflights both
+default Ornith models. It can take several minutes, but it still doesn't create
+containers, virtual machines, or storage.
 
 The later `run` command checks the planned output directory with a small
 `busybox:1.37.0` container before loading a model. The Docker runtime must see
