@@ -17,6 +17,8 @@ Important boundaries:
 - Write `run.json` before starting a model server or Harbor.
 - Use an existing Docker context. Never create or resize a virtual machine or
   disk.
+- Keep default `doctor` bounded to dependency checks. Put Docker storage and
+  model preflights behind explicit `doctor --deep`.
 - Stop Harbor when Docker-reported growth crosses the planned ceiling. Never
   prune shared Docker state automatically.
 - Accept a completed trial when it has a numeric verifier score, even if Harbor

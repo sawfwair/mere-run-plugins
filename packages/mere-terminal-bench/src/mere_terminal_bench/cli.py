@@ -328,6 +328,52 @@ def docker_inspection(docker: str, context: str | None) -> JsonMap:
     }
 
 
+def docker_quick_inspection(docker: str, context: str | None) -> JsonMap:
+    path = executable_path(docker)
+    if path is None:
+        return {"ready": False, "requested": docker, "error": "Docker executable not found"}
+    environment = docker_environment(context)
+    try:
+        current = capture([path, "context", "show"], env=environment, timeout=3.0)
+        info = capture(
+            [path, "info", "--format", "{{json .}}"],
+            env=environment,
+            timeout=5.0,
+        )
+    except PluginError as error:
+        return {
+            "ready": False,
+            "path": path,
+            "requestedContext": context,
+            "error": str(error),
+        }
+    if info.returncode != 0:
+        detail = info.stderr.strip() or info.stdout.strip()
+        return {
+            "ready": False,
+            "path": path,
+            "requestedContext": context,
+            "currentContext": current.stdout.strip() or None,
+            "error": detail,
+        }
+    try:
+        payload = as_map(json.loads(info.stdout), "docker info")
+    except json.JSONDecodeError as error:
+        return {"ready": False, "path": path, "error": str(error)}
+    return {
+        "ready": True,
+        "path": path,
+        "requestedContext": context,
+        "currentContext": current.stdout.strip() or None,
+        "serverVersion": payload.get("ServerVersion"),
+        "architecture": payload.get("Architecture"),
+        "operatingSystem": payload.get("OperatingSystem"),
+        "cpus": payload.get("NCPU"),
+        "memoryBytes": payload.get("MemTotal"),
+        "storageInspected": False,
+    }
+
+
 def validate_docker_bind_mount(
     docker: str,
     context: str | None,
@@ -372,7 +418,7 @@ def validate_docker_bind_mount(
         docker_marker.unlink(missing_ok=True)
 
 
-def harbor_inspection(harbor: str) -> JsonMap:
+def harbor_inspection(harbor: str, *, timeout: float = 30.0) -> JsonMap:
     command = harbor_command(harbor)
     install_command = "mere.run plugin install mere-terminal-bench --source --yes"
     if command is None:
@@ -383,7 +429,7 @@ def harbor_inspection(harbor: str) -> JsonMap:
             "installCommand": install_command,
             "error": "Harbor executable not found",
         }
-    completed = capture([*command, "--version"])
+    completed = capture([*command, "--version"], timeout=timeout)
     version = completed.stdout.strip() or completed.stderr.strip()
     ready = completed.returncode == 0 and version == HARBOR_VERSION
     return {
@@ -393,6 +439,24 @@ def harbor_inspection(harbor: str) -> JsonMap:
         "requiredVersion": HARBOR_VERSION,
         "installCommand": install_command,
         **({} if ready else {"error": "Harbor version does not match the pinned benchmark version"}),
+    }
+
+
+def mere_run_inspection(mere_run: str) -> JsonMap:
+    path = executable_path(mere_run)
+    if path is None:
+        return {"ready": False, "requested": mere_run, "error": "mere.run executable not found"}
+    try:
+        completed = capture([path, "--version"], timeout=5.0)
+    except PluginError as error:
+        return {"ready": False, "path": path, "error": str(error)}
+    version = completed.stdout.strip() or completed.stderr.strip()
+    ready = completed.returncode == 0
+    return {
+        "ready": ready,
+        "path": path,
+        "version": version or None,
+        **({} if ready else {"error": "mere.run version check failed"}),
     }
 
 
@@ -456,7 +520,11 @@ def plugin_manifest() -> JsonMap:
         "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-terminal-bench",
         "commands": [
             {"name": "manifest", "description": "Print the plugin manifest.", "stdout": "json"},
-            {"name": "doctor", "description": "Inspect local benchmark readiness without changing it.", "stdout": "json"},
+            {
+                "name": "doctor",
+                "description": "Check dependencies quickly or run explicit deep model preflights.",
+                "stdout": "json",
+            },
             {"name": "plan", "description": "Write a pinned, resource-bounded run manifest.", "stdout": "json"},
             {"name": "run", "description": "Execute the pending model arms in a run manifest.", "stdout": "json"},
             {"name": "resume", "description": "Resume incomplete model arms from a run manifest.", "stdout": "json"},
@@ -614,28 +682,43 @@ def command_manifest(args: argparse.Namespace) -> int:
 
 
 def command_doctor(args: argparse.Namespace) -> int:
-    harbor = harbor_inspection(args.harbor)
-    docker = docker_inspection(args.docker, args.docker_context)
-    model_reports = [
-        mere_run_preflight(
-            args.mere_run,
-            engine=args.engine,
-            model=model,
-            port=args.port,
-            context_size=args.context_size,
-        )
-        for model in (args.models or list(DEFAULT_MODELS))
-    ]
-    ready = harbor.get("ready") is True and docker.get("ready") is True and all(
-        report.get("ready") is True for report in model_reports
+    harbor = harbor_inspection(args.harbor, timeout=30.0 if args.deep else 5.0)
+    mere_run = mere_run_inspection(args.mere_run)
+    selected_models = args.models or list(DEFAULT_MODELS)
+    if args.deep:
+        docker = docker_inspection(args.docker, args.docker_context)
+        model_reports = [
+            {
+                **mere_run_preflight(
+                    args.mere_run,
+                    engine=args.engine,
+                    model=model,
+                    port=args.port,
+                    context_size=args.context_size,
+                ),
+                "preflighted": True,
+            }
+            for model in selected_models
+        ]
+    else:
+        docker = docker_quick_inspection(args.docker, args.docker_context)
+        model_reports = [{"model": model, "preflighted": False} for model in selected_models]
+    ready = (
+        harbor.get("ready") is True
+        and docker.get("ready") is True
+        and mere_run.get("ready") is True
+        and (not args.deep or all(report.get("ready") is True for report in model_reports))
     )
     report: JsonMap = {
         "plugin": PLUGIN_NAME,
         "version": __version__,
+        "mode": "deep" if args.deep else "quick",
+        "readinessScope": "dependencies-and-models" if args.deep else "dependencies",
         "ready": ready,
         "mutated": False,
         "harbor": harbor,
         "docker": docker,
+        "mereRun": mere_run,
         "models": model_reports,
         "dataset": {
             "name": DATASET_NAME,
@@ -1380,8 +1463,13 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--json", action="store_true")
     manifest.set_defaults(func=command_manifest)
 
-    doctor = sub.add_parser("doctor", help="Inspect readiness without changing local state.")
+    doctor = sub.add_parser("doctor", help="Check dependencies without changing local state.")
     add_shared_runtime_args(doctor)
+    doctor.add_argument(
+        "--deep",
+        action="store_true",
+        help="Also inspect Docker storage and preflight each selected model; this can take several minutes.",
+    )
     doctor.set_defaults(func=command_doctor)
 
     plan = sub.add_parser("plan", help="Write a pinned benchmark run manifest.")

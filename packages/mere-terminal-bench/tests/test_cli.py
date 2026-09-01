@@ -262,19 +262,86 @@ class MereTerminalBenchTests(unittest.TestCase):
                     cli.validate_docker_bind_mount("docker", "bench", root)
             self.assertEqual(list(root.iterdir()), [])
 
-    def test_doctor_is_read_only_and_reports_failures(self) -> None:
+    def test_quick_doctor_is_read_only_and_skips_deep_checks(self) -> None:
         parser = cli.build_parser()
         args = parser.parse_args(["doctor"])
         with (
-            mock.patch("mere_terminal_bench.cli.harbor_inspection", return_value={"ready": True}),
-            mock.patch("mere_terminal_bench.cli.docker_inspection", return_value={"ready": False, "error": "stopped"}),
-            mock.patch("mere_terminal_bench.cli.mere_run_preflight", return_value={"ready": True}),
+            mock.patch("mere_terminal_bench.cli.harbor_inspection", return_value={"ready": True}) as harbor,
+            mock.patch(
+                "mere_terminal_bench.cli.docker_quick_inspection",
+                return_value={"ready": False, "error": "stopped"},
+            ) as docker_quick,
+            mock.patch("mere_terminal_bench.cli.mere_run_inspection", return_value={"ready": True}),
+            mock.patch("mere_terminal_bench.cli.docker_inspection") as docker_deep,
+            mock.patch("mere_terminal_bench.cli.mere_run_preflight") as model_preflight,
             redirect_stdout(StringIO()) as stdout,
         ):
             self.assertEqual(cli.command_doctor(args), 3)
         report = json.loads(stdout.getvalue())
         self.assertFalse(report["ready"])
         self.assertFalse(report["mutated"])
+        self.assertEqual(report["mode"], "quick")
+        self.assertEqual(report["readinessScope"], "dependencies")
+        self.assertTrue(all(model["preflighted"] is False for model in report["models"]))
+        harbor.assert_called_once_with("harbor", timeout=5.0)
+        docker_quick.assert_called_once_with("docker", None)
+        docker_deep.assert_not_called()
+        model_preflight.assert_not_called()
+
+    def test_deep_doctor_runs_storage_and_model_preflights(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["doctor", "--deep", "--model", "model-a", "--model", "model-b"])
+        with (
+            mock.patch("mere_terminal_bench.cli.harbor_inspection", return_value={"ready": True}) as harbor,
+            mock.patch("mere_terminal_bench.cli.mere_run_inspection", return_value={"ready": True}),
+            mock.patch(
+                "mere_terminal_bench.cli.docker_inspection",
+                return_value={"ready": True, "reportedUsageBytes": 42},
+            ) as docker_deep,
+            mock.patch("mere_terminal_bench.cli.docker_quick_inspection") as docker_quick,
+            mock.patch("mere_terminal_bench.cli.mere_run_preflight", return_value={"ready": True}) as preflight,
+            redirect_stdout(StringIO()) as stdout,
+        ):
+            self.assertEqual(cli.command_doctor(args), 0)
+        report = json.loads(stdout.getvalue())
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["mode"], "deep")
+        self.assertEqual(report["readinessScope"], "dependencies-and-models")
+        self.assertTrue(all(model["preflighted"] is True for model in report["models"]))
+        harbor.assert_called_once_with("harbor", timeout=30.0)
+        docker_deep.assert_called_once_with("docker", None)
+        docker_quick.assert_not_called()
+        self.assertEqual(preflight.call_count, 2)
+
+    def test_quick_docker_inspection_never_reads_storage_or_runs_a_container(self) -> None:
+        context = subprocess.CompletedProcess(args=[], returncode=0, stdout="bench\n", stderr="")
+        info = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "ServerVersion": "27.0.0",
+                    "Architecture": "aarch64",
+                    "OperatingSystem": "Docker",
+                    "NCPU": 8,
+                    "MemTotal": 16 * 1024**3,
+                }
+            ),
+            stderr="",
+        )
+        with (
+            mock.patch("mere_terminal_bench.cli.executable_path", return_value="/usr/bin/docker"),
+            mock.patch("mere_terminal_bench.cli.capture", side_effect=[context, info]) as capture,
+            mock.patch("mere_terminal_bench.cli.docker_usage_bytes_with_retry") as storage,
+        ):
+            report = cli.docker_quick_inspection("docker", "bench")
+        self.assertTrue(report["ready"])
+        self.assertFalse(report["storageInspected"])
+        storage.assert_not_called()
+        commands = [call.args[0] for call in capture.call_args_list]
+        self.assertEqual(commands[0][1:], ["context", "show"])
+        self.assertEqual(commands[1][1:], ["info", "--format", "{{json .}}"])
+        self.assertNotIn("run", [part for command in commands for part in command])
 
     def test_internal_harbor_forwards_options_without_exposing_a_public_command(self) -> None:
         app = mock.Mock(return_value=None)
