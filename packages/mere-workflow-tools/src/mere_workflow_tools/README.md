@@ -20,8 +20,8 @@ Important boundaries:
 - Keep stdout JSON-only for plugin commands.
 - Treat request and manifest JSON as untrusted until narrowed.
 - Keep wrappers thin; shared run-manifest behavior belongs in `cli.py`.
-- Cleanup is local-state only unless a future provider-specific module documents
-  otherwise.
+- Cleanup is local-state only. A provider-specific module must document any
+  remote resource that it creates.
 
 `doc_graph_provider.py` exposes local document conversion through the graph SDK,
 with confined artifacts and replayable run manifests.

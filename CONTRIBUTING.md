@@ -1,6 +1,9 @@
 # Contributing
 
-Before opening a PR:
+This guide is for contributors who change plugin code, contracts, recipes, or
+documentation.
+
+Before you open a pull request, run:
 
 ```bash
 ./scripts/check.sh
@@ -18,5 +21,8 @@ remote resources must include:
 
 Do not commit secrets, real account tokens, or large training artifacts.
 
-For security-sensitive issues, follow `SECURITY.md` instead of opening a public
-issue.
+For developer-facing prose, follow the [documentation style
+guide](https://plugins-docs.mere.run/operations/documentation-style).
+
+For a security-sensitive issue, follow the private reporting process in
+[`SECURITY.md`](SECURITY.md) instead of opening a public issue.

@@ -1,4 +1,4 @@
-# Workflow Tools
+# Workflow Tools package
 
 `mere-workflow-tools` is a shared package that installs six companion commands
 and graph contract tooling:
@@ -25,7 +25,7 @@ Each command follows the same plugin fashion:
 
 The one-shot command for each tool writes a manifest and immediately executes it.
 
-## Runtime Boundary
+## Runtime boundary
 
 The package does not include OCR, ASR, captioning, anonymization, segmentation,
 or image-generation runtimes. It shells out to `mere.run` and records the exact
@@ -99,7 +99,7 @@ entries tell the runner which artifacts to hash after execution:
 {"argv":["text","anonymize","--output","./redacted.txt"],"outputs":{"redacted":"./redacted.txt"}}
 ```
 
-## Portable Graphs
+## Portable graphs
 
 `mere-dataset-tools` exposes `dataset.prepare` through the fixed graph-provider
 protocol. The package SDK centralizes confined invocation decoding, diagnostic
@@ -119,7 +119,7 @@ creative templates compose the portable `text.value`, `text.join`,
 Studio-specific graph format. The canonical graph and run schemas are mirrored
 in `contracts/` and validated with every repository gate.
 
-## Reusable Composition
+## Reusable composition
 
 Compile higher-order authoring documents into an ordinary portable graph:
 
@@ -138,14 +138,14 @@ branch, rewrites references, detects ID collisions, and records source and graph
 fingerprints. The resulting `mere.run/workflow-graph` is what local, SSH, and
 Relay executors consume; no higher-order behavior enters the worker protocol.
 
-## Graph Studio
+## Graph Studio integration
 
 Visual authoring is provided by the separate `mere-run-graph-studio`
 application. This package remains its provider boundary for catalog entries,
 native templates, workflow compilation, and conservative ComfyUI import. The
 Studio app invokes these public commands and does not import plugin internals.
 
-## ComfyUI Bridge
+## ComfyUI bridge
 
 The bridge is an importer, not a second runtime. It inspects ComfyUI UI or API
 JSON and imports a supported API prompt subset into a native graph:
@@ -165,9 +165,9 @@ exports remain inspectable but block import with explicit diagnostics. ComfyUI
 sampler and scheduler choices are reported as omitted warnings when the native
 node contract has no equivalent.
 
-## Why These Are Plugins
+## Plugin boundary
 
-These are local production workflows, not new model capabilities. Keeping them
+These are local production workflows, not additional model capabilities. Keeping them
 as companion plugins lets `mere.run` stay focused on inference while users get
 repeatable, inspectable pipelines for documents, media, datasets, transcripts,
 image generation, and batch automation.

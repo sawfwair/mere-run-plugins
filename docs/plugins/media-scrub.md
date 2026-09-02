@@ -1,4 +1,4 @@
-# Media Scrub
+# Media Scrub plugin
 
 `mere-media-scrub` scans a single image or folder of frames, extracts visible
 text locally, and optionally redacts sensitive text.
@@ -6,7 +6,7 @@ text locally, and optionally redacts sensitive text.
 ## Install and run
 
 ```bash
-mere.run plugin install mere-media-scrub
+mere.run plugin install mere-media-scrub --yes
 mere-media-scrub doctor
 mere-media-scrub scrub \
   --input ./frames \

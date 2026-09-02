@@ -1,7 +1,7 @@
-# ShotGrid Tools Plugin
+# ShotGrid Tools plugin
 
-`mere-shotgrid-tools` publishes local `mere.run` artifacts into ShotGrid, now
-Autodesk Flow Production Tracking, as production review records.
+`mere-shotgrid-tools` publishes local `mere.run` artifacts to Autodesk Flow
+Production Tracking, formerly ShotGrid, as production review records.
 
 The plugin is a companion executable. It does not run hosted inference and does
 not extend the core `mere.run` command tree. ShotGrid decides what production
@@ -51,7 +51,7 @@ The plugin reads credentials from explicit flags or environment variables:
 
 Credentials are never written to `run.json`, stdout, or planned command arrays.
 
-## Publish Shape
+## Publish request
 
 A publish creates one ShotGrid `Version` linked to a Project and optional
 Shot/Asset/Task. It can also:
@@ -66,7 +66,7 @@ Shot/Asset/Task. It can also:
 explicit flags and only operates on records stored in the run manifest as records
 created by this plugin.
 
-## Task Pull Shape
+## Task query
 
 `pull-tasks` queries assigned ShotGrid Tasks and emits JSONL requests that can
 be run by local relay or batch tooling. It performs no remote mutations.

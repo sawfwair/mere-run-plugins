@@ -1,7 +1,7 @@
 # mere-shotgrid-tools
 
-ShotGrid, now Autodesk Flow Production Tracking, companion tools for publishing
-local `mere.run` artifacts into production review.
+Companion tools for publishing local `mere.run` artifacts to Autodesk Flow
+Production Tracking, formerly ShotGrid.
 
 The plugin does not run inference and does not turn `mere.run` into a hosted
 service. It bridges local run manifests and artifact files into user-owned
@@ -27,7 +27,7 @@ export MERE_SHOTGRID_API_KEY="..."
 User login/password authentication is also supported through
 `MERE_SHOTGRID_LOGIN` and `MERE_SHOTGRID_PASSWORD`.
 
-## Publish Review Artifacts
+## Publish review artifacts
 
 ```bash
 mere-shotgrid-tools plan \
@@ -59,7 +59,7 @@ mere-shotgrid-tools publish \
 The plugin writes `run.json` before any remote mutation and updates it after
 each ShotGrid create, upload, or update call.
 
-## Pull Tasks
+## Pull tasks
 
 `pull-tasks` reads ShotGrid Tasks and emits JSONL job requests for local
 workflow tools:

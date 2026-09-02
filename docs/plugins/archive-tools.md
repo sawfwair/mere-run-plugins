@@ -260,7 +260,7 @@ mere-archive-tools benchmark evaluate \
 This phase moves the duplicate, edits the Calgary record, removes a legacy log,
 and adds a Bridgewater crane inspection. The evaluator detects the phase from
 the complete source path and SHA-256 set. It then checks that the old paths are
-gone, the new paths are indexed, and the duplicate still shares one content
+gone, the added paths are indexed, and the duplicate still shares one content
 record.
 
 ## Test with public datasets

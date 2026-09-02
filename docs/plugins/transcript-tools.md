@@ -1,4 +1,4 @@
-# Transcript Tools
+# Transcript Tools plugin
 
 `mere-transcript-tools` transcribes local audio with `mere.run` and can pass the
 result through local PII redaction.
@@ -6,7 +6,7 @@ result through local PII redaction.
 ## Install and transcribe
 
 ```bash
-mere.run plugin install mere-transcript-tools
+mere.run plugin install mere-transcript-tools --yes
 mere-transcript-tools doctor
 mere-transcript-tools transcribe \
   --input ./meeting.wav \

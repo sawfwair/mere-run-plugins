@@ -1,455 +1,136 @@
-# mere-run-plugins
+# mere.run plugins
 
-Official companion plugins for `mere.run`.
+This repository is for people who use or extend `mere.run` production
+workflows. It contains the official plugin catalog, shared contracts, workflow
+recipes, and companion command-line interfaces (CLIs).
 
-[Plugin catalog](https://plugins.mere.run/) ·
-[Documentation](https://plugins-docs.mere.run/) ·
-[Plugin contract](https://plugins-docs.mere.run/plugins/contract)
+`mere.run` owns model installation and inference. Plugins own the work around
+inference, including planning, orchestration, artifact records,
+post-processing, provider resources, and cleanup.
 
-The core `mere.run` CLI stays local-first. This repo contains explicit bridges
-to user-controlled outside resources: RunPod pods, SSH-accessed GPU machines,
-and future provider runners. A plugin can automate remote compute, but it must
-use the user's account, credentials, spending limits, and cleanup policy.
+- [Read the documentation](https://plugins-docs.mere.run/)
+- [Choose a plugin](https://plugins-docs.mere.run/guide/choosing-a-plugin)
+- [View the live catalog](https://plugins.mere.run/catalog/plugins.v1.json)
+- [Read the plugin contract](https://plugins-docs.mere.run/plugins/contract)
 
-## What Lives Here
+## Install a plugin
 
-- Contract schemas used by official plugins.
-- A live plugin catalog that `mere.run` can fetch for one-shot installs.
-- Canonical recipe files for repeatable workflows.
-- Reference-evaluation recipes for LoRA comparisons.
-- Provider-specific and local-production companion CLIs.
-- Test utilities that verify plugin manifests, plans, and run manifests.
-
-## Terminal-Bench plugin
-
-`mere-terminal-bench` compares local `mere.run` text models with the official
-Harbor harness and a pinned Terminal-Bench 2.1 dataset. The plugin uses a Docker
-context that you select. It doesn't create or resize a Docker runtime.
+To inspect the available plugins, list the catalog:
 
 ```bash
-mere.run plugin install mere-terminal-bench --yes
-mere-terminal-bench doctor --docker-context BENCHMARK_CONTEXT
-mere-terminal-bench doctor --deep --docker-context BENCHMARK_CONTEXT
-mere-terminal-bench plan \
-  --output ./runs/ornith-terminal-bench \
-  --docker-context BENCHMARK_CONTEXT
+mere.run plugin list
 ```
 
-The package requires Python 3.12 or later and installs the pinned Harbor
-runtime as a dependency. The first doctor command is a quick dependency check.
-The explicit deep check also inspects Docker storage and preflights the default
-models, so it can take several minutes.
-
-The default plan compares Ornith Q4 and Q8 with identical Terminus-2 settings.
-It records a 64 GiB additional-storage limit and `createsDockerRuntime: false`
-before the run starts.
-
-## RunPod Plugin
-
-`mere-runpod` runs a normal `mere.run image train-lora` command on an ephemeral
-RunPod pod owned by the user.
-
-Install the plugin with `pipx`:
+To preview an installation, omit `--yes`:
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
+mere.run plugin install mere-image-tools
 ```
 
+To install the plugin, confirm the catalog command:
+
 ```bash
-mere-runpod manifest --json
-mere-runpod doctor
-mere-runpod volume ensure \
-  --name mere-klein-cache \
-  --data-center-id US-KS-2 \
-  --size-gb 512 \
-  --dry-run
-mere-runpod plan \
-  --recipe klein-style-lora \
-  --data ./dataset \
-  --output ./runs/style-demo
+mere.run plugin install mere-image-tools --yes
 ```
 
-Real RunPod execution requires:
-
-- `RUNPOD_API_KEY` in the environment or an env file.
-- an SSH key registered with RunPod.
-- a Linux CUDA `mere.run` build pack tarball.
-- a paired image/caption dataset.
+After installation, check the plugin and inspect its machine-readable
+manifest:
 
 ```bash
-mere-runpod run \
-  --recipe klein-style-lora \
-  --data ./dataset \
-  --output ./runs/style-demo \
-  --build-pack ./build-packs/mere-run-linux-cuda.tar.gz \
-  --network-volume-id <volume-id> \
-  --data-center-id US-KS-2
-```
-
-The plugin writes `run.json`, streams remote logs, fetches the final LoRA,
-archive, log, and metadata, then terminates the pod by default. Use
-`--fetch-checkpoints` only when you need intermediate checkpoint safetensors.
-
-Use `mere-runpod volume ensure --dry-run` to preview the request, then run it
-without `--dry-run` once per RunPod data center to create or reuse a persistent
-cache volume. The returned `volume.id` mounts at `/workspace` for training runs,
-so `/workspace/mere-runpod/models` and `/workspace/mere-runpod/hub` can stay
-warm across terminated pods. The plugin also caches build packs under
-`/workspace/mere-runpod/build-packs` by SHA.
-The bundled Klein recipes call the current core `klein-fast-style` training
-preset and sample against `image-klein-9b`.
-
-## Image Tools Plugin
-
-`mere-image-tools` contains local image-production helpers that rely on the
-installed `mere.run` CLI instead of adding a second model runtime.
-
-Install the plugin with `pipx`:
-
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
-```
-
-The first command is `knockout`, which plans and runs a subject cutout through
-`mere.run vision segment` with SAM 3.1:
-
-```bash
-mere-image-tools manifest --json
 mere-image-tools doctor
-mere-image-tools knockout \
-  --input ./frame.png \
-  --output ./subject.png \
-  --mask-output ./subject-mask.png \
-  --prompt "subject" \
-  --prompt "prop"
+mere-image-tools manifest --json
 ```
 
-By default, `knockout` calls `mere.run vision segment --model
-vision-segment-sam31`. Set `MERE_IMAGE_TOOLS_MERE_RUN` or pass
-`--mere-run-command` when you need to target a source checkout or non-standard
-binary path.
+For task-specific installation and first-run instructions, see the
+[getting-started guide](https://plugins-docs.mere.run/guide/getting-started).
 
-## Face Tools Plugin
+## Choose a plugin
 
-`mere-face-tools` composes the native `mere.run vision face` detector and
-embedder into a resumable SQLite photo index and reference-face search. The
-plugin owns library traversal, change detection, ranking, and review artifacts;
-core `mere.run` owns model download and inference.
+The catalog contains 18 companion executables:
 
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-face-tools"
-mere.run model pull vision-face-buffalo-l
-mere-face-tools index \
-  --photos /Volumes/Photos \
-  --database ./faces.sqlite3 \
-  --output-dir ./face-index
-mere-face-tools search \
-  --database ./faces.sqlite3 \
-  --reference ./scott.jpg \
-  --output-dir ./searches/scott
-```
+| Task | Plugin |
+| --- | --- |
+| Analyze geospatial data | [Geospatial Tools](https://plugins-docs.mere.run/plugins/geo-tools) |
+| Index and search faces in a photo library | [Face Tools](https://plugins-docs.mere.run/plugins/face-tools) |
+| Index and search a shared drive | [Archive Tools](https://plugins-docs.mere.run/plugins/archive-tools) |
+| Create visual-effects shot artifacts | [VFX Tools](https://plugins-docs.mere.run/plugins/vfx-tools) |
+| Remove a still-image background | [Image Tools](https://plugins-docs.mere.run/plugins/image-tools) |
+| Produce animatic assets | [Animatic Tools](https://plugins-docs.mere.run/plugins/animatic-tools) |
+| Produce a governed short film | [Film Studio](https://plugins-docs.mere.run/plugins/film-tools) |
+| Run a live local music performance | [Perform](https://plugins-docs.mere.run/plugins/perform) |
+| Publish review artifacts | [ShotGrid Tools](https://plugins-docs.mere.run/plugins/shotgrid-tools) |
+| Run LoRA training on a user-owned pod | [RunPod Runner](https://plugins-docs.mere.run/plugins/runpod) |
+| Compare local agents with Terminal-Bench | [Terminal-Bench](https://plugins-docs.mere.run/plugins/terminal-bench) |
+| Run identity-adapter workflows | [Identity Tools](https://plugins-docs.mere.run/plugins/identity-tools) |
+| Convert or process documents | [Document Tools](https://plugins-docs.mere.run/plugins/document-tools) |
+| Remove sensitive text from media frames | [Media Scrub](https://plugins-docs.mere.run/plugins/media-scrub) |
+| Prepare image-caption datasets | [Dataset Tools](https://plugins-docs.mere.run/plugins/dataset-tools) |
+| Transcribe and reduce sensitive text | [Transcript Tools](https://plugins-docs.mere.run/plugins/transcript-tools) |
+| Generate images with references or adapters | [Image Compose](https://plugins-docs.mere.run/plugins/image-compose) |
+| Run resumable local command batches | [Batch Runner](https://plugins-docs.mere.run/plugins/batch-runner) |
 
-Search writes ranked JSON and CSV, a contact sheet, and symlink-only review
-folders. It never changes or copies the source photo library.
+For selection guidance, see
+[Choose a plugin](https://plugins-docs.mere.run/guide/choosing-a-plugin).
 
-## Archive Tools Plugin
+## Understand the safety boundary
 
-`mere-archive-tools` builds a searchable SQLite index from a read-only shared
-drive. It combines local AnyDoc conversion with `mere.run` captioning, OCR, PII
-reduction, and shared text and image embeddings.
+Plugins are separate executables. `mere.run` doesn't load plugin code into the
+core process.
 
-```bash
-mere.run plugin install mere-archive-tools --yes
-mere-archive-tools index \
-  --source /Volumes/Shared \
-  --database ./archive.sqlite3 \
-  --output-dir ./archive-run \
-  --storage-tier safe-content
-mere-archive-tools search \
-  --database ./archive.sqlite3 \
-  --query "Halifax installation photos"
-```
+Every provider plugin must support `doctor`, `plan`, `run`, `resume`, and
+`cleanup`. Before a plugin creates a paid resource, it must write `run.json`
+and provide a plan or dry run. Remote providers terminate resources by default
+unless you select an explicit keep or debug option.
 
-Choose `full-content`, `safe-content`, or `pointers` to control how much
-PII-reduced material the index retains. All tiers store source pointers and
-embeddings. The plugin never modifies source files.
+Commands that promise JSON write machine-readable data to stdout. They write
+diagnostics to stderr. Plugins must not write credentials or secrets to either
+stream.
 
-Archive Tools also includes a generated mixed-file benchmark with fake PII
-canaries, retrieval judgments, exact duplicates, and a controlled mutation
-phase. Pinned ViDoRe and GovDocs1 adapters download public test data only when
-requested:
+For the complete rules, see [Provider
+safety](https://plugins-docs.mere.run/operations/provider-safety) and [Plugin
+security](https://plugins-docs.mere.run/plugins/security).
 
-```bash
-mere-archive-tools benchmark prepare --output-dir ./archive-benchmark
-mere-archive-tools benchmark sources
-```
+## Develop a plugin
 
-## Workflow Tools
-
-`mere-workflow-tools` installs six focused companion commands that turn common
-local inference workflows into repeatable manifests, plus graph-provider
-conformance, reusable native graph templates, and conservative ComfyUI API
-import:
-
-```bash
-mere-doc-tools process --input ./scan.png --output-dir ./doc-out
-mere-doc-tools process --extractor anydoc --input ./report.docx --output-dir ./markdown-out --no-redact
-mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
-mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
-mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
-mere-image-compose generate --prompt "a product render" --output-dir ./image-out
-mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
-mere-graph-conformance --provider mere-dataset-tools --json
-mere-graph-conformance --provider ./my-provider --invocation ./fixture.json --run-dir ./fixture-run --execute --json
-mere-graph-provider-init ./my-provider --provider-id mere-example-tools --node-kind example.write
-mere-graph-compile ./program.json --output ./workflow.json --report-output ./compile.json --json
-mere-dataset-tools graph templates list --json
-mere-dataset-tools graph comfy inspect ./comfy-workflow.json --json
-```
-
-Visual authoring lives in the separate `mere-run-graph-studio` application,
-which consumes these public provider, template, compiler, and Comfy bridge
-contracts.
-
-Provider conformance can stop at catalog validation or exercise a deterministic
-fixture through preflight, NDJSON execution, output declaration matching, and
-confined artifact existence checks. `mere-graph-provider-init` creates a small
-typed local-only provider with those boundaries already in place; it refuses
-to write into a non-empty directory.
-
-These tools call existing `mere.run` surfaces such as `vision ocr`,
-`text anonymize`, `vision caption`, `speech transcribe`, and `image generate`.
-The plugin layer owns planning, artifact hashes, resumability, and local cleanup
-state.
-
-Document Tools also supports [AnyDoc](https://github.com/firecrawl/anydoc) for
-local office-document, CSV, EPUB, RTF, and text-PDF conversion to Markdown.
-The normal install includes AnyDoc on Python 3.10+ and exposes `document.convert`
-to native graphs, with Markdown, text, a run manifest, and provenance stats. See
-[Document Tools](https://plugins-docs.mere.run/plugins/document-tools) for setup
-and the `document-to-markdown` template. Conversion with `--no-redact` requires no model or `mere.run`
-executable. Hosted OCR is disabled; scanned PDFs require the local OCR path.
-
-## VFX Tools Plugin
-
-`mere-vfx-tools` turns native `mere.run` segmentation, tracking, pose,
-optical-flow, depth, geometry, image generation, and start/end-frame video
-generation into durable shot workflows. It delivers roto mattes and alpha
-video, track exports, QC, motion passes, generative shot helpers, native
-single- and multi-view geometry handoffs, verified TripoSR OBJ/PLY/GLB meshes,
-and reconstruction-only InstantMesh meshes from four or six artist-supplied
-views without adding a second inference runtime or generating unlicensed views.
-
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools"
-mere-vfx-tools roto --request-json ./roto.json --output-dir ./shot010
-```
-
-## Animatic Tools Plugin
-
-`mere-animatic-tools` contains local production helpers for relay-connected
-Animatic workflows: character knockouts, reference packs, continuity checks,
-shot kits, storyboard repair, edit review, voice kits, location plates, style
-locks, and delivery prep.
-
-```bash
-mere-animatic-tools manifest --json
-mere-animatic-tools doctor
-mere-animatic-tools shot-kit \
-  --request-json ./request.json \
-  --output-dir ./animatic-out \
-  --run-id shot-kit-001
-```
-
-The plugin writes local artifacts and a durable `run.json`; it does not create
-paid resources.
-
-## Film Studio Plugin
-
-`mere-film-tools` turns one idea into a governed short-film project. Pi handles
-the producer-director conversation and isolated specialist departments;
-`mere-film-tools` owns the durable brief, canon, approvals, media jobs, review,
-rerolls, and checksum-backed delivery. Image, multi-take video selection, timed
-speech, transcription, timed sound effects, captions, music, loudness mastering, generated-shot
-inspection, and assembly remain local `mere.run` and FFmpeg work.
-
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools"
-mere-film-tools doctor
-mere-film-tools plan \
-  --idea "A lighthouse keeper receives a signal from a vanished ship" \
-  --title "The Last Signal" \
-  --output-dir ./the-last-signal
-mere-film-tools agent --run-manifest ./the-last-signal/run.json
-mere-film-tools export-animatic ./the-last-signal/run.json
-animatic production import-film \
-  ./the-last-signal/exports/animatic/film-animatic-handoff.json \
-  --output json
-```
-
-Production defaults to plan-only. The plugin does not invoke media generation
-until the user has approved the brief, treatment, and production plan and has
-explicitly selected `draft` or `final` mode. Pi departments are read-only and
-can propose work but cannot edit canon or bypass a gate.
-
-The project ledger is single-writer locked and crash-recoverable. Review is
-grounded in the assembled cut, per-shot local vision receipts, dialogue ASR and
-caption receipts, take-selection evidence, and an offline `reviews/index.html`
-picture-lock package. Picture lock additionally requires an explicit human
-decision bound to the exact master and review evidence hashes.
-
-The Animatic handoff independently re-verifies selected ledger assets and
-preserves exact shot timing, selected takes and seeds, canon, proof state, and
-checksums. Animatic verifies the source again before writing into its existing
-project, episode, scene, shot, and asset graph.
-
-## ShotGrid Tools Plugin
-
-`mere-shotgrid-tools` publishes local `mere.run` artifacts into ShotGrid, now
-Autodesk Flow Production Tracking, without moving inference into ShotGrid.
-
-Install the plugin with `pipx`:
-
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
-```
-
-Use `plan` to record the exact remote mutations before any ShotGrid write:
-
-```bash
-mere-shotgrid-tools manifest --json
-mere-shotgrid-tools doctor
-mere-shotgrid-tools plan \
-  --project-id 123 \
-  --entity-type Shot \
-  --entity-id 456 \
-  --task-id 789 \
-  --artifact ./review.mov \
-  --thumbnail ./poster.png \
-  --note "Ready for review." \
-  --output-dir ./shotgrid-publish \
-  --run-id shot010-v003
-mere-shotgrid-tools run ./shotgrid-publish/run.json
-```
-
-`publish` combines planning and execution. It writes `run.json` before creating
-the ShotGrid Version, then records each created Version, upload, thumbnail, Note,
-Playlist link, and Task status update as it succeeds. `cleanup` skips by default;
-deleting plugin-created tracking records requires explicit confirmation.
-
-`pull-tasks` queries ShotGrid Tasks and writes JSONL job requests for local relay
-or batch tooling.
-
-## Perform Plugin
-
-`mere-perform` plans and runs realtime Magenta Heart performances through the
-installed `mere.run music realtime` command. It records a durable `run.json`,
-exports a local stage UI, passes MIDI mappings through to CoreMIDI, writes event
-JSONL, and captures WAV output when requested. The show file treats prompts as
-a palette of blendable anchors with roles, jam/solo modes, prompt strength, and
-patch-level realtime controls. By default, the initial prompt stays stable and
-the MIDI controller drives the performance; timed prompt changes require
-`--sequence-scenes`. Its stage UI also renders a Jam-inspired MIDI controller
-surface with source/gate readouts and an interactive piano strip. Physical MIDI
-ingestion stays in native `mere.run`; the live stage mirrors observed
-`mere.run` note logs through a local `stage/live.json` feed and can send typed
-prompts back into the running `mere.run --interactive` process.
-
-Install the plugin with `pipx`:
-
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-perform"
-```
-
-```bash
-mere-perform manifest --json
-mere-perform doctor
-mere-perform show-template --output ./show.json
-mere-perform plan \
-  --show ./show.json \
-  --output-dir ./runs/heart-demo \
-  --run-id heart-demo \
-  --no-play
-mere-perform stage ./runs/heart-demo/run.json
-mere-perform run ./runs/heart-demo/run.json
-```
-
-The plugin does not create paid resources and does not ship another Magenta
-runtime. It wraps the local `mere.run` realtime surface and owns planning,
-stage export, event recording, artifact hashes, and cleanup state.
-
-## Catalog
-
-The live catalog is published from this repo:
+The repository uses Python packages for plugin executables and VitePress for
+documentation. The main directories are:
 
 ```text
-https://raw.githubusercontent.com/sawfwair/mere-run-plugins/main/catalog/plugins.v1.json
+benchmark-recipes/  Pinned external benchmark protocols
+bundles/            Reviewed inputs for signed macOS bundles
+catalog/            The official installation catalog
+contracts/          Language-neutral JSON Schemas
+docs/               VitePress documentation source
+eval-recipes/       Reference evaluation protocols
+packages/           Python plugin packages
+recipes/            Executable workflow recipes
+scripts/            Validation and maintenance commands
 ```
 
-`mere.run plugin install mere-runpod` can read that catalog and run the exact
-`pipx install` command from the selected `main` channel:
+For repository structure and contribution steps, see [Development
+guidance](https://plugins-docs.mere.run/operations/development) and
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
-```
+## Validate a change
 
-## Contract Philosophy
-
-Plugins are companion executables, not dynamic code loaded into `mere.run`.
-They expose a shared command fashion:
-
-```text
-<plugin> manifest --json
-<plugin> doctor
-<plugin> plan ...
-<plugin> run ...
-<plugin> resume <run.json>
-<plugin> cleanup <run.json>
-```
-
-Provider-specific helper commands, such as `mere-runpod volume`, are allowed
-when they keep stdout machine-readable. Helpers that can create paid resources
-must expose a dry-run or plan mode.
-
-The stdout/stderr rule matches `mere.run`: stdout is machine-readable when a
-command promises JSON or paths; stderr is for diagnostics.
-
-## Validate
+Before you open a pull request, run the repository gate:
 
 ```bash
 ./scripts/check.sh
+```
+
+To validate and build the documentation, run:
+
+```bash
 corepack pnpm install --frozen-lockfile
 corepack pnpm docs:coverage
 corepack pnpm docs:build
 ```
 
-Run the docs locally with `corepack pnpm docs:dev`. The public docs site at
-`plugins-docs.mere.run` is deployed separately from the built
-`docs/.vitepress/dist/` output; the catalog site at `plugins.mere.run` lives in
-its own repo.
+The repository gate compiles packages, runs unit tests, validates contracts and
+recipes, and tests installed commands. The Terminal-Bench smoke test remains
+plan-only and verifies that the plugin doesn't create a Docker runtime.
 
-## Repo Layout
-
-```text
-contracts/                 JSON schemas for plugin, recipe, run, and artifacts
-catalog/                   live install catalog for official plugins
-docs/                      comprehensive VitePress guide, plugin, reference, and operations docs
-recipes/                   canonical machine-readable recipe files
-eval-recipes/              canonical machine-readable eval protocols
-bundles/                   reviewed inputs for reproducible signed macOS plugin bundles
-benchmark-recipes/         pinned external benchmark protocols
-packages/mere-runpod/      first official provider plugin
-packages/mere-terminal-bench/ local Terminal-Bench orchestration plugin
-packages/mere-image-tools/ local image-production plugin
-packages/mere-face-tools/  local face-library indexing and search plugin
-packages/mere-archive-tools/ local shared-drive indexing and search plugin
-packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
-packages/mere-animatic-tools/ local Animatic production helpers
-packages/mere-film-tools/    Pi-powered governed short-film studio
-packages/mere-shotgrid-tools/ ShotGrid production-tracking bridge
-packages/mere-perform/     realtime performance and stage UI plugin
-packages/mere-vfx-tools/   local shot-oriented VFX production plugin
-scripts/check.sh           repo gate
-scripts/validate_repo.py   schema/manifest/recipe smoke validation
-SECURITY.md                private vulnerability reporting policy
-```
+A successful local build doesn't prove that a package, catalog, or website was
+published. For release boundaries, see [Releasing and
+deployment](https://plugins-docs.mere.run/operations/releasing).

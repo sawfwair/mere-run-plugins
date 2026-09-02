@@ -36,11 +36,12 @@ Each entry defines:
 
 ```bash
 mere.run plugin list
-mere.run plugin install mere-vfx-tools
+mere.run plugin install mere-vfx-tools --yes
 ```
 
 The CLI resolves the catalog ID and channel to the declared package spec. The
 catalog does not execute plugin code.
+Omit `--yes` to print the resolved command without installing the package.
 
 ## Updating the catalog
 

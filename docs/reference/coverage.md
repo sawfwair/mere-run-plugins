@@ -14,6 +14,7 @@ This site covers every public product surface in the repository.
 | Terminal-Bench evaluation | `contracts/terminal-bench-*.schema.json` | [Terminal-Bench plugin](/plugins/terminal-bench) |
 | Film production and evidence | `contracts/film-*.schema.json` | [Film Studio](/plugins/film-tools), [Contracts](/reference/contracts) |
 | Provider safety | implementations and repository rules | [Provider safety](/operations/provider-safety) |
+| Documentation conventions | project rules and Google developer documentation style | [Documentation style](/operations/documentation-style) |
 | Repository validation | `scripts/check.sh` | [Testing](/operations/testing) |
 | Docs build and release handoff | `package.json`, `docs/.vitepress/dist/` | [Releasing](/operations/releasing) |
 

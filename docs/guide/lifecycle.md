@@ -1,43 +1,58 @@
 # Plugin lifecycle
 
-Every official plugin exposes the same control loop:
+This guide is for users and automation authors who operate manifest-based
+plugins. It explains the shared control loop and the exceptions for focused
+local commands.
 
-```text
-discover → doctor → plan → run → resume/inspect → cleanup
+## Inspect a plugin
+
+To describe a plugin without running a readiness check, run:
+
+```bash
+PLUGIN_COMMAND manifest --json
 ```
 
-## Discover
+The manifest reports the executable, capabilities, commands, output policy, and
+security posture. Replace `PLUGIN_COMMAND` with an installed command, such as
+`mere-vfx-tools`.
 
-`manifest --json` reports capabilities and commands. Discovery must not invoke
-readiness checks or perform work.
+## Check readiness
 
-## Doctor
+The `doctor` command verifies required executables, credentials, paths, and
+provider access. It doesn't create paid resources.
 
-`doctor` verifies local executables, credentials, paths, and provider readiness.
-It does not create paid resources.
+## Plan the workflow
 
-## Plan
+The `plan` command validates inputs, resolves commands and provider settings,
+and writes a `run.json` file with the `planned` status.
 
-`plan` validates inputs, resolves commands and provider settings, and writes
-`run.json` with status `planned`.
+Review the plan before any workflow that creates cost or changes remote state.
 
-## Run
+## Run the plan
 
-`run` consumes that manifest. Provider plugins persist the manifest before the
-first external mutation, then update it as resources and artifacts change.
+The `run` command consumes the reviewed manifest. A provider plugin writes the
+manifest before the first external change. It then updates the manifest as
+resources and artifacts change.
 
-## Resume
+## Resume or inspect a run
 
-`resume` continues or inspects a durable run. A plugin may report that a remote
-resource no longer exists, but the response must remain machine-readable.
+The `resume` command continues or inspects a durable run. If a remote resource
+no longer exists, the command reports that state in its machine-readable
+result.
 
-## Cleanup
+## Clean up resources
 
-`cleanup` tears down referenced remote resources or records a local-only no-op.
-It is idempotent: repeating cleanup must not create a new failure mode.
+The `cleanup` command stops referenced remote resources or records a local
+no-op. Cleanup is idempotent, so repeated cleanup requests preserve a successful
+cleanup state.
 
-## One-shot commands
+## Use focused commands
 
-Many plugins expose a workflow-named convenience command such as `knockout`,
-`roto`, `perform`, or `process`. It combines plan and run while preserving the
-same manifest and output rules.
+Many plugins provide a task command such as `knockout`, `roto`, `perform`,
+or `process`. These commands combine planning and execution while preserving
+the plugin's manifest and output rules.
+
+Some focused local and graph-provider plugins use a smaller command surface.
+For the authoritative command list, run `manifest --json` or read the
+plugin's reference page. Provider plugins always implement `doctor`, `plan`,
+`run`, `resume`, and `cleanup`.

@@ -1,4 +1,4 @@
-# Image Tools Plugin
+# Image Tools plugin
 
 `mere-image-tools` contains local image-production helpers for `mere.run`
 workflows.
@@ -6,7 +6,7 @@ workflows.
 The first supported workflow is subject knockout through the native
 `mere.run vision segment` SAM 3.1 command.
 
-## Why This Is A Plugin
+## Plugin boundary
 
 Subject knockout needs matte post-processing and recipe-specific defaults that
 are useful in production image workflows. Keeping that workflow in a companion
@@ -34,7 +34,7 @@ mere-image-tools cleanup ./subject.run.json
 immediately. Use `plan` plus `run` when you want to inspect or store the
 operation before execution.
 
-## mere.run Runtime
+## `mere.run` runtime
 
 The plugin calls:
 

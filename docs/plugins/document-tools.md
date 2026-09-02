@@ -1,4 +1,4 @@
-# Document Tools
+# Document Tools plugin
 
 `mere-doc-tools` converts office documents and text PDFs to Markdown with
 [AnyDoc](https://github.com/firecrawl/anydoc), or performs image OCR with native

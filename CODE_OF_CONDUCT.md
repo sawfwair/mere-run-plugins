@@ -1,9 +1,9 @@
-# Code of Conduct
+# Code of conduct
 
-## Our Standard
+## Our standard
 
 This project is for people building local-first `mere.run` companion tooling.
-Public discussion should stay practical, respectful, and focused on helping
+Public discussion must stay practical, respectful, and focused on helping
 contributors and users understand the software.
 
 Examples of welcome behavior:

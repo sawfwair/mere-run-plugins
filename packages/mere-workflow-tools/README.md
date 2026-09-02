@@ -23,7 +23,7 @@ mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
 Set `MERE_WORKFLOW_TOOLS_MERE_RUN` or pass `--mere-run-command` to target a
 source-checkout binary.
 
-## Tool Map
+## Tool map
 
 - `mere-doc-tools`: local AnyDoc Markdown conversion or `mere.run vision ocr`, plus optional `mere.run text anonymize`
 - `mere-media-scrub`: OCR/redaction over image folders or single frames
@@ -128,7 +128,7 @@ provider, template, compiler, and Comfy bridge commands. Keeping the visual app
 outside this package lets workflow tools remain headless and independently
 versioned.
 
-The initializer writes only into a new or empty destination. Its generated
+The initializer writes only into an unused or empty destination. Its generated
 provider is deterministic, emits a final `node_result`, confines declared
 outputs, and includes a catalog test. Full conformance additionally validates
 preflight requirements, contiguous event sequences, declared output names,

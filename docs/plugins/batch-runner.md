@@ -1,4 +1,4 @@
-# Batch Runner
+# Batch Runner plugin
 
 `mere-batch-runner` executes explicit `mere.run` argument arrays from JSONL. It
 records durable per-job state, supports resume, and hashes discovered outputs.
@@ -6,7 +6,7 @@ records durable per-job state, supports resume, and hashes discovered outputs.
 ## Install
 
 ```bash
-mere.run plugin install mere-batch-runner
+mere.run plugin install mere-batch-runner --yes
 mere-batch-runner doctor
 ```
 

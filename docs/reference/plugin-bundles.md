@@ -65,7 +65,7 @@ Updates keep the previous version. A process lock serializes installation and
 rollback; a failed check leaves the active version unchanged. A monotonic
 sequence rejects downloaded downgrades or conflicting releases. Explicit
 rollback revalidates a retained installation without lowering the recorded
-highest sequence. Expiration prevents new installs, not offline use of an
+highest sequence. Expiration prevents subsequent installs, not offline use of an
 installed version. Initial-install freshness depends on the signed expiration;
 this pilot does not implement a transparency log or online revocation service.
 An existing artifact digest must match its retained release metadata exactly.

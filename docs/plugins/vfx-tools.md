@@ -1,11 +1,11 @@
-# VFX Tools Plugin
+# VFX Tools plugin
 
 `mere-vfx-tools` is the sequence-oriented production layer for native
 `mere.run` visual inference. The plugin owns shot plans, manifests, deterministic
 matte processing, hashes, exports, review media, and cleanup records. Model
 loading and inference remain in core `mere.run`.
 
-## Current workflows
+## Supported workflows
 
 - `roto` calls `mere.run vision track`, combines object masks by frame, applies
   grow/choke/feather operations, and can encode ProRes 4444 alpha media.

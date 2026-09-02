@@ -1,4 +1,4 @@
-# Klein LoRA Recipes
+# Klein LoRA recipes
 
 The canonical Klein flow has two phases:
 
@@ -11,7 +11,7 @@ Reference-image eval protocols live separately in `eval-recipes/`. Use
 `klein-times-square-kiss` when you need a fixed composition test for comparing
 style pull across multiple Klein LoRAs.
 
-## Style LoRA
+## Style LoRA recipe
 
 Use `klein-style-lora` for broad visual style.
 
@@ -29,13 +29,13 @@ Captioning:
 - do not mention that the image belongs to a dataset
 
 The style recipe delegates to `mere.run image train-lora --recipe
-klein-fast-style`, which currently selects the `fal-klein-fast` LoRA target
+klein-fast-style`, which selects the `fal-klein-fast` LoRA target
 preset, the Klein base model, low-memory CUDA settings, and 250-step
 checkpoints. The plugin recipe adds explicit sample generation against
 `image-klein-9b` so remote runs produce preview artifacts without relying on
 implicit local defaults.
 
-## Character LoRA
+## Character LoRA recipe
 
 Use `klein-character-lora` for identity portability.
 
@@ -43,7 +43,7 @@ Recommended use:
 
 - a recurring person or character
 - a mascot
-- a fictional subject that should survive scene changes
+- a fictional subject that remains recognizable across scene changes
 
 Captioning:
 
@@ -55,7 +55,7 @@ Captioning:
 - never write `same person`, `same character`, `previous image`, or
   `another view`
 
-Character LoRAs should be evaluated by changing the scene, pose, clothing,
+Evaluate character LoRAs by changing the scene, pose, clothing,
 medium, and camera distance. If the identity only works in the training outfit
 or training background, the adapter is overbound.
 

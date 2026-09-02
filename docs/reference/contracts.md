@@ -13,6 +13,10 @@ plugins, recipes, and downstream automation.
 | [`terminal-bench-report.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/terminal-bench-report.v1.schema.json) | Matched Terminal-Bench results and pairwise outcomes |
 | [`run-manifest.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/run-manifest.v1.schema.json) | Durable execution state |
 | [`artifact-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/artifact-bundle.v1.schema.json) | Fetched result inventory |
+| [`plugin-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/plugin-bundle.v1.schema.json) | Installable signed-plugin bundle |
+| [`plugin-bundle-envelope.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/plugin-bundle-envelope.v1.schema.json) | Signed publisher statement for a plugin bundle |
+| [`archive-benchmark.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-benchmark.v1.schema.json) | Archive benchmark cases, judgments, and change scenarios |
+| [`archive-benchmark-report.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-benchmark-report.v1.schema.json) | Archive benchmark metrics and evaluation results |
 | [`film-brief.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-brief.v1.schema.json) | User-confirmed film requirements and greenlight readiness |
 | [`film-department-result.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-department-result.v1.schema.json) | Structured proposal returned by a read-only Pi department |
 | [`film-production-plan.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-production-plan.v1.schema.json) | Accepted cast, location, sound, and shot plan |
@@ -28,22 +32,29 @@ plugins, recipes, and downstream automation.
 | [`film-animatic-handoff.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-animatic-handoff.v1.schema.json) | Verified cast, locations, shot timing, deterministic seeds, and media for native Animatic import |
 | [`workflow-graph.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-graph.v1.schema.json) | Portable executable graph |
 | [`graph-node-provider.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-provider.v1.schema.json) | Typed provider node catalog |
+| [`graph-node-invocation.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-invocation.v1.schema.json) | Confined graph-node request |
+| [`graph-node-preflight.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-preflight.v1.schema.json) | Structured node readiness report |
+| [`graph-node-event.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-event.v1.schema.json) | Streamed node progress, artifact, diagnostic, metric, and result events |
+| [`graph-run.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-run.v1.schema.json) | Portable graph execution record |
+| [`graph-template-catalog.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-template-catalog.v1.schema.json) | Discoverable reusable graph templates |
+| [`graph-template-package.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-template-package.v1.schema.json) | Confined user-published graph template |
 | [`workflow-program.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-program.v1.schema.json) | Reusable composition and static expansion source |
 | [`workflow-module.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-module.v1.schema.json) | Reusable imported graph module |
 | [`workflow-editor-sidecar.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-editor-sidecar.v1.schema.json) | Non-executable canvas state |
 
-See [Signed plugin bundles](/reference/plugin-bundles) for installable code, publisher verification, and activation requirements.
+For information about installable code, publisher verification, and activation,
+see [Signed plugin bundles](/reference/plugin-bundles).
 
 ## Versioning
 
 Contract identifiers carry an explicit version such as
 `mere.run/plugin-catalog.v1`. Additive implementation changes can remain within
 the version only when existing valid documents and consumers keep their meaning.
-Breaking shape or semantic changes require a new contract version.
+Breaking shape or semantic changes require another contract version.
 
 ## Change rule
 
-If a plugin needs a new contract field, update all affected surfaces together:
+If a plugin needs an additional contract field, update all affected surfaces together:
 
 - schema;
 - plugin implementation;

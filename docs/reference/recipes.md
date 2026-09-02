@@ -26,6 +26,6 @@ print secrets.
 
 ## Authoring rule
 
-A recipe should make cost and execution legible before a run. Include explicit
+A recipe must make cost and execution legible before a run. Include explicit
 inputs, exact commands, expected artifact locations, and cleanup expectations.
 Update docs and tests with every recipe contract change.

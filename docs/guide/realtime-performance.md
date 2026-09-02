@@ -6,7 +6,7 @@ run with MIDI control, a local stage, event logs, and optional audio capture.
 ## Create a show file
 
 ```bash
-mere.run plugin install mere-perform
+mere.run plugin install mere-perform --yes
 mere-perform show-template --output ./show.json
 ```
 

@@ -41,7 +41,7 @@ mere-terminal-bench run \
   /Volumes/SALVATION/mere-run-evidence/ornith-terminal-bench-2-1/run.json
 ```
 
-The first `doctor` command quickly checks Harbor, Docker, and `mere.run`. It
+The first `doctor` command checks Harbor, Docker, and `mere.run`. It
 doesn't inspect Docker storage or preflight models. The explicit `--deep` check
 adds those slower readiness checks and can take several minutes. Neither mode
 creates a Docker runtime or task container.

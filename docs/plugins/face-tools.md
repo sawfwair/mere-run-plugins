@@ -1,4 +1,4 @@
-# Face Tools
+# Face Tools plugin
 
 `mere-face-tools` turns native `mere.run` face detection and embeddings into a
 durable photo-library index and reference-face search. It traverses the library,
@@ -8,7 +8,7 @@ review artifacts. Core `mere.run` continues to own model download and inference.
 ## Install and check readiness
 
 ```bash
-mere.run plugin install mere-face-tools
+mere.run plugin install mere-face-tools --yes
 mere.run model pull vision-face-buffalo-l
 mere-face-tools doctor
 ```

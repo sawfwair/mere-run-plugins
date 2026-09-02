@@ -69,9 +69,9 @@ mere-perform devices
 Set `MERE_PERFORM_MERE_RUN` or pass `--mere-run-command` to target a source
 checkout or non-standard binary.
 
-## Prompt Palette
+## Prompt palette
 
-`show-template` now treats prompts as a performance palette. Each prompt can
+`show-template` treats prompts as a performance palette. Each prompt can
 carry:
 
 - `role`: stage meaning such as `texture`, `groove`, `lead`, or `space`
@@ -95,7 +95,7 @@ Keep anchors compact and musical: genre, instrumentation, texture/production,
 and energy. Solo prompts stay clean in JSON; the plugin adds the Magenta-style
 `SOLO ` runtime prefix when sending commands to `mere.run`.
 
-## MIDI Controller Stage
+## MIDI controller stage
 
 The plugin passes physical MIDI through to native `mere.run` with
 `--midi-input`, `--midi-channel`, `--midi-note-offset`, and repeatable

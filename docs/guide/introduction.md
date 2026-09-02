@@ -1,48 +1,62 @@
-# Introduction
+# Introduction to mere.run plugins
 
-The official `mere.run` plugins turn local model commands into repeatable
-production workflows. They are normal companion executables discovered through
-the live plugin catalog; they are not dynamically loaded into the core process.
+This guide is for people who run local AI production workflows or automate
+those workflows. It explains the boundary between `mere.run` and its official
+companion plugins.
 
-## What plugins add
+## Understand what plugins add
 
-Plugins cover the work around inference:
+Plugins turn individual inference commands into repeatable workflows. A plugin
+can:
 
-- validate tools, inputs, credentials, and output locations;
-- write an inspectable plan before execution;
-- call the installed `mere.run` runtime for canonical model behavior;
-- coordinate local tools or user-controlled providers;
-- record artifacts, hashes, status, and cleanup in `run.json`;
-- expose JSON-friendly command surfaces for agents and pipelines.
+- Validate tools, inputs, credentials, and output locations.
+- Write an inspectable plan before execution.
+- Call the installed `mere.run` runtime for canonical model behavior.
+- Coordinate local tools or user-controlled providers.
+- Record artifacts, hashes, status, and cleanup in a `run.json` file.
+- Provide machine-readable output for agents and pipelines.
 
-## What stays in core
+Plugins run as separate executables. `mere.run` doesn't load plugin code into
+the core process.
 
-Model discovery, download, loading, and native inference remain in `mere.run`.
-A plugin may select and compose core commands, but it must not ship a parallel
-model runtime or turn the core CLI into a hosted service.
+## Understand what stays in the core runtime
 
-## The product surface
+`mere.run` owns model discovery, download, storage, loading, and inference. A
+plugin can select and compose core commands, but it must not ship a competing
+model runtime.
 
-The catalog currently contains 13 official commands across five outcomes:
+This boundary keeps local inference behavior consistent. It also isolates
+plugin dependencies, permissions, provider failures, and upgrades.
 
-| Outcome | Plugins |
+## Choose a workflow category
+
+The catalog contains 18 official commands across the following workflow
+categories:
+
+| Category | Example tasks |
 | --- | --- |
-| Create | VFX Tools, Image Tools, Image Compose |
-| Perform | Perform |
-| Produce | Face Tools, Animatic Tools, ShotGrid Tools, Dataset Tools |
-| Protect | Document Tools, Media Scrub, Transcript Tools |
-| Scale | RunPod Runner, Batch Runner |
+| Create media | Generate images, prepare visual-effects shots, produce animatics, make short films, and perform music |
+| Process data | Analyze geospatial sources, search photo libraries, index archives, convert documents, and transcribe audio |
+| Automate work | Compile graphs, prepare datasets, run command batches, and preserve resumable manifests |
+| Use providers | Train adapters on RunPod and publish review artifacts to Flow Production Tracking |
+| Evaluate systems | Compare local agents with Terminal-Bench and run identity-adapter evaluations |
 
-See [Choose a plugin](/guide/choosing-a-plugin) for task-based routing or
-[All plugins](/plugins/) for the complete catalog.
+For a task-to-command mapping, see [Choose a
+plugin](/guide/choosing-a-plugin). For the complete catalog, see [Official
+plugins](/plugins/).
 
-## Design promises
+## Apply the operating guarantees
 
-- Local workflows remain local.
-- Provider resources remain in the user's account.
-- Paid work is visible in a plan before it starts.
+Official plugins follow these guarantees:
+
+- Local workflows keep their source data on the local machine unless the
+  documented workflow uses a provider.
+- Provider resources remain in your account.
+- Paid work appears in a plan before it starts.
 - Remote resources terminate by default.
-- JSON output stays on stdout; diagnostics go to stderr.
+- Commands that promise JSON write machine-readable data to stdout.
+- Commands write human-readable diagnostics to stderr.
 - A durable run manifest connects inputs, execution, artifacts, and cleanup.
 
-Next: [install and run a first plugin](/guide/getting-started).
+To install and run a plugin, continue to [Getting
+started](/guide/getting-started).

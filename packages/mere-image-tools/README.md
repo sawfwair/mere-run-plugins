@@ -39,7 +39,7 @@ mere.run vision segment frame.png \
   --mask-output-dir subject.sam31/masks
 ```
 
-Pass multiple `--prompt` values when a knockout should include a subject plus
+Pass multiple `--prompt` values when a knockout must include a subject plus
 props; the plugin combines the best SAM mask for each prompted label.
 
 The plugin writes a `run.json` manifest before execution, records output paths
