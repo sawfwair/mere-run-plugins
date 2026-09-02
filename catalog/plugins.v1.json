@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-09-02T11:21:29Z",
+  "updatedAt": "2026-09-02T14:13:16Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -187,7 +187,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-archive-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-archive-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-archive-tools/0.1.0-1/envelope.json"
+          }
         }
       }
     },
