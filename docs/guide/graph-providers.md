@@ -2,7 +2,7 @@
 
 Graph providers extend portable Mere workflows without putting private tools,
 hosted services, or domain-specific dependencies into the public `mere.run`
-runtime. They expose a typed catalog and execute one invocation through the
+runtime. They expose a typed catalog and run one invocation through the
 same process contract on local, SSH, and Relay workers.
 
 ## Start a provider

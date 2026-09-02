@@ -1,104 +1,109 @@
-# Mere Plugin Contract
+# Plugin contract
 
-Plugins are companion executables. They are not loaded into the `mere.run`
-process, and they do not extend the core command tree by mutating it at runtime.
+This reference is for plugin authors and automation maintainers. It defines the
+process boundary, required provider lifecycle, output streams, and discovery
+behavior for official `mere.run` plugins.
 
-This keeps the base CLI local-first while allowing official bridges to
-user-controlled services, machines, and workflow tools.
+Plugins are companion executables. `mere.run` doesn't load them into the core
+process or let them mutate the core command tree.
 
-## Required Commands
+## Implement discovery
 
-Every official plugin exposes:
+An installable plugin provides this command:
 
 ```text
-<plugin> manifest --json
-<plugin> doctor
-<plugin> plan ...
-<plugin> run ...
-<plugin> resume <run.json>
-<plugin> cleanup <run.json>
+PLUGIN_COMMAND manifest --json
 ```
 
-Provider plugins may expose additional helper commands when they are declared in
-the manifest. Helpers must follow the same stdout/stderr and security rules as
-the required commands, including dry-run or plan coverage for paid resource
-creation.
+The command prints a document that conforms to
+`contracts/plugin.v1.schema.json`. It describes the plugin identity,
+executable, commands, capabilities, output policy, and security posture.
 
-### `manifest --json`
+Discovery calls only `manifest --json`. It doesn't call `doctor`, `plan`,
+or `run`.
 
-Prints a manifest matching `contracts/plugin.v1.schema.json`.
+## Implement the provider lifecycle
 
-The manifest describes:
+Every provider plugin provides the following commands:
 
-- plugin name and version
-- executable name
-- supported commands
-- capabilities
-- stdout/stderr policy
-- security posture
+```text
+PLUGIN_COMMAND doctor
+PLUGIN_COMMAND plan ...
+PLUGIN_COMMAND run ...
+PLUGIN_COMMAND resume RUN_MANIFEST
+PLUGIN_COMMAND cleanup RUN_MANIFEST
+```
 
-### `doctor`
+Focused local and graph-provider plugins can expose a smaller surface when their
+catalog entry and manifest describe it.
 
-Checks local readiness without creating paid resources.
+### Check readiness with `doctor`
 
-Examples:
+The `doctor` command checks required executables, credentials, paths, and
+provider access. It must not create paid resources.
 
-- required executables
-- provider credentials are present
-- SSH key exists
-- output directories are writable
-- optional provider CLI is installed
+### Preview work with `plan`
 
-### `plan`
+The `plan` command validates inputs and writes a dry-run manifest with the
+`planned` status. For paid work, the manifest includes the resolved resource
+settings, command, expected artifacts, and cleanup policy.
 
-Writes a dry-run plan and prints a JSON run manifest with status `planned`.
+### Execute work with `run`
 
-`plan` must show:
+The `run` command executes a reviewed plan. A provider plugin writes
+`run.json` before it creates the first remote resource. After each state
+change, it updates the resource, artifact, failure, and cleanup fields.
 
-- recipe id
-- dataset path and pair count
-- exact training command
-- remote provider settings
-- cleanup default
-- expected artifact directory
+### Continue work with `resume`
 
-### `run`
+The `resume` command continues or inspects a run manifest. If the provider
+resource no longer exists, the command returns that state in a machine-readable
+result.
 
-Creates resources and executes work.
+### Remove resources with `cleanup`
 
-`run` must write `run.json` before the first paid resource is created. If the
-process fails, the plugin must update `run.json` with failure and cleanup status.
+The `cleanup` command removes remote resources referenced by a run manifest.
+It is idempotent and updates the cleanup state after each attempt.
 
-### `resume`
+## Add helper commands
 
-Continues or inspects an existing run manifest. A plugin may refuse resume when
-the remote resource is already gone, but it must say so in machine-readable
-terms.
+A plugin can expose helper commands in its manifest. A helper that creates paid
+resources must provide a plan or dry-run mode. Helper commands follow the same
+stream and secret-handling rules as lifecycle commands.
 
-### `cleanup`
+## Write to the correct stream
 
-Tears down any remote resource referenced by a run manifest. Cleanup must be
-idempotent.
+When a command promises JSON, paths, or newline-delimited JSON (NDJSON), it
+writes only that machine-readable value to stdout. It writes diagnostics and
+progress to stderr.
 
-## Streams
+A plugin must not write secrets to either stream.
 
-- stdout is machine-readable when the command promises JSON or paths.
-- stderr is for logs and diagnostics.
-- secrets must never appear on either stream.
+## Return consistent exit codes
 
-## Exit Codes
+Official plugins use these exit codes:
 
-- `0`: command succeeded.
-- `1`: expected operator-facing failure.
-- `2`: invalid CLI usage.
-- `3`: readiness check failed.
-- `4`: provider resource failure.
-- `5`: cleanup failed.
+| Code | Meaning |
+| ---: | --- |
+| `0` | The command succeeded |
+| `1` | An expected operator-facing failure occurred |
+| `2` | The command or input was invalid |
+| `3` | A readiness check failed |
+| `4` | A provider resource operation failed |
+| `5` | Cleanup failed |
 
-## Discovery
+For automation guidance, see [Exit codes](/reference/exit-codes).
 
-The future core discovery rule is simple: scan `PATH` for executables named
-`mere-*`, call `manifest --json`, then validate the result against
-`plugin.v1.schema.json`.
+## Publish the plugin
 
-Core discovery should not execute plugin `doctor`, `plan`, or `run`.
+Add the package source, manifest, tests, catalog entry, and documentation in one
+change. Before you open a pull request, run:
+
+```bash
+./scripts/check.sh
+corepack pnpm docs:coverage
+corepack pnpm docs:build
+```
+
+For schema details, see [Contract schemas](/reference/contracts). For resource
+rules, see [Provider safety](/operations/provider-safety).

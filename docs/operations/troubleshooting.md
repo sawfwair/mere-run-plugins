@@ -6,7 +6,7 @@ Confirm installation and shell path:
 
 ```bash
 mere.run plugin list
-mere.run plugin install mere-image-tools
+mere.run plugin install mere-image-tools --yes
 command -v mere-image-tools
 ```
 

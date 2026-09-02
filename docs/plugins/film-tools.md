@@ -1,4 +1,4 @@
-# Film Studio
+# Film Studio plugin
 
 `mere-film-tools` is a Pi-powered producer-director for short films. A user can
 start with one sentence, resolve only the requirements that materially affect
@@ -15,7 +15,7 @@ Install Pi using its current `@earendil-works/pi-coding-agent` package, ensure
 `mere.run`, FFmpeg, and FFprobe are available, then install the plugin:
 
 ```bash
-mere.run plugin install mere-film-tools
+mere.run plugin install mere-film-tools --yes
 mere-film-tools doctor
 mere-film-tools plan \
   --idea "A lighthouse keeper receives a signal from a vanished ship" \

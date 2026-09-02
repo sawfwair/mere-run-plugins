@@ -1,4 +1,4 @@
-# Geospatial Tools
+# Geospatial Tools plugin
 
 `mere-geo-tools` is the portable workflow layer around core `mere.run` geo
 models. It prepares exact source imagery, preserves raster and preprocessing
@@ -14,7 +14,7 @@ provenance, invokes native Swift/MLX inference, and georeferences the result.
 ## Install and inspect
 
 ```bash
-mere.run plugin install mere-geo-tools
+mere.run plugin install mere-geo-tools --yes
 mere-geo-tools manifest --json
 mere-geo-tools doctor --json
 mere-geo-tools graph catalog --json

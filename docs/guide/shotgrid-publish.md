@@ -6,7 +6,7 @@ Tracking without moving inference into ShotGrid.
 ## Check configuration
 
 ```bash
-mere.run plugin install mere-shotgrid-tools
+mere.run plugin install mere-shotgrid-tools --yes
 mere-shotgrid-tools doctor
 ```
 

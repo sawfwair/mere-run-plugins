@@ -1,4 +1,4 @@
-# Identity Tools
+# Identity Tools plugin
 
 `mere-identity-tools` is the product-neutral graph-provider facade for local
 identity work. It advertises curriculum generation, text-LoRA training,
@@ -8,7 +8,7 @@ calling application or local artifact paths.
 ## Install
 
 ```bash
-mere.run plugin install mere-identity-tools
+mere.run plugin install mere-identity-tools --yes
 ```
 
 Identity Tools deliberately separates the public Relay contract from the local
@@ -34,7 +34,7 @@ mere-identity-tools stage ./source.jsonl \
 The backend is executed directly, without a shell. It must implement the
 `mere.run/plugin-graph-provider.v1` preflight and event-stream contracts.
 
-## Public graph nodes
+## Use public graph nodes
 
 - `identity.curriculum.generate`
 - `identity.text-lora.train`

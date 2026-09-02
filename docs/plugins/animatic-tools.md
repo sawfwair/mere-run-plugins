@@ -1,4 +1,4 @@
-# Animatic Tools Plugin
+# Animatic Tools plugin
 
 `mere-animatic-tools` contains local production helpers for Animatic workflows
 served by a `mere.run` relay node.
@@ -63,7 +63,7 @@ of advertising a false-ready Sets runtime.
 }
 ```
 
-## Request Shape
+## Request shape
 
 Each one-shot command accepts `--request-json` with an object shaped for relay
 tool jobs:
@@ -108,7 +108,7 @@ Every successful run records uploadable artifact items in:
 The relay node uploads each artifact and returns URLs to Animatic. Animatic then
 stores them as project assets under the requested parent.
 
-## Character Knockout
+## Character knockout
 
 `character-knockout` uses `mere-image-tools knockout` when that executable is
 available. If `mere-image-tools` or native `mere.run vision segment` is not

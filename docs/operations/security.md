@@ -29,8 +29,8 @@ review `plan`, and verify cleanup after every remote run.
 ## Dependencies and source
 
 Catalog installation specs point to the public repository and explicit package
-subdirectories. Release changes should be reviewed with the same attention as
-runtime code because plugins can invoke local tools and provider APIs.
+subdirectories. Review release changes with the same attention as runtime code
+because plugins can invoke local tools and provider APIs.
 
 ## Reporting
 

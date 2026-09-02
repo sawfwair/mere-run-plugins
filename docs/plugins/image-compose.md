@@ -1,4 +1,4 @@
-# Image Compose
+# Image Compose plugin
 
 `mere-image-compose` turns a local image generation command into a repeatable
 composition with recorded prompts, model settings, references, LoRAs, seed,
@@ -7,7 +7,7 @@ dimensions, artifacts, and hashes.
 ## Install and generate
 
 ```bash
-mere.run plugin install mere-image-compose
+mere.run plugin install mere-image-compose --yes
 mere-image-compose doctor
 mere-image-compose generate \
   --prompt "cinematic product render on warm paper" \
@@ -32,7 +32,7 @@ mere-image-compose generate \
 
 ## Planned composition
 
-Use `plan` with the same generation flags to write `run.json`, then execute it
+Use `plan` with the same generation flags to write `run.json`, then run it
 with `run`. This is useful when a pipeline or reviewer must approve the complete
 composition before inference.
 

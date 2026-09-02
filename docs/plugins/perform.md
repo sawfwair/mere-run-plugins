@@ -51,7 +51,7 @@ to launch the default browser after the local server starts:
 mere-perform stage ./runs/heart-demo/run.json --serve --open --port 8765
 ```
 
-## Show File
+## Show file
 
 `show-template` prints a starter `mere.run/perform-show.v1` JSON file:
 
@@ -79,7 +79,7 @@ Scene prompts are not sent automatically in the default instrument mode. With
 mappings are passed through to the native CoreMIDI surface. Incoming note
 transposition is passed through to native `--midi-note-offset`.
 
-## Prompt Strategy
+## Prompt strategy
 
 Author prompts as compact musical anchors, not paragraph-length song requests.
 The useful shape is:
@@ -129,7 +129,7 @@ note-following lead or instrument prompts. Solo mode keeps the authored prompt
 clean in the show file and sends the Magenta-style `SOLO ` runtime prefix to
 `mere.run`.
 
-Patches should usually reference palette nodes by `promptId` instead of
+We recommend that patches reference palette nodes by `promptId` instead of
 duplicating prompt text. They become timed prompt changes only when the run uses
 `--sequence-scenes`:
 
@@ -151,7 +151,7 @@ Magenta RT2 is strongest for instrumental realtime steering. If a show needs
 lyrics or explicit sung words, route that scene through another `mere.run`
 music surface rather than trying to force lyrics through the realtime prompt.
 
-## MIDI Controller Layer
+## MIDI controller layer
 
 `mere-perform` does not reimplement CoreMIDI. Physical MIDI notes and CCs stay
 inside `mere.run music realtime`; the plugin records the intended controller

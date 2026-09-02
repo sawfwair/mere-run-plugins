@@ -18,7 +18,7 @@ Create changes inside the relevant package and update its tests. Keep stdout
 machine-readable wherever the command promises JSON; write diagnostics to
 stderr.
 
-If a new contract field is needed, update contracts, examples, documentation,
+If an additional contract field is needed, update contracts, examples, documentation,
 and tests in the same change.
 
 ## Local docs workflow

@@ -3,15 +3,15 @@
 Use VFX Tools when the result is a shot-level package rather than one isolated
 model call.
 
-## 1. Install and inspect
+## Install and inspect
 
 ```bash
-mere.run plugin install mere-vfx-tools
+mere.run plugin install mere-vfx-tools --yes
 mere-vfx-tools doctor
 mere-vfx-tools manifest --json
 ```
 
-## 2. Write a request
+## Write a request
 
 Each tool accepts a JSON document with `inputs` and `options`:
 
@@ -22,7 +22,7 @@ Each tool accepts a JSON document with `inputs` and `options`:
 }
 ```
 
-## 3. Plan the pass
+## Plan the pass
 
 ```bash
 mere-vfx-tools plan \
@@ -32,22 +32,22 @@ mere-vfx-tools plan \
   --run-id shot-010-roto
 ```
 
-Inspect `./runs/shot-010-roto/run.json`, then execute:
+Inspect `./runs/shot-010-roto/run.json`, and then run:
 
 ```bash
 mere-vfx-tools run ./runs/shot-010-roto/run.json
 ```
 
-## 4. Chain verified outputs
+## Chain verified outputs
 
 A production path can use the resulting masks for matte refinement, tracking,
 clean-plate generation, relighting, alpha delivery, or shot QC. Each pass gets
 its own manifest and artifact hashes, so the handoff stays explicit.
 
-## 5. Publish for review
+## Publish for review
 
-Use [ShotGrid Tools](/guide/shotgrid-publish) when the approved artifact should
-become a review Version or update a task.
+To publish the approved artifact as a review Version or update a task, use
+[ShotGrid Tools](/guide/shotgrid-publish).
 
 See [VFX Tools](/plugins/vfx-tools) for the supported workflow families and
 native handoff guarantees.

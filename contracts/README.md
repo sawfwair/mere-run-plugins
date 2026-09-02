@@ -15,6 +15,13 @@ companion plugins.
 - `run-manifest.v1.schema.json`: durable execution record written before remote
   resources are created.
 - `artifact-bundle.v1.schema.json`: fetched result bundle inventory.
+- `plugin-bundle.v1.schema.json`: installable signed-plugin bundle.
+- `plugin-bundle-envelope.v1.schema.json`: signed publisher statement for a
+  plugin bundle.
+- `archive-benchmark.v1.schema.json`: archive benchmark cases, judgments, and
+  change scenarios.
+- `archive-benchmark-report.v1.schema.json`: archive benchmark metrics and
+  evaluation results.
 - `film-brief.v1.schema.json`: user-confirmed story, audience, creative, and
   delivery requirements held at the first approval gate.
 - `film-department-result.v1.schema.json`: read-only Pi department proposal
@@ -65,7 +72,7 @@ companion plugins.
   positions, groups, notes, saved selections, and viewport state stored
   separately from executable graphs.
 
-Contracts should remain language-neutral. Provider-specific behavior belongs in
+Contracts must remain language-neutral. Provider-specific behavior belongs in
 plugin code and docs, not in the schemas.
 
 Document Tools reuses the open `plugin-run.v1` extension fields for AnyDoc;

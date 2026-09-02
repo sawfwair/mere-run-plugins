@@ -1,51 +1,73 @@
-# Getting started
+# Get started with a plugin
 
-## Prerequisites
+This guide is for `mere.run` users who want to install and run an official
+plugin. It uses Image Tools because the first workflow runs locally and doesn't
+require provider credentials.
 
-Install a working `mere.run` CLI first. Most plugins call it directly, so verify
-the core executable before debugging a plugin:
+## Before you begin
+
+Install `mere.run`, and verify that the core command works:
 
 ```bash
 mere.run --help
-mere.run models list
+mere.run model list
 ```
 
-Provider-specific workflows can require additional credentials or tools. The
-plugin's `doctor` command reports those requirements without creating resources.
+For a provider workflow, you might also need provider credentials or external
+tools. The plugin's `doctor` command reports those requirements without
+creating resources.
 
-## Discover the catalog
+## Inspect the catalog
+
+To list the official plugins, run:
 
 ```bash
 mere.run plugin list
 ```
 
-The catalog is also available as JSON at
-[`plugins.mere.run/catalog/plugins.v1.json`](https://plugins.mere.run/catalog/plugins.v1.json).
+To inspect one catalog entry and its installation source, run:
 
-## Install a plugin
+```bash
+mere.run plugin info mere-image-tools
+```
+
+The [live plugin catalog](https://plugins.mere.run/catalog/plugins.v1.json) is
+also available as JSON.
+
+## Install Image Tools
+
+To preview the installation command without running it, omit `--yes`:
 
 ```bash
 mere.run plugin install mere-image-tools
 ```
 
-For direct development installs, every catalog entry points to a package
-subdirectory in the public repository:
+To install the plugin, confirm the command:
 
 ```bash
-pipx install "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-image-tools"
+mere.run plugin install mere-image-tools --yes
 ```
 
-## Check readiness
+## Check the installation
+
+To verify local dependencies, run:
 
 ```bash
 mere-image-tools doctor
+```
+
+To inspect the plugin's capabilities and command contract, run:
+
+```bash
 mere-image-tools manifest --json
 ```
 
-`doctor` checks the machine. `manifest --json` describes the command surface,
-capabilities, output policy, and security posture.
+The `doctor` command checks the machine. The `manifest --json` command
+describes the plugin and doesn't perform a readiness check or workflow.
 
-## Plan before execution
+## Plan a subject knockout
+
+To write a plan without running inference, run:
 
 ```bash
 mere-image-tools plan \
@@ -55,13 +77,22 @@ mere-image-tools plan \
   --prompt subject
 ```
 
-Planning writes a `run.json` with status `planned`. Inspect it, then execute:
+The command writes a `run.json` file with the `planned` status. Review the
+resolved command, input paths, output paths, and cleanup policy in that file.
+
+## Run the plan
+
+To execute the reviewed plan, pass its manifest to `run`:
 
 ```bash
 mere-image-tools run ./subject.run.json
 ```
 
-Or use the one-shot workflow when you do not need a separate approval step:
+The exact manifest path appears in the `plan` output. Keep the `run.json` file
+with the generated artifacts.
+
+For an interactive local task that doesn't require a separate approval step,
+use the one-shot command:
 
 ```bash
 mere-image-tools knockout \
@@ -71,15 +102,13 @@ mere-image-tools knockout \
   --prompt subject
 ```
 
-## Keep the run manifest
+## Continue with another workflow
 
-Do not treat `run.json` as a temporary log. It is the durable record needed to
-inspect, resume, clean up, and verify a run. See
-[Artifacts and runs](/guide/artifacts-and-runs).
-
-## Next steps
-
-- [Choose a plugin](/guide/choosing-a-plugin)
-- [Understand the lifecycle](/guide/lifecycle)
-- [Build a VFX shot](/guide/vfx-shot)
-- [Keep sensitive workflows private](/guide/private-workflows)
+- To select a plugin by task, see [Choose a
+  plugin](/guide/choosing-a-plugin).
+- To understand shared commands, see [Plugin
+  lifecycle](/guide/lifecycle).
+- To preserve and inspect workflow evidence, see [Artifacts and
+  runs](/guide/artifacts-and-runs).
+- To operate paid resources, see [Provider
+  safety](/operations/provider-safety).

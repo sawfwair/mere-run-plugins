@@ -1,18 +1,18 @@
-# RunPod Plugin
+# RunPod Runner plugin
 
 `mere-runpod` runs `mere.run` workflows on ephemeral RunPod pods owned by the
 user.
 
 The first supported workflow is FLUX.2 Klein LoRA training.
 
-## Why This Is A Plugin
+## Plugin boundary
 
 The core `mere.run` repo is local-first. RunPod creates paid remote compute, so
 it belongs in an explicit companion plugin. The plugin still runs the normal
 `mere.run image train-lora` command remotely, which keeps training behavior
 aligned with local runs.
 
-## Required Inputs
+## Required inputs
 
 - `RUNPOD_API_KEY`
 - SSH private/public key registered with RunPod
@@ -51,7 +51,7 @@ log, and small metadata files. Intermediate checkpoint safetensors are skipped
 unless `--fetch-checkpoints` is passed. Pass `--keep-pod` only for active
 debugging.
 
-## Build Pack Strategy
+## Build pack strategy
 
 The plugin requires a build pack for real remote runs. This avoids spending H100
 minutes compiling Swift and CUDA dependencies on every run. The build pack must
@@ -62,7 +62,7 @@ Bootstrap/source packs that contain `source.tar.gz` and a wrapper `bin/mere.run`
 compile on the paid pod. The plugin rejects those packs by default; pass
 `--allow-bootstrap-build-pack` only for an intentional slow debug run.
 
-## Network Volume Strategy
+## Network volume strategy
 
 For fast repeated training, use a RunPod network volume as the persistent model
 cache:

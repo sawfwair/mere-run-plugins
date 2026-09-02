@@ -17,7 +17,7 @@ The Klein style recipe expects paired image and caption files. You can use
 ## Check credentials and tools
 
 ```bash
-mere.run plugin install mere-runpod
+mere.run plugin install mere-runpod --yes
 mere-runpod doctor
 ```
 

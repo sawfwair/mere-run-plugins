@@ -1,4 +1,4 @@
-# Dataset Tools
+# Dataset Tools plugin
 
 `mere-dataset-tools` prepares local image datasets for LoRA workflows with
 captions, optional OCR sidecars, trigger tokens, focus guidance, and a contact
@@ -7,7 +7,7 @@ sheet.
 ## Install and caption
 
 ```bash
-mere.run plugin install mere-dataset-tools
+mere.run plugin install mere-dataset-tools --yes
 mere-dataset-tools doctor
 mere-dataset-tools caption \
   --input ./dataset \
@@ -17,7 +17,7 @@ mere-dataset-tools caption \
   --contact-sheet
 ```
 
-Add `--ocr` when visible text should be extracted into sidecars. Use
+To extract visible text into sidecars, add `--ocr`. Use
 `--prompt` to supply caption guidance and repeat `--focus` for multiple
 priorities.
 

@@ -1,4 +1,4 @@
-# Klein Reference Evaluation Recipes
+# Klein reference evaluation recipes
 
 Reference-image LoRA evals test whether an adapter can pull a neutral source
 image into the learned style while preserving a fixed composition. They are
@@ -6,7 +6,7 @@ recipes for comparing adapters, not model-training recipes.
 
 Machine-readable eval recipes live in `eval-recipes/`.
 
-## Times Square Kiss
+## Times Square Kiss recipe
 
 Use `klein-times-square-kiss` when comparing Klein style LoRAs against the same
 source photograph.
@@ -50,4 +50,3 @@ Guidance:
 - Store private source images, LoRAs, and generated eval outputs outside the
   public core repo. A project-local path such as
   `data/lora-evals/times-square-kiss/` is appropriate for artifacts.
-

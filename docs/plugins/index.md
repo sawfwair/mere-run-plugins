@@ -27,11 +27,12 @@ The live catalog contains 18 official companion executables.
 
 ```bash
 mere.run plugin list
-mere.run plugin install mere-vfx-tools
+mere.run plugin install mere-vfx-tools --yes
 ```
 
 Catalog IDs are stable machine identifiers. Some shared-package plugins have an
 ID that matches the executable rather than the Python distribution name.
+Omit `--yes` to preview the resolved installation command.
 
 ## Shared contract
 
