@@ -1,0 +1,65 @@
+Third-party notices for Archive Tools
+====================================
+
+This file preserves notices for AnyDoc 0.2.4 and its pdf-inspector 1.14.2
+component. The mere-archive-tools package installs firecrawl-anydoc as a
+separate dependency. It does not vendor the dependency's source or binaries.
+
+These notices supplement, rather than replace, the licenses and notices for
+other dependencies. This file is not a complete dependency license inventory.
+Before redistributing dependencies, review the resolved versions and preserve
+all applicable notices. Update this file when the reviewed licenses change.
+
+AnyDoc 0.2.4, including the firecrawl-anydoc Python bindings
+---------------------------------------------------------
+Source: https://github.com/firecrawl/anydoc/tree/v0.2.4
+License: https://github.com/firecrawl/anydoc/blob/v0.2.4/LICENSE
+
+MIT License
+
+Copyright (c) 2026 Sideguide Technologies Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+pdf-inspector 1.14.2
+--------------------
+Source: https://github.com/firecrawl/pdf-inspector/tree/v1.14.2
+License: https://github.com/firecrawl/pdf-inspector/blob/v1.14.2/LICENSE
+
+MIT License
+
+Copyright (c) 2026 Firecrawl
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

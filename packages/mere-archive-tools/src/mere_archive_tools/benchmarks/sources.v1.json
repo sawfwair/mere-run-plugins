@@ -1,0 +1,31 @@
+{
+  "contractVersion": "mere.run/archive-benchmark-sources.v1",
+  "datasets": {
+    "govdocs1-shard-000": {
+      "archiveBytes": 486762106,
+      "archiveSha1": "c444d5b3c916183543027a4a1270bef294ba79f5",
+      "archiveUrl": "https://downloads.digitalcorpora.org/corpora/files/govdocs1/zipfiles/000.zip",
+      "homepage": "https://digitalcorpora.org/corpora/file-corpora/files/",
+      "license": "Review the source collection terms before redistribution",
+      "purpose": "Parser coverage, malformed-file handling, throughput, and resume behavior",
+      "retrievalGroundTruth": false
+    },
+    "mere-archive-gauntlet": {
+      "generator": "mere-archive-tools",
+      "license": "MIT",
+      "networkRequired": false,
+      "purpose": "Deterministic custody, privacy, deduplication, mutation, tier, and retrieval checks",
+      "retrievalGroundTruth": true
+    },
+    "vidore-government-reports": {
+      "homepage": "https://huggingface.co/datasets/vidore/syntheticDocQA_government_reports_test",
+      "license": "MIT",
+      "parquetBytes": 338596059,
+      "parquetPath": "data/test-00000-of-00001.parquet",
+      "parquetSha256": "2e17b2fbadba82f5ae8e4ea2defb51b119250e8a6e82d8bf39006667256039d2",
+      "purpose": "Real visually rich page retrieval with query relevance judgments",
+      "retrievalGroundTruth": true,
+      "revision": "91cf66572d89c9cccac0661de227acaf04b44f64"
+    }
+  }
+}

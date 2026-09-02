@@ -19,6 +19,20 @@ mere-doc-tools process \
 Use [Document Tools](/plugins/document-tools) for a single document or small
 document set.
 
+## Shared drives
+
+```bash
+mere-archive-tools index \
+  --source /Volumes/Shared \
+  --database ./archive.sqlite3 \
+  --output-dir ./archive-run \
+  --storage-tier safe-content
+```
+
+Use [Archive Tools](/plugins/archive-tools) for a large, mixed collection of
+documents and images. The plugin reduces PII before it stores derived text or
+embeddings. Source files remain unchanged.
+
 ## Media frames
 
 ```bash

@@ -91,8 +91,10 @@ failed-update/rollback behavior. Optional programs such as Blender stay
 visible in `doctor`; they are not silently installed or treated as mandatory
 for unrelated local workflows. A valid signature alone is not a workflow test.
 
-Reviewed recipes cover Workflow, Image, Face, Animatic, VFX, Perform, Film
-Studio, Geospatial, and Terminal-Bench tools. The Terminal-Bench recipe includes
+Reviewed recipes cover Workflow, Archive, Image, Face, Animatic, VFX, Perform,
+Film Studio, Geospatial, and Terminal-Bench tools. The Archive Tools bundle
+includes AnyDoc and its native license inventory; it does not depend on a user
+Python installation or package manager. The Terminal-Bench recipe includes
 the pinned Harbor runtime and invokes it through the plugin's restricted frozen
 entrypoint. It doesn't include Docker, task images, task data, model weights,
 credentials, or benchmark results. Its bundle notice also preserves the exact

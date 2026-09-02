@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-09-01T01:35:13Z",
+  "updatedAt": "2026-09-02T11:21:29Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -158,6 +158,36 @@
           "bundles": {
             "macos-arm64": "https://mere.run/releases/plugins/mere-face-tools/0.1.0-1/release.json"
           }
+        }
+      }
+    },
+    {
+      "id": "mere-archive-tools",
+      "name": "Archive Tools",
+      "description": "Build and search a local PII-reduced shared-drive index without modifying source files.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-archive-tools",
+      "subdirectory": "packages/mere-archive-tools",
+      "entrypoint": "mere-archive-tools",
+      "capabilities": [
+        "archive-index",
+        "shared-drive",
+        "document-conversion",
+        "captioning",
+        "ocr",
+        "pii-reduction",
+        "multimodal-embeddings",
+        "semantic-search",
+        "full-text-search",
+        "sqlite",
+        "deduplication",
+        "archive-benchmark"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-archive-tools"
         }
       }
     },

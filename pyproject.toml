@@ -2,6 +2,7 @@
 target-version = "py39"
 line-length = 120
 src = [
+  "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
   "packages/mere-face-tools/src",
@@ -46,6 +47,7 @@ pretty = true
 warn_unreachable = true
 explicit_package_bases = true
 mypy_path = [
+  "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
   "packages/mere-face-tools/src",
@@ -59,6 +61,7 @@ mypy_path = [
   "packages/mere-geo-tools/src",
 ]
 files = [
+  "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
   "packages/mere-face-tools/src",
@@ -94,6 +97,7 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 source = [
+  "packages/mere-archive-tools/src/mere_archive_tools",
   "packages/mere-animatic-tools/src/mere_animatic_tools",
   "packages/mere-image-tools/src/mere_image_tools",
   "packages/mere-face-tools/src/mere_face_tools",

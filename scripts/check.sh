@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-archive-tools/src:$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -29,9 +29,10 @@ if rg -n 'ignore_errors\s*=\s*true' pyproject.toml; then
   echo "Whole-module mypy exemptions are forbidden." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-runpod/src packages/mere-terminal-bench/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-archive-tools/src packages/mere-runpod/src packages/mere-terminal-bench/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
-"$PYTHON" -m coverage run -m unittest discover -s packages/mere-runpod/tests
+"$PYTHON" -m coverage run -m unittest discover -s packages/mere-archive-tools/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-runpod/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-terminal-bench/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-image-tools/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-face-tools/tests
@@ -48,6 +49,7 @@ fi
 "$PYTHON" scripts/check_plugin_bundles.py
 
 unset PYTHONPATH
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-archive-tools
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-runpod
 if "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
   "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-terminal-bench
@@ -77,6 +79,18 @@ import sys
 import tempfile
 import zipfile
 from importlib import resources
+
+archive_source_notices = pathlib.Path(
+    "packages/mere-archive-tools/src/mere_archive_tools/THIRD_PARTY_NOTICES.txt"
+)
+archive_installed_notices = resources.files("mere_archive_tools").joinpath(
+    "THIRD_PARTY_NOTICES.txt"
+)
+if (
+    not archive_installed_notices.is_file()
+    or archive_installed_notices.read_bytes() != archive_source_notices.read_bytes()
+):
+    raise SystemExit("installed Archive Tools package omitted or changed third-party notices")
 
 source_notices = pathlib.Path("packages/mere-workflow-tools/src/mere_workflow_tools/THIRD_PARTY_NOTICES.txt")
 installed_notices = resources.files("mere_workflow_tools").joinpath("THIRD_PARTY_NOTICES.txt")
@@ -267,6 +281,63 @@ result = subprocess.run(
 )
 if '"runId": "installed-face-smoke"' not in result.stdout:
     raise SystemExit("installed face-tools smoke did not produce expected run manifest")
+
+archive_cli = pathlib.Path(sys.executable).with_name("mere-archive-tools")
+archive_source = root / "archive-source"
+archive_source.mkdir()
+(archive_source / "proposal.txt").write_text("Halifax installation proposal")
+result = subprocess.run(
+    [
+        str(archive_cli),
+        "plan",
+        "--source",
+        str(archive_source),
+        "--database",
+        str(root / "archive.sqlite3"),
+        "--output-dir",
+        str(root / "archive-index"),
+        "--run-id",
+        "installed-archive-smoke",
+        "--mere-run-command",
+        "fake-mere-run",
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+if '"runId": "installed-archive-smoke"' not in result.stdout:
+    raise SystemExit("installed archive-tools smoke did not produce expected run manifest")
+result = subprocess.run(
+    [str(archive_cli), "benchmark", "sources"],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+archive_sources = json.loads(result.stdout)["datasets"]
+if "vidore-government-reports" not in archive_sources or "govdocs1-shard-000" not in archive_sources:
+    raise SystemExit("installed archive-tools package omitted its benchmark source catalog")
+archive_benchmark = root / "archive-benchmark"
+result = subprocess.run(
+    [
+        str(archive_cli),
+        "benchmark",
+        "prepare",
+        "--output-dir",
+        str(archive_benchmark),
+    ],
+    cwd=root,
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    check=True,
+)
+archive_benchmark_result = json.loads(result.stdout)
+if archive_benchmark_result["sourceFiles"] != 18:
+    raise SystemExit("installed archive-tools benchmark generated the wrong file count")
 
 animatic_cli = pathlib.Path(sys.executable).with_name("mere-animatic-tools")
 request = root / "animatic-request.json"

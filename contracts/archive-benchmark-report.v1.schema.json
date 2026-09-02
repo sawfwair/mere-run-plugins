@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/archive-benchmark-report.v1.schema.json",
+  "title": "mere.run Archive Benchmark Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "createdAt",
+    "passed",
+    "dataset",
+    "phase",
+    "database",
+    "databaseSizeBytes",
+    "checks",
+    "retrieval"
+  ],
+  "properties": {
+    "contractVersion": { "const": "mere.run/archive-benchmark-report.v1" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "phase": { "type": "string", "minLength": 1 },
+    "database": { "type": "string", "minLength": 1 },
+    "databaseSizeBytes": { "type": "integer", "minimum": 0 },
+    "checks": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "passed", "detail"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" },
+          "detail": {}
+        }
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scored",
+        "queryCount",
+        "recallAt1",
+        "recallAt5",
+        "recallAt10",
+        "hitRateAt1",
+        "hitRateAt5",
+        "hitRateAt10",
+        "mrrAt10",
+        "searchLatencyMs",
+        "queries"
+      ],
+      "properties": {
+        "scored": { "type": "boolean" },
+        "queryCount": { "type": "integer", "minimum": 0 },
+        "recallAt1": { "$ref": "#/$defs/nullableScore" },
+        "recallAt5": { "$ref": "#/$defs/nullableScore" },
+        "recallAt10": { "$ref": "#/$defs/nullableScore" },
+        "hitRateAt1": { "$ref": "#/$defs/nullableScore" },
+        "hitRateAt5": { "$ref": "#/$defs/nullableScore" },
+        "hitRateAt10": { "$ref": "#/$defs/nullableScore" },
+        "mrrAt10": { "$ref": "#/$defs/nullableScore" },
+        "searchLatencyMs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mean", "p50", "p95", "maximum"],
+          "properties": {
+            "mean": { "$ref": "#/$defs/nullableNonnegative" },
+            "p50": { "$ref": "#/$defs/nullableNonnegative" },
+            "p95": { "$ref": "#/$defs/nullableNonnegative" },
+            "maximum": { "$ref": "#/$defs/nullableNonnegative" }
+          }
+        },
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "relevantDocumentIds", "retrievedResults", "firstRelevantRank"],
+            "properties": {
+              "id": { "type": "string" },
+              "relevantDocumentIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "retrievedResults": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["rank", "documentIds"],
+                  "properties": {
+                    "rank": { "type": "integer", "minimum": 1 },
+                    "documentIds": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              },
+              "firstRelevantRank": {
+                "type": ["integer", "null"],
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nullableScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nullableNonnegative": {
+      "type": ["number", "null"],
+      "minimum": 0
+    }
+  }
+}

@@ -152,6 +152,38 @@ mere-face-tools search \
 Search writes ranked JSON and CSV, a contact sheet, and symlink-only review
 folders. It never changes or copies the source photo library.
 
+## Archive Tools Plugin
+
+`mere-archive-tools` builds a searchable SQLite index from a read-only shared
+drive. It combines local AnyDoc conversion with `mere.run` captioning, OCR, PII
+reduction, and shared text and image embeddings.
+
+```bash
+mere.run plugin install mere-archive-tools --yes
+mere-archive-tools index \
+  --source /Volumes/Shared \
+  --database ./archive.sqlite3 \
+  --output-dir ./archive-run \
+  --storage-tier safe-content
+mere-archive-tools search \
+  --database ./archive.sqlite3 \
+  --query "Halifax installation photos"
+```
+
+Choose `full-content`, `safe-content`, or `pointers` to control how much
+PII-reduced material the index retains. All tiers store source pointers and
+embeddings. The plugin never modifies source files.
+
+Archive Tools also includes a generated mixed-file benchmark with fake PII
+canaries, retrieval judgments, exact duplicates, and a controlled mutation
+phase. Pinned ViDoRe and GovDocs1 adapters download public test data only when
+requested:
+
+```bash
+mere-archive-tools benchmark prepare --output-dir ./archive-benchmark
+mere-archive-tools benchmark sources
+```
+
 ## Workflow Tools
 
 `mere-workflow-tools` installs six focused companion commands that turn common
@@ -410,6 +442,7 @@ packages/mere-runpod/      first official provider plugin
 packages/mere-terminal-bench/ local Terminal-Bench orchestration plugin
 packages/mere-image-tools/ local image-production plugin
 packages/mere-face-tools/  local face-library indexing and search plugin
+packages/mere-archive-tools/ local shared-drive indexing and search plugin
 packages/mere-workflow-tools/ local document, media, dataset, transcript, image, and batch tools
 packages/mere-animatic-tools/ local Animatic production helpers
 packages/mere-film-tools/    Pi-powered governed short-film studio

@@ -4,7 +4,7 @@ This site covers every public product surface in the repository.
 
 | Surface | Source of truth | Documentation |
 | --- | --- | --- |
-| 17 catalog entries | `catalog/plugins.v1.json` | [Plugin catalog](/plugins/) and one page per entry |
+| 18 catalog entries | `catalog/plugins.v1.json` | [Plugin catalog](/plugins/) and one page per entry |
 | Plugin discovery and lifecycle | `contracts/plugin.v1.schema.json` | [Plugin contract](/plugins/contract), [CLI lifecycle](/reference/cli) |
 | Durable runs | `contracts/run-manifest.v1.schema.json` | [Run manifest](/reference/run-manifest), [Artifacts and runs](/guide/artifacts-and-runs) |
 | Artifact fetches | `contracts/artifact-bundle.v1.schema.json` | [Contracts](/reference/contracts) |
