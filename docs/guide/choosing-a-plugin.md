@@ -6,6 +6,7 @@ Start from the outcome, not the model.
 | --- | --- | --- |
 | Segment flood/fire candidates or create Earth-observation embeddings | [`mere-geo-tools`](/plugins/geo-tools) | Typed STAC inputs, content-addressed rasters, hardware-scaled native models, and explicit evidence boundaries |
 | Index a photo library or find photos of the same person | [`mere-face-tools`](/plugins/face-tools) | Resumable local indexing, similarity search, and review exports without changing source photos |
+| Search years of mixed files on a shared drive | [`mere-archive-tools`](/plugins/archive-tools) | Read-only traversal, required PII reduction, three retention tiers, and local hybrid search |
 | Roto, key, track, relight, restore, extend, or reconstruct a shot | [`mere-vfx-tools`](/plugins/vfx-tools) | Shot-oriented workflows and verified production handoffs |
 | Cut a subject out of a still | [`mere-image-tools`](/plugins/image-tools) | Focused SAM 3.1 knockout and matte cleanup |
 | Play a local generative music model live | [`mere-perform`](/plugins/perform) | MIDI, stage UI, prompt control, logs, and capture |
@@ -27,7 +28,7 @@ tracking, alpha delivery, and QC, VFX Tools owns the larger lifecycle.
 
 ## Local or provider-backed?
 
-Thirteen catalog commands can operate locally. Geospatial Tools can also run on
+Fourteen catalog commands can operate locally. Geospatial Tools can also run on
 a provisioned Relay fleet. RunPod Runner is provider-backed and therefore has
 stronger planning and cleanup obligations. Read
 [Provider safety](/operations/provider-safety) before creating paid resources.

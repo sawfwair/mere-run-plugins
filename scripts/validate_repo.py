@@ -220,6 +220,7 @@ def validate_catalog() -> None:
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
+        ROOT / "packages" / "mere-archive-tools" / "src",
         ROOT / "packages" / "mere-runpod" / "src",
         ROOT / "packages" / "mere-terminal-bench" / "src",
         ROOT / "packages" / "mere-image-tools" / "src",
@@ -270,6 +271,11 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_archive_tools",
+        "mere-archive-tools",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "index", "search", "stats"},
+    )
     validate_plugin_manifest(
         "mere_geo_tools",
         "mere-geo-tools",
@@ -632,6 +638,58 @@ def validate_face_tools_plan() -> None:
             fail("face-tools plan should count supported photos")
         if not (output / "run.json").is_file():
             fail("face-tools plan should write run.json")
+
+
+def validate_archive_tools_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        source = root / "shared"
+        source.mkdir()
+        (source / "proposal.txt").write_text("Halifax installation proposal")
+        database = root / "archive.sqlite3"
+        output = root / "archive-index"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mere_archive_tools",
+                "plan",
+                "--source",
+                str(source),
+                "--database",
+                str(database),
+                "--output-dir",
+                str(output),
+                "--run-id",
+                "validate-archive-index",
+                "--mere-run-command",
+                "fake-mere-run",
+            ],
+            cwd=ROOT,
+            env=plugin_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        manifest = json.loads(result.stdout)
+        validate_schema(
+            pathlib.Path("mere-archive-tools plan"),
+            contract_schema("run-manifest.v1.schema.json"),
+            manifest,
+        )
+        if manifest["status"] != "planned":
+            fail("archive-tools plan manifest should have planned status")
+        if manifest["settings"]["storageTier"] != "safe-content":
+            fail("archive-tools plan should default to safe-content")
+        if manifest["privacy"]["piiReduction"] != "required-before-persistence":
+            fail("archive-tools plan must require PII reduction before persistence")
+        if manifest["tool"]["sourceAccess"] != "read-only":
+            fail("archive-tools plan must record read-only source access")
+        if manifest["dataset"]["pairCount"] != 1:
+            fail("archive-tools plan should count supported source files")
+        if not (output / "run.json").is_file():
+            fail("archive-tools plan should write run.json")
 
 
 def validate_film_tools_plan() -> None:
@@ -1036,6 +1094,7 @@ def main() -> int:
     validate_terminal_bench_plan()
     validate_image_tools_plan()
     validate_face_tools_plan()
+    validate_archive_tools_plan()
     validate_film_tools_plan()
     validate_workflow_tools_plans()
     validate_animatic_tools_plan()

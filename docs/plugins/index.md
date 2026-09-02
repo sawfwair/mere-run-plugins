@@ -1,12 +1,13 @@
 # Official plugins
 
-The live catalog contains 17 official companion executables.
+The live catalog contains 18 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
 | [Identity Tools](/plugins/identity-tools) | `mere-identity-tools` | Local identity curricula, text adapters, evaluation, and sanitized reports | Local or Relay |
 | [Geospatial Tools](/plugins/geo-tools) | `mere-geo-tools` | Humanitarian hazard candidates and Earth-observation embeddings with raster provenance | Local or Relay |
 | [Face Tools](/plugins/face-tools) | `mere-face-tools` | Photo-library indexing and reference-face search | Local |
+| [Archive Tools](/plugins/archive-tools) | `mere-archive-tools` | PII-reduced shared-drive indexing and search | Local |
 | [VFX Tools](/plugins/vfx-tools) | `mere-vfx-tools` | Shot-oriented VFX and verified 3D handoffs | Local |
 | [Perform](/plugins/perform) | `mere-perform` | Realtime Magenta Heart performance | Local |
 | [Image Tools](/plugins/image-tools) | `mere-image-tools` | Subject knockout and matte cleanup | Local |

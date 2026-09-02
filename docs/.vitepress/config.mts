@@ -85,6 +85,7 @@ export default defineConfig({
             { text: 'All plugins', link: '/plugins/' },
             { text: 'Geospatial Tools', link: '/plugins/geo-tools' },
             { text: 'Face Tools', link: '/plugins/face-tools' },
+            { text: 'Archive Tools', link: '/plugins/archive-tools' },
             { text: 'VFX Tools', link: '/plugins/vfx-tools' },
             { text: 'Perform', link: '/plugins/perform' },
             { text: 'Image Tools', link: '/plugins/image-tools' },

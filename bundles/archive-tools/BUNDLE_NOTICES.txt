@@ -1,0 +1,14 @@
+Mere Archive Tools bundle acknowledgments
+
+CPython and its native dependency notices are preserved in python-licenses.
+AnyDoc and pdf-inspector notices are preserved in THIRD_PARTY_NOTICES.txt.
+Additional AnyDoc Cargo dependency license texts and source/checksum references
+are preserved in anydoc-native-notices.txt and anydoc-native-inventory.json.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in pyinstaller-6.22.2.dist-info/licenses/COPYING.txt.
+
+License expressions in the build inventory do not replace the upstream terms.
+The Cargo inventory includes build dependencies and is not a claim that every
+listed component is linked into the distributed binary.

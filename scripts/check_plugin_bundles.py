@@ -17,6 +17,7 @@ class BundleContractTests(unittest.TestCase):
     def test_distribution_recipes_match_their_packages(self) -> None:
         expected = {
             "animatic-tools",
+            "archive-tools",
             "face-tools",
             "film-tools",
             "geo-tools",
@@ -75,6 +76,11 @@ class BundleContractTests(unittest.TestCase):
                     self.assertNotIn("pillow==", requirements, bundle)
                     self.assertNotIn("PIL", recipe.get("collectAll", []), bundle)
                     self.assertNotIn("pillow", recipe.get("copyMetadata", []), bundle)
+
+                if bundle == "archive-tools":
+                    self.assertIn("firecrawl-anydoc==0.2.4 \\", requirements)
+                    self.assertIn("anydoc", recipe.get("collectAll", []))
+                    self.assertIn("firecrawl-anydoc", recipe.get("copyMetadata", []))
 
                 if bundle == "terminal-bench":
                     self.assertIn("harbor==0.22.0 \\", requirements)
@@ -207,16 +213,19 @@ class BundleContractTests(unittest.TestCase):
                     assert_license_files(inventory)
 
     def test_native_notices_match_the_pinned_anydoc_dependency(self) -> None:
-        inputs = ROOT / "bundles/workflow-tools"
-        inventory = json.loads((inputs / "anydoc-native-inventory.json").read_text())
-        notices = (inputs / "anydoc-native-notices.txt").read_bytes()
-        self.assertIn(f"firecrawl-anydoc=={inventory['version']} ", (inputs / "requirements.lock").read_text())
-        self.assertEqual(hashlib.sha256(notices).hexdigest(), inventory["noticesSHA256"])
-        self.assertTrue(inventory["packages"])
-        for package in inventory["packages"]:
-            self.assertTrue(package["licenseFiles"], package["name"])
-            for license_file in package["licenseFiles"]:
-                self.assertIn(license_file["sha256"].encode(), notices, package["name"])
+        for bundle in ("archive-tools", "workflow-tools"):
+            with self.subTest(bundle=bundle):
+                inputs = ROOT / "bundles" / bundle
+                inventory = json.loads((inputs / "anydoc-native-inventory.json").read_text())
+                notices = (inputs / "anydoc-native-notices.txt").read_bytes()
+                requirements = (inputs / "requirements.lock").read_text()
+                self.assertIn(f"firecrawl-anydoc=={inventory['version']} ", requirements)
+                self.assertEqual(hashlib.sha256(notices).hexdigest(), inventory["noticesSHA256"])
+                self.assertTrue(inventory["packages"])
+                for package in inventory["packages"]:
+                    self.assertTrue(package["licenseFiles"], package["name"])
+                    for license_file in package["licenseFiles"]:
+                        self.assertIn(license_file["sha256"].encode(), notices, package["name"])
 
     def test_manifest_example_and_rejected_boundaries(self) -> None:
         schema = json.loads((ROOT / "contracts/plugin-bundle.v1.schema.json").read_text())
