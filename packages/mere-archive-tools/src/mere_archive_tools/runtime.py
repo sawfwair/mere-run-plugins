@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -11,6 +12,13 @@ import tempfile
 from typing import cast
 
 JsonMap = dict[str, object]
+
+EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])"
+)
+PHONE_PATTERN = re.compile(
+    r"(?<![\w])(?:\+?1[\s.-]?)?(?:\([0-9]{3}\)|[0-9]{3})[\s.-][0-9]{3}[\s.-][0-9]{4}(?![\w])"
+)
 
 
 class InferenceError(RuntimeError):
@@ -44,6 +52,13 @@ def privacy_chunks(text: str, maximum_chars: int = 3_000) -> list[str]:
         chunks.append(text[start:end])
         start = end
     return chunks
+
+
+def reduce_common_identifiers(text: str, replacement: str) -> str:
+    email_replacement = replacement.replace("{label}", "private_email").replace("{index}", "1")
+    phone_replacement = replacement.replace("{label}", "private_phone").replace("{index}", "1")
+    reduced = EMAIL_PATTERN.sub(email_replacement, text)
+    return PHONE_PATTERN.sub(phone_replacement, reduced)
 
 
 def as_map(value: object, label: str) -> JsonMap:
@@ -97,7 +112,7 @@ class MereRunClient:
             if completed.returncode != 0:
                 raise InferenceError(f"PII reduction failed with exit {completed.returncode}")
             reduced.append(completed.stdout.rstrip("\n"))
-        return "".join(reduced)
+        return reduce_common_identifiers("".join(reduced), self.replacement)
 
     def caption_image(self, path: pathlib.Path, prompt: str) -> str:
         with tempfile.TemporaryDirectory(prefix="mere-archive-caption-") as temporary:

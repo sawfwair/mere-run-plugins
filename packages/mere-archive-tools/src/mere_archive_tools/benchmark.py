@@ -26,9 +26,10 @@ from . import extractors
 BENCHMARK_CONTRACT = "mere.run/archive-benchmark.v1"
 REPORT_CONTRACT = "mere.run/archive-benchmark-report.v1"
 SYNTHETIC_DATASET_ID = "mere-archive-gauntlet"
+HARBOURLINE_DATASET_ID = "harbourline-operations-archive"
 VIDORE_DATASET_ID = "vidore-government-reports"
 GOVDOCS_DATASET_ID = "govdocs1-shard-000"
-DATASET_IDS = (SYNTHETIC_DATASET_ID, VIDORE_DATASET_ID, GOVDOCS_DATASET_ID)
+DATASET_IDS = (SYNTHETIC_DATASET_ID, HARBOURLINE_DATASET_ID, VIDORE_DATASET_ID, GOVDOCS_DATASET_ID)
 VIDORE_ROWS_URL = "https://datasets-server.huggingface.co/rows"
 JsonMap = dict[str, object]
 SearchFunction = Callable[[str, int], JsonMap]
@@ -462,6 +463,291 @@ def _synthetic_queries(mutated: bool) -> list[JsonMap]:
     ]
 
 
+def _harbourline_files() -> dict[str, bytes]:
+    files: dict[str, bytes] = {}
+
+    def text(path: str, value: str) -> None:
+        files[path] = value.encode()
+
+    def pdf(path: str, value: str) -> None:
+        files[path] = _pdf(value)
+
+    def docx(path: str, value: str) -> None:
+        files[path] = _docx(value)
+
+    def xlsx(path: str, rows: list[list[str]]) -> None:
+        files[path] = _xlsx(rows)
+
+    def pptx(path: str, title: str, body: str) -> None:
+        files[path] = _pptx(title, body)
+
+    def image(path: str, asset: str) -> None:
+        files[path] = resources.files("mere_archive_tools").joinpath(
+            f"benchmarks/harbourline/{asset}"
+        ).read_bytes()
+
+    halifax_work_order = (
+        "Harbourline Cold Storage - corrective work order WO-HFX-241842\n"
+        "Site: Halifax North Dock. Asset: Freezer 3, evaporator EVAP-HFX-03.\n"
+        "On 2024-02-17, the high-temperature alarm followed an iced west evaporator fan. "
+        "Northshore Refrigeration replaced fan motor FM-8821 and defrost relay DR-44. "
+        "Parts carry a 24-month warranty through 2026-02-17. "
+        "Technician: Dana Mercer, dana@example.com, 800-555-0199."
+    )
+    pdf("Facilities/Halifax/Freezer 3/2024/WO-HFX-241842-corrective-repair.pdf", halifax_work_order)
+    text("Facilities/Halifax/Freezer 3/2024/alarm-log.jsonl", '\n'.join([
+        '{"time":"2024-02-17T05:51:00-04:00","asset":"EVAP-HFX-03","alarm":"high temperature","reading_c":-12.8}',
+        '{"time":"2024-02-17T06:08:00-04:00","asset":"EVAP-HFX-03","observation":"west fan stalled; ice buildup visible"}',
+        '{"time":"2024-02-17T11:42:00-04:00","asset":"EVAP-HFX-03","status":"returned to -21.0 C"}',
+    ]))
+    xlsx("Facilities/Halifax/Asset Registers/2025-freezer-assets.xlsx", [
+        ["Asset", "Location", "Manufacturer", "Model", "Serial", "Critical spare"],
+        ["EVAP-HFX-03", "Freezer 3 west wall", "Mariner Cooling", "MC-EV-480", "HFX3-24117", "FM-8821"],
+        ["COMP-HFX-03A", "Freezer 3 plant room", "Mariner Cooling", "MC-COMP-90", "HFX90-1138", "seal kit SK-90"],
+    ])
+    pdf("Finance/Accounts Payable/Northshore Refrigeration/2024/INV-8841.pdf",
+        "Invoice INV-8841. Harbourline Halifax. Work order WO-HFX-241842. "
+        "Fan motor FM-8821: $1,840. Defrost relay DR-44: $320. Labour: $960. Total: $3,120. "
+        "Warranty reference NSR-24M-8841. Contact dana@example.com, 800-555-0199.")
+    docx("Vendors/Northshore Refrigeration/service-agreement-2024.docx",
+         "Northshore Refrigeration service agreement. Emergency response target: four hours. "
+         "Installed parts receive a 24-month warranty. Dispatch: dana@example.com, 800-555-0199.")
+    text("Operations/Halifax/Shift Handover/2024-02-17.md",
+         "# Halifax shift handover\nFreezer 3 returned to -21 C at 11:42. Northshore replaced the west fan motor and defrost relay. "
+         "Verify temperature every two hours through 18 February. Product remained below the escalation threshold.")
+    docx("Safety/Halifax/Incident Reviews/2024-02-freezer-3-review.docx",
+         "Freezer 3 incident review. Root cause: drain pan ice obstructed the west evaporator fan. "
+         "Action: add drain inspection to the January preventive-maintenance route. Owner: Facilities.")
+    image("Facilities/Halifax/Freezer 3/2024/Photos/evaporator-west-ice.png", "freezer-evaporator-west-ice.png")
+    image("Facilities/Halifax/Freezer 3/2024/Photos/nameplate-mc-ev-480.png", "freezer-nameplate.png")
+    files["Old Backups/Email Attachments/2024/INV-8841-copy.pdf"] = files[
+        "Finance/Accounts Payable/Northshore Refrigeration/2024/INV-8841.pdf"
+    ]
+
+    pdf("Safety/Dartmouth/Fire Doors/2025/Bay-12-inspection.pdf",
+        "Harbourline Dartmouth Bay 12 fire-door inspection. Door FD-DAR-12 did not self-close. "
+        "The hydraulic closer leaked and the pallet staging area obstructed the marked clearance zone. Corrective action due 2025-05-09.")
+    text("Safety/Dartmouth/Fire Doors/2025/corrective-actions.csv",
+         "action,owner,due,status\nReplace FD-DAR-12 closer,Facilities,2025-05-09,complete\nRepaint clearance zone,Operations,2025-05-09,complete\n")
+    pdf("Procurement/Purchase Orders/2025/PO-5528-fire-door-closer.pdf",
+        "Purchase order PO-5528. DoorSafe Atlantic. Norton 1601 closer for FD-DAR-12. Approved amount $685. Delivery 2025-05-06.")
+    docx("Safety/Dartmouth/Fire Doors/2025/completion-signoff.docx",
+         "Corrective action closeout for FD-DAR-12. New closer installed 2025-05-07. Door completed ten self-close tests. Clearance zone repainted and photographed.")
+    image("Safety/Dartmouth/Fire Doors/2025/Photos/bay-12-before.png", "fire-door-before.png")
+    image("Safety/Dartmouth/Fire Doors/2025/Photos/bay-12-complete.png", "fire-door-complete.png")
+
+    pdf("Engineering/Saint John/Stormwater/2025/SJ-17-inspection.pdf",
+        "Catch basin SJ-17 at the east truck entrance drains slowly after heavy rain. Sediment depth measured 28 cm. Cleanout recommended before 2025-09-30.")
+    text("Operations/Saint John/Weather Events/2025-08-22.md",
+         "Rainfall event: 71 mm in 24 hours. Ponding reached the east truck entrance near catch basin SJ-17. No building water entry.")
+    xlsx("Engineering/Saint John/Stormwater/asset-register.xlsx", [
+        ["Asset", "Location", "Last cleanout", "Risk"], ["SJ-17", "East truck entrance", "2023-10-12", "High"],
+        ["SJ-09", "Employee parking", "2025-04-03", "Low"]])
+    pdf("Procurement/Quotes/2025/Saint John/SJ-17-cleanout-quotes.pdf",
+        "SJ-17 cleanout quotes. Bay Environmental: $2,480. Fundy Vac Services: $2,720. Scope includes sediment removal and disposal manifest.")
+    image("Engineering/Saint John/Stormwater/Photos/SJ-17-after-rain.png", "catch-basin-after-rain.png")
+    text("Meeting Notes/Regional Facilities/2025-08-28.jsonl",
+         '{"site":"Saint John","decision":"approve Bay Environmental for SJ-17 cleanout","budget":"2480","owner":"Quinn"}\n')
+
+    text("Projects/Moncton/Solar/2025/inverter-commissioning.json",
+         json.dumps({"site":"Moncton", "asset":"SUN-47", "status":"commissioned", "date":"2025-06-18", "capacity_kw":125}, sort_keys=True))
+    pdf("Projects/Moncton/Solar/2025/electrical-inspection.pdf",
+        "Moncton rooftop solar electrical inspection. Inverter SUN-47 passed isolation, grounding, and shutdown tests on 2025-06-18.")
+    xlsx("Projects/Moncton/Solar/2025/monthly-output.xlsx", [
+        ["Month", "Expected kWh", "Actual kWh"], ["2025-07", "14800", "15120"], ["2025-08", "13700", "12940"]])
+    pptx("Board/Capital Projects/2025-Q3-facilities.pptx", "Capital projects - Q3 2025",
+         "Moncton solar commissioned. August output was 5.5% below plan; inspect rooftop array for shading and debris. Halifax Freezer 3 replacement remains in the 2027 plan.")
+    image("Projects/Moncton/Solar/2025/Photos/rooftop-array-toolbox.png", "solar-rooftop-toolbox.png")
+    docx("Projects/Moncton/Solar/2025/warranty.docx",
+         "SUN-47 inverter warranty. Ten-year equipment coverage. Claim portal requires serial MCT-S47-8820 and commissioning report.")
+
+    pdf("Maintenance/Yarmouth/Generator/2024/monthly-test-2024-11.pdf",
+        "Generator GEN-YAR-9 monthly test. Starter battery voltage fell to 10.4 V under crank. Replace battery before the December test.")
+    text("Maintenance/Yarmouth/Generator/2024/service-history.xml",
+         "<history><asset>GEN-YAR-9</asset><service date='2024-11-21'>starter battery replaced; load test passed</service></history>")
+    xlsx("Maintenance/Yarmouth/Generator/fuel-and-runtime.xlsx", [
+        ["Date", "Runtime hours", "Fuel percent"], ["2024-11-21", "438", "82"], ["2025-02-20", "442", "76"]])
+    image("Maintenance/Yarmouth/Generator/Photos/yellow-generator-panel.png", "yellow-generator-panel.png")
+    pdf("Finance/Accounts Payable/Yarmouth Power/2024/battery-invoice.pdf",
+        "Invoice for GEN-YAR-9 starter battery. Battery BAT-31HD, $486. Installed 2024-11-21. Warranty 36 months.")
+    docx("Emergency Plans/Yarmouth/power-loss-procedure.docx",
+         "Yarmouth power-loss procedure. Confirm GEN-YAR-9 starts, transfer switch closes, and cold rooms remain below limits. Record every manual start.")
+
+    xlsx("Inventory/Truro/Material Handling/forklift-register.xlsx", [
+        ["Asset", "Type", "Inspection due", "Assigned area"], ["FLT-TRU-07", "Electric forklift", "2025-10-03", "Freezer staging"],
+        ["PJT-TRU-11", "Pallet jack", "2025-08-19", "Dry storage"]])
+    pdf("Safety/Truro/Training/2025/forklift-certifications.pdf",
+        "Truro forklift certifications. Operators Alex Chen and Noor Rahman certified for FLT-TRU-07 through 2026-04-30.")
+    text("Inventory/Truro/Cycle Counts/2025-08.csv",
+         "location,item,quantity\nA-14,purple tote,38\nB-02,fan motor FM-8821,1\nC-08,defrost relay DR-44,4\n")
+    image("Inventory/Truro/Photos/aisle-a-blue-ladder.png", "warehouse-blue-ladder.png")
+    docx("Operations/Truro/2025/aisle-safety-review.docx",
+         "Aisle A safety review. Move the blue rolling ladder to the marked bay after use. Keep the yellow pallet jack clear of fire equipment.")
+    files["Old Backups/Truro/2025-08-cycle-count-copy.csv"] = files["Inventory/Truro/Cycle Counts/2025-08.csv"]
+
+    pdf("Leases/Sydney/2023/warehouse-lease.pdf",
+        "Sydney overflow warehouse lease. Bay 7 is reserved for marine cable storage. Renewal notice due 2026-01-31. Annual rent $84,000.")
+    docx("Leases/Sydney/2025/renewal-options.docx",
+         "Sydney lease options. Three-year renewal at $89,500 annually or month-to-month at $8,600. Facilities recommends exiting after cable inventory falls below 12 reels.")
+    xlsx("Inventory/Sydney/2025/marine-cable.xlsx", [
+        ["Date", "Bay", "Reels"], ["2025-01-31", "7", "26"], ["2025-08-31", "7", "14"]])
+    text("Meeting Notes/Sydney/2025-09-04.md",
+         "Sydney lease review. Fourteen cable reels remain. Defer renewal decision until November forecast; notice deadline is 31 January 2026.")
+    pdf("Finance/Sydney/2025/storage-cost-review.pdf",
+        "Sydney storage cost review. Current annual lease cost is $84,000. Internal space becomes available after Halifax racking project in December 2025.")
+
+    docx("IT/Fredericton/2025/network-refresh.docx",
+         "Fredericton network refresh. Switch stack NET-FRD-62 serves the second-floor training room. Replacement window approved for 2025-11-08.")
+    xlsx("IT/Asset Registers/network-equipment.xlsx", [
+        ["Asset", "Site", "Model", "Support end"], ["NET-FRD-62", "Fredericton", "Summit 48P", "2025-12-31"],
+        ["NET-HFX-11", "Halifax", "Summit 24P", "2027-06-30"]])
+    pdf("Procurement/Purchase Orders/2025/PO-5610-network-refresh.pdf",
+        "PO-5610. Replacement switch stack for Fredericton training room. Vendor: Atlantic Systems. Total $18,420. Delivery 2025-10-28.")
+    text("IT/Change Calendar/2025-Q4.yaml",
+         "changes:\n  - date: 2025-11-08\n    site: Fredericton\n    asset: NET-FRD-62\n    impact: training room network unavailable 08:00-12:00\n")
+    pptx("IT/Steering Committee/2025-09-update.pptx", "Technology renewal",
+         "Fredericton NET-FRD-62 reaches support end in December. Hardware is ordered under PO-5610. Change window: 8 November.")
+
+    pdf("Compliance/2025/records-retention-policy.pdf",
+        "Harbourline records retention policy. Maintenance and food-safety records use review marker RET-7. Access follows job role. Local indexes require an approved owner, encrypted storage, and tested backup.")
+    docx("Compliance/2025/privacy-handling-guide.docx",
+         "Privacy handling guide. Reduce contact details before creating search indexes. Source records remain authoritative and unchanged. Report suspected exposure to dana@example.com.")
+    xlsx("Vendors/master-vendor-register.xlsx", [
+        ["Vendor", "Service", "Email", "Phone"], ["Northshore Refrigeration", "Cooling", "dana@example.com", "800-555-0199"],
+        ["Bay Environmental", "Drainage", "dana@example.com", "800-555-0199"]])
+    pptx("Board/2026-capital-plan.pptx", "2026 capital priorities",
+         "Priority one: replace Halifax Freezer 3 west evaporator and controls. Evidence: two corrective repairs since 2024 and parts-support risk after 2027.")
+    text("Finance/Capital Planning/2026/facility-projects.csv",
+         "project,site,budget,status\nFreezer 3 evaporator replacement,Halifax,185000,proposed\nSydney racking consolidation,Halifax,72000,approved\n")
+    pdf("Insurance/2025/property-risk-survey.pdf",
+        "Property risk survey. Halifax Freezer 3 is business-critical. Maintain tested spares for fan motor FM-8821 and relay DR-44 until planned replacement.")
+    text("Archive/README.txt",
+         "Harbourline shared-drive export. Files span Facilities, Operations, Safety, Finance, Procurement, IT, Compliance, and Board records. Originals are retained by the owning teams.")
+    text("Archive/Unfiled/notes-from-old-laptop.log",
+         "2019-06-07 replaced office printer toner. 2020-01-11 moved spare chairs. 2021-03-18 archived retired pager list.")
+    return files
+
+
+def _harbourline_documents() -> list[JsonMap]:
+    groups = {
+        "hfx-repair": ["Facilities/Halifax/Freezer 3/2024/WO-HFX-241842-corrective-repair.pdf"],
+        "hfx-alarm": ["Facilities/Halifax/Freezer 3/2024/alarm-log.jsonl"],
+        "hfx-assets": ["Facilities/Halifax/Asset Registers/2025-freezer-assets.xlsx"],
+        "hfx-invoice": ["Finance/Accounts Payable/Northshore Refrigeration/2024/INV-8841.pdf", "Old Backups/Email Attachments/2024/INV-8841-copy.pdf"],
+        "hfx-vendor": ["Vendors/Northshore Refrigeration/service-agreement-2024.docx"],
+        "hfx-handover": ["Operations/Halifax/Shift Handover/2024-02-17.md"],
+        "hfx-review": ["Safety/Halifax/Incident Reviews/2024-02-freezer-3-review.docx"],
+        "hfx-ice-photo": ["Facilities/Halifax/Freezer 3/2024/Photos/evaporator-west-ice.png"],
+        "hfx-nameplate-photo": ["Facilities/Halifax/Freezer 3/2024/Photos/nameplate-mc-ev-480.png"],
+        "dar-inspection": ["Safety/Dartmouth/Fire Doors/2025/Bay-12-inspection.pdf"],
+        "dar-actions": ["Safety/Dartmouth/Fire Doors/2025/corrective-actions.csv"],
+        "dar-po": ["Procurement/Purchase Orders/2025/PO-5528-fire-door-closer.pdf"],
+        "dar-closeout": ["Safety/Dartmouth/Fire Doors/2025/completion-signoff.docx"],
+        "dar-before-photo": ["Safety/Dartmouth/Fire Doors/2025/Photos/bay-12-before.png"],
+        "dar-after-photo": ["Safety/Dartmouth/Fire Doors/2025/Photos/bay-12-complete.png"],
+        "sj-inspection": ["Engineering/Saint John/Stormwater/2025/SJ-17-inspection.pdf"],
+        "sj-rain": ["Operations/Saint John/Weather Events/2025-08-22.md"],
+        "sj-assets": ["Engineering/Saint John/Stormwater/asset-register.xlsx"],
+        "sj-quotes": ["Procurement/Quotes/2025/Saint John/SJ-17-cleanout-quotes.pdf"],
+        "sj-photo": ["Engineering/Saint John/Stormwater/Photos/SJ-17-after-rain.png"],
+        "sj-decision": ["Meeting Notes/Regional Facilities/2025-08-28.jsonl"],
+        "mct-commissioning": ["Projects/Moncton/Solar/2025/inverter-commissioning.json"],
+        "mct-inspection": ["Projects/Moncton/Solar/2025/electrical-inspection.pdf"],
+        "mct-output": ["Projects/Moncton/Solar/2025/monthly-output.xlsx"],
+        "mct-board": ["Board/Capital Projects/2025-Q3-facilities.pptx"],
+        "mct-photo": ["Projects/Moncton/Solar/2025/Photos/rooftop-array-toolbox.png"],
+        "mct-warranty": ["Projects/Moncton/Solar/2025/warranty.docx"],
+        "yar-test": ["Maintenance/Yarmouth/Generator/2024/monthly-test-2024-11.pdf"],
+        "yar-history": ["Maintenance/Yarmouth/Generator/2024/service-history.xml"],
+        "yar-runtime": ["Maintenance/Yarmouth/Generator/fuel-and-runtime.xlsx"],
+        "yar-photo": ["Maintenance/Yarmouth/Generator/Photos/yellow-generator-panel.png"],
+        "yar-invoice": ["Finance/Accounts Payable/Yarmouth Power/2024/battery-invoice.pdf"],
+        "yar-procedure": ["Emergency Plans/Yarmouth/power-loss-procedure.docx"],
+        "tru-register": ["Inventory/Truro/Material Handling/forklift-register.xlsx"],
+        "tru-training": ["Safety/Truro/Training/2025/forklift-certifications.pdf"],
+        "tru-count": ["Inventory/Truro/Cycle Counts/2025-08.csv", "Old Backups/Truro/2025-08-cycle-count-copy.csv"],
+        "tru-photo": ["Inventory/Truro/Photos/aisle-a-blue-ladder.png"],
+        "tru-safety": ["Operations/Truro/2025/aisle-safety-review.docx"],
+        "syd-lease": ["Leases/Sydney/2023/warehouse-lease.pdf"],
+        "syd-options": ["Leases/Sydney/2025/renewal-options.docx"],
+        "syd-inventory": ["Inventory/Sydney/2025/marine-cable.xlsx"],
+        "syd-notes": ["Meeting Notes/Sydney/2025-09-04.md"],
+        "syd-cost": ["Finance/Sydney/2025/storage-cost-review.pdf"],
+        "frd-refresh": ["IT/Fredericton/2025/network-refresh.docx"],
+        "frd-register": ["IT/Asset Registers/network-equipment.xlsx"],
+        "frd-po": ["Procurement/Purchase Orders/2025/PO-5610-network-refresh.pdf"],
+        "frd-calendar": ["IT/Change Calendar/2025-Q4.yaml"],
+        "frd-board": ["IT/Steering Committee/2025-09-update.pptx"],
+        "policy-retention": ["Compliance/2025/records-retention-policy.pdf"],
+        "policy-privacy": ["Compliance/2025/privacy-handling-guide.docx"],
+        "vendor-register": ["Vendors/master-vendor-register.xlsx"],
+        "capital-board": ["Board/2026-capital-plan.pptx"],
+        "capital-projects": ["Finance/Capital Planning/2026/facility-projects.csv"],
+        "insurance-risk": ["Insurance/2025/property-risk-survey.pdf"],
+        "archive-readme": ["Archive/README.txt"],
+        "archive-noise": ["Archive/Unfiled/notes-from-old-laptop.log"],
+    }
+    return [{"id": document_id, "paths": paths} for document_id, paths in groups.items()]
+
+
+def _harbourline_queries() -> list[JsonMap]:
+    questions = [
+        ("hfx-response", "What failed on Halifax Freezer 3, which parts were installed, and when does their warranty end?", ["hfx-repair", "hfx-invoice", "hfx-vendor"]),
+        ("hfx-dispatch", "Give the service history, equipment model, and photo evidence for Halifax Freezer 3 before dispatching a technician.", ["hfx-repair", "hfx-assets", "hfx-ice-photo", "hfx-nameplate-photo"]),
+        ("hfx-root-cause", "What caused the 2024 Halifax Freezer 3 incident and what preventive action was added?", ["hfx-review", "hfx-alarm"]),
+        ("hfx-spares", "Which critical spares should Halifax keep for Freezer 3?", ["hfx-assets", "insurance-risk"]),
+        ("hfx-cost", "How much did the 2024 Freezer 3 repair cost and which work order supports it?", ["hfx-invoice", "hfx-repair"]),
+        ("hfx-recovery", "When did Freezer 3 return to temperature and what monitoring followed?", ["hfx-alarm", "hfx-handover"]),
+        ("dar-finding", "What was wrong with Dartmouth Bay 12 fire door?", ["dar-inspection", "dar-before-photo"]),
+        ("dar-proof", "Show the inspection, repair order, closeout, and completion photo for Dartmouth fire door FD-DAR-12.", ["dar-inspection", "dar-po", "dar-closeout", "dar-after-photo"]),
+        ("dar-status", "Were the Dartmouth Bay 12 corrective actions completed by the due date?", ["dar-actions", "dar-closeout"]),
+        ("sj-response", "Why does Saint John catch basin SJ-17 need work, and which contractor was approved?", ["sj-inspection", "sj-rain", "sj-decision"]),
+        ("sj-cost", "Compare the Saint John SJ-17 cleanout quotes and find the approved amount.", ["sj-quotes", "sj-decision"]),
+        ("sj-evidence", "Find the post-rain photo and inspection for the east truck entrance catch basin.", ["sj-photo", "sj-inspection"]),
+        ("mct-performance", "Why was Moncton solar output below plan in August, and what should Facilities inspect?", ["mct-output", "mct-board", "mct-photo"]),
+        ("mct-warranty", "Find the commissioning evidence and warranty for Moncton inverter SUN-47.", ["mct-commissioning", "mct-inspection", "mct-warranty"]),
+        ("yar-battery", "Why was the Yarmouth generator battery replaced, and what warranty applies?", ["yar-test", "yar-history", "yar-invoice"]),
+        ("yar-readiness", "Find the Yarmouth emergency power procedure, latest runtime record, and generator photo.", ["yar-procedure", "yar-runtime", "yar-photo"]),
+        ("tru-spare", "Does Truro have a spare fan motor for Halifax Freezer 3?", ["tru-count", "hfx-assets"]),
+        ("tru-safety", "Find the forklift training record and aisle safety issue at Truro.", ["tru-training", "tru-safety", "tru-photo"]),
+        ("syd-decision", "Should Harbourline renew the Sydney warehouse now, and what facts remain unresolved?", ["syd-lease", "syd-options", "syd-inventory", "syd-notes", "syd-cost"]),
+        ("syd-deadline", "When is the Sydney lease notice deadline and how many cable reels remained in August?", ["syd-lease", "syd-inventory"]),
+        ("frd-change", "When will Fredericton switch NET-FRD-62 be replaced and who supplies the hardware?", ["frd-refresh", "frd-po", "frd-calendar"]),
+        ("frd-risk", "Why must Fredericton replace NET-FRD-62 before year end?", ["frd-register", "frd-board"]),
+        ("capital-case", "What evidence supports replacing Halifax Freezer 3 in the capital plan?", ["capital-board", "capital-projects", "hfx-repair", "hfx-review", "insurance-risk"]),
+        ("retention", "What controls apply before Harbourline builds a local records index?", ["policy-retention", "policy-privacy"]),
+        ("vendor-contact", "Find Northshore Refrigeration's service terms without exposing the contact details in the retained index.", ["hfx-vendor", "vendor-register", "policy-privacy"]),
+        ("duplicate-invoice", "Find every path containing Northshore invoice INV-8841.", ["hfx-invoice"]),
+        ("duplicate-count", "Find every path for the Truro cycle count that lists one spare fan motor FM-8821.", ["tru-count"]),
+        ("cross-site-parts", "Which sites have records for fan motor FM-8821?", ["hfx-repair", "hfx-assets", "hfx-invoice", "tru-count", "insurance-risk"]),
+        ("board-overview", "Which current facilities issues appear in board materials?", ["mct-board", "capital-board"]),
+        ("source-authority", "Which file explains who owns the original Harbourline records?", ["archive-readme"]),
+    ]
+    return [
+        {"id": query_id, "text": query, "relevantDocumentIds": relevant}
+        for query_id, query, relevant in questions
+    ]
+
+
+def _harbourline_phase(files: dict[str, bytes]) -> JsonMap:
+    return {
+        "sourceFiles": _source_files(files),
+        "documents": _harbourline_documents(),
+        "queries": _harbourline_queries(),
+        "duplicateGroups": [
+            {
+                "id": "northshore-invoice-copy",
+                "paths": ["Finance/Accounts Payable/Northshore Refrigeration/2024/INV-8841.pdf", "Old Backups/Email Attachments/2024/INV-8841-copy.pdf"],
+            },
+            {
+                "id": "truro-cycle-count-copy",
+                "paths": ["Inventory/Truro/Cycle Counts/2025-08.csv", "Old Backups/Truro/2025-08-cycle-count-copy.csv"],
+            },
+        ],
+        "requireNoFileErrors": True,
+    }
+
+
 def _phase(files: dict[str, bytes], mutated: bool, require_no_errors: bool = True) -> JsonMap:
     duplicate_path = (
         "Recovered/Halifax/pump-installation-copy.md"
@@ -542,6 +828,40 @@ def prepare_synthetic(output_dir: pathlib.Path) -> JsonMap:
                 "text": "Bridgewater crane inspection. Hoist CRANE-BRW-5 needs a new upper limit switch.",
             },
         ]
+        _write_json(staging / "benchmark.json", manifest)
+        _write_json(staging / "state.json", {"contractVersion": BENCHMARK_CONTRACT, "phase": "baseline"})
+        staging.replace(output_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return load_manifest(output_dir / "benchmark.json")
+
+
+def prepare_harbourline(output_dir: pathlib.Path) -> JsonMap:
+    staging = _prepare_directory(output_dir)
+    try:
+        source = staging / "source"
+        baseline = _harbourline_files()
+        for relative_path, content in baseline.items():
+            destination = source / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+        manifest = _manifest(
+            {
+                "id": HARBOURLINE_DATASET_ID,
+                "name": "Harbourline Cold Storage Operations Archive",
+                "license": "MIT",
+                "redistribution": "included as generated fictional test data",
+            },
+            {"baseline": _harbourline_phase(baseline)},
+            ["dana@example.com", "800-555-0199"],
+            {
+                "generator": "mere-archive-tools",
+                "networkUsed": False,
+                "company": "Harbourline Cold Storage",
+                "fictional": True,
+            },
+        )
         _write_json(staging / "benchmark.json", manifest)
         _write_json(staging / "state.json", {"contractVersion": BENCHMARK_CONTRACT, "phase": "baseline"})
         staging.replace(output_dir)
@@ -732,6 +1052,8 @@ def prepare_govdocs(output_dir: pathlib.Path) -> JsonMap:
 def prepare(dataset_id: str, output_dir: pathlib.Path, limit: int) -> JsonMap:
     if dataset_id == SYNTHETIC_DATASET_ID:
         return prepare_synthetic(output_dir)
+    if dataset_id == HARBOURLINE_DATASET_ID:
+        return prepare_harbourline(output_dir)
     if dataset_id == VIDORE_DATASET_ID:
         return prepare_vidore(output_dir, limit)
     if dataset_id == GOVDOCS_DATASET_ID:

@@ -2,7 +2,8 @@
 
 Build a local, searchable index from a read-only shared drive. The plugin
 converts documents with AnyDoc, captions and reads text from images with
-`mere.run`, reduces personally identifiable information (PII), and stores
+`mere.run`, reduces personally identifiable information (PII) with the local
+classifier plus deterministic email and phone matching, and stores
 shared text and image embeddings in SQLite.
 
 Install the distributable plugin bundle with mere.run. The bundle includes its
@@ -53,6 +54,11 @@ The generated Mere Archive Gauntlet includes 18 files, office documents,
 images, exact duplicates, fake PII canaries, and 16 retrieval questions. Use
 `benchmark mutate` to apply a controlled rename, edit, deletion, and addition,
 then reindex the same database to test incremental behavior.
+
+For a connected business scenario, pass `--dataset
+harbourline-operations-archive`. That benchmark creates 58 fictional records
+for a regional cold-storage operator and 30 questions that connect maintenance,
+safety, procurement, compliance, finance, and capital-planning evidence.
 
 Image indexing defaults to PII-reduced captions and OCR. Pass `--image-index
 visual` to add embeddings of source pixels. Visual embeddings can preserve
