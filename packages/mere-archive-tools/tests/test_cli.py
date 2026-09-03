@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
-from mere_archive_tools import benchmark, cli, extractors
+from mere_archive_tools import benchmark, cli, extractors, runtime
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -71,6 +71,14 @@ def invoke(arguments: list[str]) -> tuple[int, dict[str, object], str]:
 
 
 class MereArchiveToolsCLITests(unittest.TestCase):
+    def test_common_identifier_reduction_catches_classifier_misses(self) -> None:
+        source = "Contact dana@example.com or 800-555-0199; backup: (902) 555-0142."
+        reduced = runtime.reduce_common_identifiers(source, "[{label}]")
+        self.assertEqual(
+            reduced,
+            "Contact [private_email] or [private_phone]; backup: [private_phone].",
+        )
+
     def test_manifest_has_required_commands_and_security_contract(self) -> None:
         manifest = cli.plugin_manifest()
         names = {command["name"] for command in manifest["commands"]}
@@ -466,6 +474,37 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             self.assertTrue((source / "Incoming/2026/bridge-crane-inspection.txt").is_file())
             phase_name, _, exact = benchmark.detect_phase(manifest, source)
             self.assertEqual((phase_name, exact), ("mutated", True))
+
+    def test_benchmark_prepares_connected_harbourline_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = pathlib.Path(temporary) / "harbourline"
+            exit_code, payload, _ = invoke(
+                [
+                    "benchmark",
+                    "prepare",
+                    "--dataset",
+                    benchmark.HARBOURLINE_DATASET_ID,
+                    "--output-dir",
+                    str(output),
+                ]
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["dataset"]["id"], benchmark.HARBOURLINE_DATASET_ID)
+            self.assertGreaterEqual(payload["sourceFiles"], 55)
+            self.assertEqual(payload["queries"], 30)
+            manifest_path = output / "benchmark.json"
+            manifest = benchmark.load_manifest(manifest_path)
+            manifest_schema = json.loads(
+                (REPO_ROOT / "contracts/archive-benchmark.v1.schema.json").read_text()
+            )
+            self.assertEqual(list(Draft202012Validator(manifest_schema).iter_errors(manifest)), [])
+            source = benchmark.source_root(manifest_path, manifest)
+            phase_name, _, exact = benchmark.detect_phase(manifest, source)
+            self.assertEqual((phase_name, exact), ("baseline", True))
+            self.assertEqual(
+                (source / "Finance/Accounts Payable/Northshore Refrigeration/2024/INV-8841.pdf").read_bytes(),
+                (source / "Old Backups/Email Attachments/2024/INV-8841-copy.pdf").read_bytes(),
+            )
 
     def test_benchmark_evaluates_custody_privacy_deduplication_and_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

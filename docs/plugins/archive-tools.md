@@ -84,7 +84,8 @@ The plugin processes each unique file in this order:
 
 1. It reads the source file and computes a SHA-256 fingerprint.
 2. It extracts document text or creates image captions and OCR in temporary storage.
-3. It reduces PII with `mere.run text anonymize`.
+3. It reduces PII with `mere.run text anonymize`, followed by deterministic
+   email and phone matching.
 4. It chunks and embeds only the PII-reduced text.
 5. It stores data according to the selected tier.
 6. It discards temporary unreduced derivatives.
@@ -262,6 +263,28 @@ and adds a Bridgewater crane inspection. The evaluator detects the phase from
 the complete source path and SHA-256 set. It then checks that the old paths are
 gone, the added paths are indexed, and the duplicate still shares one content
 record.
+
+### Test connected business questions
+
+The Harbourline benchmark models a fictional regional cold-storage company. Its
+58 files connect maintenance, safety, procurement, compliance, finance, and
+capital-planning records across six facilities. Unlike the smaller gauntlet,
+its 30 questions can require several related files to answer one operational
+question.
+
+Generate the fictional archive:
+
+```bash
+mere-archive-tools benchmark prepare \
+  --dataset harbourline-operations-archive \
+  --output-dir ./harbourline-benchmark
+```
+
+The collection includes two duplicate groups, two fictional PII canaries,
+eight image fixtures, and 14 supported formats. Example questions cover an
+urgent freezer repair, a fire-door closeout, a stormwater cleanout decision,
+solar performance, generator readiness, a warehouse lease, a network change,
+and a capital-replacement case.
 
 ## Test with public datasets
 
