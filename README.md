@@ -72,6 +72,11 @@ The catalog contains 18 companion executables:
 For selection guidance, see
 [Choose a plugin](https://plugins-docs.mere.run/guide/choosing-a-plugin).
 
+For authored local model evaluations, see the
+[ATE-derived tool-decision cases](benchmarks/ate-v0/README.md). This source pack
+includes 240 cases and 60 executable fixture cases; it is not an installable
+plugin or an official Cohere benchmark.
+
 ## Understand the safety boundary
 
 Plugins are separate executables. `mere.run` doesn't load plugin code into the
@@ -97,6 +102,7 @@ documentation. The main directories are:
 
 ```text
 benchmark-recipes/  Pinned external benchmark protocols
+benchmarks/         Authored evaluation cases and deterministic fixtures
 bundles/            Reviewed inputs for signed macOS bundles
 catalog/            The official installation catalog
 contracts/          Language-neutral JSON Schemas

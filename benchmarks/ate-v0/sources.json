@@ -1,0 +1,777 @@
+{
+  "dataset": "CohereLabs/ATE",
+  "revision": "4b567ba98acc6ddf27b2abb9004844581083c5d8",
+  "url": "https://huggingface.co/datasets/CohereLabs/ATE/tree/4b567ba98acc6ddf27b2abb9004844581083c5d8",
+  "retrieved_on": "2026-09-05",
+  "source_files_sha256": {
+    "tools": "d5ec03a90fdde415519d68e7319aa6aead483690876ab80161f9bd0c566ee04e",
+    "servers": "382cd437a97dedb6488ce9577ebf79161513473564aa321e14daa4c01dabedc9"
+  },
+  "scope": "Twenty deliberately selected public server families; not a representative sample of ATE.",
+  "description_policy": "Descriptions and schemas in this pack are authored fixture adapters. Upstream description text is not redistributed.",
+  "tools": [
+    {
+      "alias": "audio.generate_music",
+      "tool_id": "63ca5b85b350fe77:generate_music",
+      "tool_row_id": 21438,
+      "upstream_repository": "https://github.com/jxoesneon/gemini-audio-mcp",
+      "source_record_sha256": "1e9a328e9a30143d4138e901aca0ba320b5740efebb2936b07a30e532fa949de"
+    },
+    {
+      "alias": "audio.generate_soundscape",
+      "tool_id": "63ca5b85b350fe77:generate_soundscape",
+      "tool_row_id": 21437,
+      "upstream_repository": "https://github.com/jxoesneon/gemini-audio-mcp",
+      "source_record_sha256": "a78ae7682183f9ba8a45f1b765427c1f19812ecaef2009431bf15a03d3f76857"
+    },
+    {
+      "alias": "audio.generate_voice",
+      "tool_id": "63ca5b85b350fe77:generate_voice",
+      "tool_row_id": 21439,
+      "upstream_repository": "https://github.com/jxoesneon/gemini-audio-mcp",
+      "source_record_sha256": "d84aa013a875085fcc41c9c4d31efab08abcd3f03e261fcaefee2b7646c3cf8e"
+    },
+    {
+      "alias": "audio.transition_soundscape",
+      "tool_id": "63ca5b85b350fe77:transition_soundscape",
+      "tool_row_id": 21440,
+      "upstream_repository": "https://github.com/jxoesneon/gemini-audio-mcp",
+      "source_record_sha256": "45fde3969f71b55f26d788c930773f194a7aab287eb4484cd440f201308bb5f1"
+    },
+    {
+      "alias": "browser.browser_click",
+      "tool_id": "4b6e718d0ac8bb88:browser_click",
+      "tool_row_id": 56417,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "3c827b5d7cad3364fb3a3b3723be4965387231f4dba899d61bc3eafef9c8dc1d"
+    },
+    {
+      "alias": "browser.browser_fill_form",
+      "tool_id": "4b6e718d0ac8bb88:browser_fill_form",
+      "tool_row_id": 56419,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "b25711c18c9f289239588c85cda574203b2ddfd94b163e4c49152e1ed2ecaad2"
+    },
+    {
+      "alias": "browser.browser_navigate",
+      "tool_id": "4b6e718d0ac8bb88:browser_navigate",
+      "tool_row_id": 56414,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "701aa9a39082f158c01ce571440565033d64685c1bd1aed022860613f57c6a9a"
+    },
+    {
+      "alias": "browser.browser_screenshot",
+      "tool_id": "4b6e718d0ac8bb88:browser_screenshot",
+      "tool_row_id": 56421,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "b987d3afb18aaa32b2d9242a1992f9918af96279653c5ed4dd75153368c37da4"
+    },
+    {
+      "alias": "browser.browser_snapshot",
+      "tool_id": "4b6e718d0ac8bb88:browser_snapshot",
+      "tool_row_id": 56415,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "b1999708659f1721a30581391a884853b44f45872d8698651cce9a50ac3d372b"
+    },
+    {
+      "alias": "browser.browser_tabs",
+      "tool_id": "4b6e718d0ac8bb88:browser_tabs",
+      "tool_row_id": 56416,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "4f66a3737f466351a3f42044a1e9a5340e83caee58afbab973e007a6c7d0e8fd"
+    },
+    {
+      "alias": "browser.browser_type",
+      "tool_id": "4b6e718d0ac8bb88:browser_type",
+      "tool_row_id": 56418,
+      "upstream_repository": "https://github.com/patrick-ogbue/mcp",
+      "source_record_sha256": "88940803248fa823752b32657489454273e4969f31b41e497ebb8e26204f5ca5"
+    },
+    {
+      "alias": "calendar.create_event",
+      "tool_id": "8a73f2fadbdbb56f:create_event",
+      "tool_row_id": 50659,
+      "upstream_repository": "https://github.com/samrind/gcal-mcp-server",
+      "source_record_sha256": "9354246810d575561bcca8fa342eaded1a63207f4967e25e6113724b9f555397"
+    },
+    {
+      "alias": "calendar.delete_event",
+      "tool_id": "8a73f2fadbdbb56f:delete_event",
+      "tool_row_id": 50662,
+      "upstream_repository": "https://github.com/samrind/gcal-mcp-server",
+      "source_record_sha256": "92683664fad94897623894fdaaf293c5151edfeb3b1959f952696ce277dc02ac"
+    },
+    {
+      "alias": "calendar.find_free_slots",
+      "tool_id": "8a73f2fadbdbb56f:find_free_slots",
+      "tool_row_id": 50660,
+      "upstream_repository": "https://github.com/samrind/gcal-mcp-server",
+      "source_record_sha256": "0e517d8b14a8be7cdfc4eac93e0176862694f7d97b3baec6fe901562969c01fe"
+    },
+    {
+      "alias": "calendar.list_events",
+      "tool_id": "8a73f2fadbdbb56f:list_events",
+      "tool_row_id": 50658,
+      "upstream_repository": "https://github.com/samrind/gcal-mcp-server",
+      "source_record_sha256": "3f6e3a8b2a09c851b39cdb87ea74a5ea0a2200a4bcd21968d5be7944228f8657"
+    },
+    {
+      "alias": "calendar.update_event",
+      "tool_id": "8a73f2fadbdbb56f:update_event",
+      "tool_row_id": 50661,
+      "upstream_repository": "https://github.com/samrind/gcal-mcp-server",
+      "source_record_sha256": "83d3708383e84ae7d99d66121d2aefb8bbd21435d0586b219c40c5e0edb4a3e1"
+    },
+    {
+      "alias": "captions.get_metadata",
+      "tool_id": "000536ca3497c880:get_metadata",
+      "tool_row_id": 579611,
+      "upstream_repository": "https://github.com/sbugratiryaki/youtube-caption-mcp",
+      "source_record_sha256": "740ce02fc0e2c513ad3300e245c7ad8b6b2acb1ae11cedbbef28d48e853c9e9d"
+    },
+    {
+      "alias": "captions.get_transcript",
+      "tool_id": "000536ca3497c880:get_transcript",
+      "tool_row_id": 579610,
+      "upstream_repository": "https://github.com/sbugratiryaki/youtube-caption-mcp",
+      "source_record_sha256": "8dfd1b0370b6703f9b3917aceabdd50d6a844243424a7fd15376d7089e176a0f"
+    },
+    {
+      "alias": "documents.convert_html",
+      "tool_id": "0002480418bbeb7f:convert_html",
+      "tool_row_id": 40798,
+      "upstream_repository": "https://github.com/zcag/readdown-mcp",
+      "source_record_sha256": "11960d7ab302c5fac189239c0497290b0769dd9d5747f0fa5df4cfee8dd2c39f"
+    },
+    {
+      "alias": "documents.fetch_markdown",
+      "tool_id": "0002480418bbeb7f:fetch_markdown",
+      "tool_row_id": 40797,
+      "upstream_repository": "https://github.com/zcag/readdown-mcp",
+      "source_record_sha256": "c8f10c1ab209a0620849dade756497b89c51b246ac518d1d58da571e4e8d703c"
+    },
+    {
+      "alias": "filesystem.create",
+      "tool_id": "79d857f7d4c2acfb:create",
+      "tool_row_id": 100958,
+      "upstream_repository": "https://github.com/domdomegg/filesystem-mcp",
+      "source_record_sha256": "9e05255f959ce13434f1190779462e905e60035d8f3b053ac31ab027f5680787"
+    },
+    {
+      "alias": "filesystem.insert",
+      "tool_id": "79d857f7d4c2acfb:insert",
+      "tool_row_id": 100960,
+      "upstream_repository": "https://github.com/domdomegg/filesystem-mcp",
+      "source_record_sha256": "4f5ed6f2334d05e5c4459a4ef7bbafe68b62bfef3835f895f3dabc1042f00572"
+    },
+    {
+      "alias": "filesystem.str_replace",
+      "tool_id": "79d857f7d4c2acfb:str_replace",
+      "tool_row_id": 100959,
+      "upstream_repository": "https://github.com/domdomegg/filesystem-mcp",
+      "source_record_sha256": "14d127be6f5fc59e77a34f724346ed280a8baf6f12b6ed6d7e0459878cab7e10"
+    },
+    {
+      "alias": "filesystem.view",
+      "tool_id": "79d857f7d4c2acfb:view",
+      "tool_row_id": 100957,
+      "upstream_repository": "https://github.com/domdomegg/filesystem-mcp",
+      "source_record_sha256": "a1cc2c2fe11c020e861202711afea5bfc62d97112d5d3ba1edfa9d35915c3612"
+    },
+    {
+      "alias": "geo.find_boundaries",
+      "tool_id": "72da6fb372c9ce5a:find_boundaries",
+      "tool_row_id": 553705,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "fb3d63445e9d5edd25fe4cdd3930f9878a3d9264e6faf22c30e42cf46be1e458"
+    },
+    {
+      "alias": "geo.geocode",
+      "tool_id": "72da6fb372c9ce5a:geocode",
+      "tool_row_id": 553700,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "055676c68f7fe18ba7568d51a06e59709802b9063a244b88e6a14050d7b6b27c"
+    },
+    {
+      "alias": "geo.get_area_stats",
+      "tool_id": "72da6fb372c9ce5a:get_area_stats",
+      "tool_row_id": 553704,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "f6d16f334d075d61820cd9445686f2decf95eb4e7f26fc2076e6a2862721b002"
+    },
+    {
+      "alias": "geo.get_route_info",
+      "tool_id": "72da6fb372c9ce5a:get_route_info",
+      "tool_row_id": 553703,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "4d136d0cf1ebbd6d82db87c303812ffbea22abecba6bd2c9ec374f5e92cd8b8a"
+    },
+    {
+      "alias": "geo.reverse_geocode",
+      "tool_id": "72da6fb372c9ce5a:reverse_geocode",
+      "tool_row_id": 553701,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "e1c66100b5de429fca4b582ab390bc6ae12a0b7b7953da7a5fb2ca15975d8717"
+    },
+    {
+      "alias": "geo.search_nearby",
+      "tool_id": "72da6fb372c9ce5a:search_nearby",
+      "tool_row_id": 553702,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "19a0091aecefab5cb058450210a0160abb60497f91c11a8f459b8472ee1dd741"
+    },
+    {
+      "alias": "geo.search_pois",
+      "tool_id": "72da6fb372c9ce5a:search_pois",
+      "tool_row_id": 553706,
+      "upstream_repository": "https://github.com/aiagentkarl/geospatial-mcp-server",
+      "source_record_sha256": "180ffed41ffdeeeafa2fc106a1e88948b8d8c39898994178af63ec3a611d6816"
+    },
+    {
+      "alias": "git.git_add",
+      "tool_id": "9f3fb116a265bf91:git_add",
+      "tool_row_id": 211150,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "41ead5fb0a3d1599d4e3e833435e95e644bdc4ec417341c69277be7c765fe1fb"
+    },
+    {
+      "alias": "git.git_checkout",
+      "tool_id": "9f3fb116a265bf91:git_checkout",
+      "tool_row_id": 211154,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "02d4c78b4ff8d377b15c435382d3b2af11118544874bb2eb09e31a764a7803c3"
+    },
+    {
+      "alias": "git.git_commit",
+      "tool_id": "9f3fb116a265bf91:git_commit",
+      "tool_row_id": 211149,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "0b62337495098e6638f1a0f69224e86cda1d6b3077c45d8ff60e7f711bcbdfbf"
+    },
+    {
+      "alias": "git.git_create_branch",
+      "tool_id": "9f3fb116a265bf91:git_create_branch",
+      "tool_row_id": 211153,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "1075c893f9fb6bf48e3672abb9bf3a7c4c9cc165439f8a14dda210c998fdac9a"
+    },
+    {
+      "alias": "git.git_diff",
+      "tool_id": "9f3fb116a265bf91:git_diff",
+      "tool_row_id": 211148,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "92a5af6dfa78295f77fdd2c95fd1214fc191379adc8e395a6a86916b2e0f04b4"
+    },
+    {
+      "alias": "git.git_diff_staged",
+      "tool_id": "9f3fb116a265bf91:git_diff_staged",
+      "tool_row_id": 211147,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "bc6a9e8f89259ac95b41bc19773d7219a4e657ab90bec2dd458a6c315d3a1bfc"
+    },
+    {
+      "alias": "git.git_diff_unstaged",
+      "tool_id": "9f3fb116a265bf91:git_diff_unstaged",
+      "tool_row_id": 211146,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "ffffc28298ae75c3798573f1be31d6e934044c6dd463d85e28c5637879bd3de1"
+    },
+    {
+      "alias": "git.git_log",
+      "tool_id": "9f3fb116a265bf91:git_log",
+      "tool_row_id": 211152,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "d6e43c7f16e3af9645d8362019723fce862ffed6ea7b514bfb7dbf44bcaf965f"
+    },
+    {
+      "alias": "git.git_reset",
+      "tool_id": "9f3fb116a265bf91:git_reset",
+      "tool_row_id": 211151,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "998709e8e546ad90fdfa9e18cba3f5e11087ca9f77551c1a604730cde924a9d4"
+    },
+    {
+      "alias": "git.git_show",
+      "tool_id": "9f3fb116a265bf91:git_show",
+      "tool_row_id": 211155,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "0aaf27f59b5078ab2e4aee1b350f2f75d4913b927a8d7304142dd09a73eab4d6"
+    },
+    {
+      "alias": "git.git_status",
+      "tool_id": "9f3fb116a265bf91:git_status",
+      "tool_row_id": 211145,
+      "upstream_repository": "https://github.com/geropl/git-mcp-go",
+      "source_record_sha256": "d1c04a0bf73558daf2437d8f6cc8d99963b0946eb86031778ce5dc2d24e9b9aa"
+    },
+    {
+      "alias": "images.edit_image",
+      "tool_id": "6d5bdfd4a698fde5:edit_image",
+      "tool_row_id": 9360,
+      "upstream_repository": "https://github.com/jhupo/image-studio-mcp",
+      "source_record_sha256": "e5fefec8715be5d3eba7f0367c2898f170c31151fe6ed7ee582682dc320b221a"
+    },
+    {
+      "alias": "images.generate_image",
+      "tool_id": "6d5bdfd4a698fde5:generate_image",
+      "tool_row_id": 9359,
+      "upstream_repository": "https://github.com/jhupo/image-studio-mcp",
+      "source_record_sha256": "666cf3847241b07bb401a75124df809aebd83db20e4c272a1ffdaf762125c06b"
+    },
+    {
+      "alias": "images.image_studio_doctor",
+      "tool_id": "6d5bdfd4a698fde5:image_studio_doctor",
+      "tool_row_id": 9358,
+      "upstream_repository": "https://github.com/jhupo/image-studio-mcp",
+      "source_record_sha256": "15af3a686dc83fd2b14369b3952ab7766822f6f5730306907309d2b944291021"
+    },
+    {
+      "alias": "issues.create_issue",
+      "tool_id": "f8f79dc79dff8c01:create_issue",
+      "tool_row_id": 173805,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "30f7dcf693de1a2bcbbd5d9d3626b44cb9628c3182a2022e965bea6a0f80e721"
+    },
+    {
+      "alias": "issues.get_commit_statuses",
+      "tool_id": "f8f79dc79dff8c01:get_commit_statuses",
+      "tool_row_id": 173806,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "b0638fb9a103932599156652e5b0eb904398b23b61c67aa6e538bdb124efeab1"
+    },
+    {
+      "alias": "issues.get_repo_issues",
+      "tool_id": "f8f79dc79dff8c01:get_repo_issues",
+      "tool_row_id": 173804,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "d8105b4dde17b068e20fcf0831e4f0acb70885ebca046b51001d553f59e473a8"
+    },
+    {
+      "alias": "issues.get_user_info",
+      "tool_id": "f8f79dc79dff8c01:get_user_info",
+      "tool_row_id": 173801,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "6b3b235db55600eb668b9a9261d67a090c952bb3a49804ffd89342a815e241b5"
+    },
+    {
+      "alias": "issues.list_repositories",
+      "tool_id": "f8f79dc79dff8c01:list_repositories",
+      "tool_row_id": 173803,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "481b4b6fb856be8bffa1228e5b5bcc79278f7752da04e4b815b48f2b3ab51652"
+    },
+    {
+      "alias": "issues.owner_info",
+      "tool_id": "f8f79dc79dff8c01:owner_info",
+      "tool_row_id": 173800,
+      "upstream_repository": "https://github.com/sami-07/custom-github-mcp-server",
+      "source_record_sha256": "acdea44eba889348283b76a1276ab82b583b81364a8b29f97aa8551fd86a0ea7"
+    },
+    {
+      "alias": "mail.get_attachment",
+      "tool_id": "5d69ae1141361698:get_attachment",
+      "tool_row_id": 18059,
+      "upstream_repository": "https://github.com/minjaf/email-mcp",
+      "source_record_sha256": "189a6433aab68591741f7abf51932ec8a3613ba8e2d44210baae9d1f598628f7"
+    },
+    {
+      "alias": "mail.list_folders",
+      "tool_id": "5d69ae1141361698:list_folders",
+      "tool_row_id": 18056,
+      "upstream_repository": "https://github.com/minjaf/email-mcp",
+      "source_record_sha256": "e09c2c46740a133cc1ccb375887ac868137496226b57b61450291af15209f79b"
+    },
+    {
+      "alias": "mail.read_email",
+      "tool_id": "5d69ae1141361698:read_email",
+      "tool_row_id": 18058,
+      "upstream_repository": "https://github.com/minjaf/email-mcp",
+      "source_record_sha256": "90fbe604c86a881f1aacaea2099d2250532094822adaf17219e0f267134afcfc"
+    },
+    {
+      "alias": "mail.search_emails",
+      "tool_id": "5d69ae1141361698:search_emails",
+      "tool_row_id": 18057,
+      "upstream_repository": "https://github.com/minjaf/email-mcp",
+      "source_record_sha256": "7124ca16960c134894691b99f31383cac4ea943fe8cec215b9db023fa59262f8"
+    },
+    {
+      "alias": "mail.send_email",
+      "tool_id": "5d69ae1141361698:send_email",
+      "tool_row_id": 18060,
+      "upstream_repository": "https://github.com/minjaf/email-mcp",
+      "source_record_sha256": "5a591dae56edf24621cb2216d4eede737d066a689d10677927e075af7430e8ed"
+    },
+    {
+      "alias": "metrics.get_cpu_usage",
+      "tool_id": "72e7b488f083e813:get_cpu_usage",
+      "tool_row_id": 135429,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "796c64406de2fb66112344b490904cf62457cd31794e3bb834eaa130648d71d1"
+    },
+    {
+      "alias": "metrics.get_disk_usage",
+      "tool_id": "72e7b488f083e813:get_disk_usage",
+      "tool_row_id": 135431,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "ee98649f89b794372c4d6d39150f7f442ce304cd15be68524b405466c779fdaa"
+    },
+    {
+      "alias": "metrics.get_memory_info",
+      "tool_id": "72e7b488f083e813:get_memory_info",
+      "tool_row_id": 135430,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "da9148b76b41dd6d81a1eac62f0be383b5ce84ea34ed594f3734652342fa82c6"
+    },
+    {
+      "alias": "metrics.get_network_stats",
+      "tool_id": "72e7b488f083e813:get_network_stats",
+      "tool_row_id": 135435,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "911e7498897e18372f6a552493f0eb7016af6b8552d700fe9b259f6428803a2e"
+    },
+    {
+      "alias": "metrics.get_process_info",
+      "tool_id": "72e7b488f083e813:get_process_info",
+      "tool_row_id": 135433,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "399cd1ef65b97b4dcde4a971525e6f70efeb5d653cf878b3c2d7294ad5fddab8"
+    },
+    {
+      "alias": "metrics.get_system_info",
+      "tool_id": "72e7b488f083e813:get_system_info",
+      "tool_row_id": 135428,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "4aac1b82994dba902640385646d5754b2f2a1b4e6497b54b6c9b5c8adea276b4"
+    },
+    {
+      "alias": "metrics.kill_process",
+      "tool_id": "72e7b488f083e813:kill_process",
+      "tool_row_id": 135434,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "2b5414e41d1c34e8ad9f65fe468fe16a65ffb7c570b77c0b42b646e9d8166be6"
+    },
+    {
+      "alias": "metrics.list_processes",
+      "tool_id": "72e7b488f083e813:list_processes",
+      "tool_row_id": 135432,
+      "upstream_repository": "https://github.com/praveert/cord",
+      "source_record_sha256": "a8127f6a71ebd87e36e9b0bf5e00be4b8ef3ae33550656c4631036ab6f6e0488"
+    },
+    {
+      "alias": "notes.kura_create",
+      "tool_id": "0002924b3178544f:kura_create",
+      "tool_row_id": 85810,
+      "upstream_repository": "https://github.com/tillmatthis/kura-notes-mcp",
+      "source_record_sha256": "20ed2710accef49532ed3fe7a48b80089bbe4451a2a1716f7bba881b00fa1bca"
+    },
+    {
+      "alias": "notes.kura_delete",
+      "tool_id": "0002924b3178544f:kura_delete",
+      "tool_row_id": 85813,
+      "upstream_repository": "https://github.com/tillmatthis/kura-notes-mcp",
+      "source_record_sha256": "cdf53c33dc26a809517de6ea5357f43051d6adaf44cff35f9b1e66e24be032eb"
+    },
+    {
+      "alias": "notes.kura_get",
+      "tool_id": "0002924b3178544f:kura_get",
+      "tool_row_id": 85811,
+      "upstream_repository": "https://github.com/tillmatthis/kura-notes-mcp",
+      "source_record_sha256": "1af79f299ac7664192b5eb9e696837ad192379ba1d26675f36c424448b8a7c3b"
+    },
+    {
+      "alias": "notes.kura_list_recent",
+      "tool_id": "0002924b3178544f:kura_list_recent",
+      "tool_row_id": 85812,
+      "upstream_repository": "https://github.com/tillmatthis/kura-notes-mcp",
+      "source_record_sha256": "3e37ef799a7989a2112c76351df794af836eee25b1a9fe7ee166ce1cb18dab80"
+    },
+    {
+      "alias": "notes.kura_search",
+      "tool_id": "0002924b3178544f:kura_search",
+      "tool_row_id": 85809,
+      "upstream_repository": "https://github.com/tillmatthis/kura-notes-mcp",
+      "source_record_sha256": "5a07d35ee30ea6c9fa20f7002a3cbb3359e65c35a1ea4f8654f06af26dfd9478"
+    },
+    {
+      "alias": "publishing.create-post",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/create-post",
+      "tool_row_id": 629365,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "de2cc1d80567d9fe951851b1b6c6cb64fedb63b78f8b6b945b4039b6f9dbdec5"
+    },
+    {
+      "alias": "publishing.delete-post",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/delete-post",
+      "tool_row_id": 629367,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "4f08675efb4a66f084a546fe274b9312a67bcfc736461062b1de8581d9cf769f"
+    },
+    {
+      "alias": "publishing.get-post",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/get-post",
+      "tool_row_id": 629364,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "fa240d7418610545a1a72519ae680e634f01eb2be03e3e27b1deacb008d35598"
+    },
+    {
+      "alias": "publishing.get-site-title",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/get-site-title",
+      "tool_row_id": 629362,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "ed9b349fe1fccef06b590d4de269da7136bc5beb01531a20b02632cb1fa39b52"
+    },
+    {
+      "alias": "publishing.list-posts",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/list-posts",
+      "tool_row_id": 629363,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "cbe83de0db33681ae6623fdb0c231030d9b2229f9f2e4346f2fe7fd486d2c046"
+    },
+    {
+      "alias": "publishing.update-post",
+      "tool_id": "000900ed8bf300bb:my-mcp-server/update-post",
+      "tool_row_id": 629366,
+      "upstream_repository": "https://github.com/presstwooddesign/my-mcp-server",
+      "source_record_sha256": "c186410a76180a0044d7c12d2c402c1c746f1609960d7b8ff8a46295d5fe4750"
+    },
+    {
+      "alias": "scheduling.cancel_task",
+      "tool_id": "0000ab3c031322f6:cancel_task",
+      "tool_row_id": 351166,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "ca7f5d775e9325762e0e58f897786574c187d4d99fca3538362de16a6221ba20"
+    },
+    {
+      "alias": "scheduling.get_stats",
+      "tool_id": "0000ab3c031322f6:get_stats",
+      "tool_row_id": 351168,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "cac38c6b482ccda8145da849f947fd9c9f9f713f56cbefe522ff63d5a030d79d"
+    },
+    {
+      "alias": "scheduling.list_tasks",
+      "tool_id": "0000ab3c031322f6:list_tasks",
+      "tool_row_id": 351163,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "a9166d7fcd3b78fd589a7f996d8ea8739abdf8e512b8bc72e782ff7d90b954e8"
+    },
+    {
+      "alias": "scheduling.pause_task",
+      "tool_id": "0000ab3c031322f6:pause_task",
+      "tool_row_id": 351164,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "3983f5685ef5a642129bacb2b062a12065a9414bbe1f6893c9a4edbae64da6b4"
+    },
+    {
+      "alias": "scheduling.resume_task",
+      "tool_id": "0000ab3c031322f6:resume_task",
+      "tool_row_id": 351165,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "fd6b02fbef0828519edc1ea35dab9dcbba478d9d57976631614c7b549bd32231"
+    },
+    {
+      "alias": "scheduling.schedule_task",
+      "tool_id": "0000ab3c031322f6:schedule_task",
+      "tool_row_id": 351162,
+      "upstream_repository": "https://github.com/sskarz/nanoclawbster",
+      "source_record_sha256": "aef26e3ea8a6ff65ba020c4004a2826ecc2b1ed48967ebc7321710908a1328a0"
+    },
+    {
+      "alias": "search.fetch_page",
+      "tool_id": "d4de547a40af8e36:fetch_page",
+      "tool_row_id": 8711,
+      "upstream_repository": "https://github.com/urtworkmail/web-search-mcp",
+      "source_record_sha256": "b6e5fbbb002d7e137508af596860302a590df782ee0a9971f3ed9be3eb3f5e5b"
+    },
+    {
+      "alias": "search.search_news",
+      "tool_id": "d4de547a40af8e36:search_news",
+      "tool_row_id": 8710,
+      "upstream_repository": "https://github.com/urtworkmail/web-search-mcp",
+      "source_record_sha256": "03ae5b7762549c76ad9d55eee6844c72cf8611d133bf62e2e6f5c31958c068ce"
+    },
+    {
+      "alias": "search.search_web",
+      "tool_id": "d4de547a40af8e36:search_web",
+      "tool_row_id": 8709,
+      "upstream_repository": "https://github.com/urtworkmail/web-search-mcp",
+      "source_record_sha256": "98faa90f01b8f59a2f410d8d63a9c0705885ae826ce1d9e48ece1e8047adfa6a"
+    },
+    {
+      "alias": "sql.describe_table",
+      "tool_id": "818eb99a954eb194:describe_table",
+      "tool_row_id": 41329,
+      "upstream_repository": "https://github.com/awiseking/sqlite_mcp_server",
+      "source_record_sha256": "f6a376c741f343e219a11d48cea5797d6a4c5b37dfef550d93fd7072074283e2"
+    },
+    {
+      "alias": "sql.list_tables",
+      "tool_id": "818eb99a954eb194:list_tables",
+      "tool_row_id": 41328,
+      "upstream_repository": "https://github.com/awiseking/sqlite_mcp_server",
+      "source_record_sha256": "a891820635021cae4549ecb74570d77dbf2c2eb5976139a51afcee8691467939"
+    },
+    {
+      "alias": "sql.read_query",
+      "tool_id": "818eb99a954eb194:read_query",
+      "tool_row_id": 41326,
+      "upstream_repository": "https://github.com/awiseking/sqlite_mcp_server",
+      "source_record_sha256": "ec19dadbb53c3e8fe35aa916458018051818db15eb08465d1c8ea2b41e9cfa62"
+    },
+    {
+      "alias": "sql.write_query",
+      "tool_id": "818eb99a954eb194:write_query",
+      "tool_row_id": 41327,
+      "upstream_repository": "https://github.com/awiseking/sqlite_mcp_server",
+      "source_record_sha256": "7326dc52d07e371add4427cc71c2aa10a7ef4110d0b88f72df7c7f6028bb118b"
+    },
+    {
+      "alias": "storage.clear_values",
+      "tool_id": "0002fc635572892d:clear_values",
+      "tool_row_id": 131382,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "d27dc7de2e909d965b8e806f70b1d5aa9cf87fbf5e35e389a8a51ed8b989b90c"
+    },
+    {
+      "alias": "storage.delete_value",
+      "tool_id": "0002fc635572892d:delete_value",
+      "tool_row_id": 131380,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "5b32e8fae0c315019c5d4f2bc161a4164fffb3251d56bcef4a2ca45b965b02a7"
+    },
+    {
+      "alias": "storage.get_store_info",
+      "tool_id": "0002fc635572892d:get_store_info",
+      "tool_row_id": 131383,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "29f26c239eb35082508b750ab11198315d8d1a63fe01c839898941619e86952e"
+    },
+    {
+      "alias": "storage.get_value",
+      "tool_id": "0002fc635572892d:get_value",
+      "tool_row_id": 131378,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "7e77676e364a4f1096edbfcf60706ef183e08fb0b59889acbeef0c449dac0f37"
+    },
+    {
+      "alias": "storage.list_keys",
+      "tool_id": "0002fc635572892d:list_keys",
+      "tool_row_id": 131381,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "b82667198b826d27e1b9202384fd66502b9b9a6ab5f463a8529531de98fb3b4e"
+    },
+    {
+      "alias": "storage.set_value",
+      "tool_id": "0002fc635572892d:set_value",
+      "tool_row_id": 131379,
+      "upstream_repository": "https://github.com/jmgress/simple-mcp",
+      "source_record_sha256": "30910d307ad1b79dec0053f4f3716b7e675b3c5aa29cc4596471509767b89716"
+    },
+    {
+      "alias": "tables.append_rows",
+      "tool_id": "b0ce0841e00b1c62:append_rows",
+      "tool_row_id": 60741,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "0273654d079ae75b821d72b077c49796e66d2f0b9abb4b941ce0d93b80f02b37"
+    },
+    {
+      "alias": "tables.check_sheet_errors",
+      "tool_id": "b0ce0841e00b1c62:check_sheet_errors",
+      "tool_row_id": 60737,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "f28a1e8ee58ad03280a195aeeaa270d2b399fcc0e99dd9f55632f93bb05f7a8f"
+    },
+    {
+      "alias": "tables.create_sheet",
+      "tool_id": "b0ce0841e00b1c62:create_sheet",
+      "tool_row_id": 60739,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "5146f318dcb032b719f333e8fb4ebc0ddd995671a3c01eda6d8de9604b5800e9"
+    },
+    {
+      "alias": "tables.format_sheet",
+      "tool_id": "b0ce0841e00b1c62:format_sheet",
+      "tool_row_id": 60742,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "a6fb9d24b2a9bcbf79f51dd60877307d52a416e0a5793c4dfce44580a7b3b482"
+    },
+    {
+      "alias": "tables.get_column_values",
+      "tool_id": "b0ce0841e00b1c62:get_column_values",
+      "tool_row_id": 60734,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "6f2cd60a720ab9c348c9b6e927d1eb981d6ae82e73eaeb311be269e69761df4e"
+    },
+    {
+      "alias": "tables.get_sheet_data",
+      "tool_id": "b0ce0841e00b1c62:get_sheet_data",
+      "tool_row_id": 60733,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "0c14c87f4e29b8a79ed2484f9066bc969697774c246892b2fe437a4863542c79"
+    },
+    {
+      "alias": "tables.get_sheet_metadata",
+      "tool_id": "b0ce0841e00b1c62:get_sheet_metadata",
+      "tool_row_id": 60732,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "8676bcd42f984aec4c0a344c43b8c14d66018c8e5b30693d8a27422e60cb4a96"
+    },
+    {
+      "alias": "tables.search_in_sheet",
+      "tool_id": "b0ce0841e00b1c62:search_in_sheet",
+      "tool_row_id": 60736,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "8bbd6c3cb0ffb8b482dabe240e989ece199509670183f964b8c6e24fb6ddd7fc"
+    },
+    {
+      "alias": "tables.set_headers",
+      "tool_id": "b0ce0841e00b1c62:set_headers",
+      "tool_row_id": 60740,
+      "upstream_repository": "https://github.com/da-ponta/spreadsheet-mcp",
+      "source_record_sha256": "92a2179dd14c7b23ed9183d5caf38ac8a42855cfd126dbb89b2bf45feeedd235"
+    },
+    {
+      "alias": "web.fetch_html",
+      "tool_id": "48185eebb19933ab:fetch_html",
+      "tool_row_id": 170086,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "dcaba8e8089fc091dd41094b2040a6b3f16dacb816119b69eba62b598cac1c87"
+    },
+    {
+      "alias": "web.fetch_json",
+      "tool_id": "48185eebb19933ab:fetch_json",
+      "tool_row_id": 170089,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "cce0bbbecd8e6733da4cb15bf76564fea81525fe4233fdace717a3e3ed2ebb4b"
+    },
+    {
+      "alias": "web.fetch_markdown",
+      "tool_id": "48185eebb19933ab:fetch_markdown",
+      "tool_row_id": 170087,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "80fbe5aa5be2ac900fef686d17c64d3fc873b2480faa005c7e51a3fddb01834c"
+    },
+    {
+      "alias": "web.fetch_readable",
+      "tool_id": "48185eebb19933ab:fetch_readable",
+      "tool_row_id": 170090,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "afcce30dd54e6170da51fe8c7722ac2d704cf2421b6ac0ea33b458e93f5cf32c"
+    },
+    {
+      "alias": "web.fetch_txt",
+      "tool_id": "48185eebb19933ab:fetch_txt",
+      "tool_row_id": 170088,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "4b0ac174100bbf100691d3fcb1405cf9ddff321d4fd510807927252c2e9be1e7"
+    },
+    {
+      "alias": "web.fetch_youtube_transcript",
+      "tool_id": "48185eebb19933ab:fetch_youtube_transcript",
+      "tool_row_id": 170091,
+      "upstream_repository": "https://github.com/zcaceres/fetch-mcp",
+      "source_record_sha256": "1d3629c304a2c8c43d556eefe6a86662b62119da9fdb09a76bbe8188ee2db6c5"
+    }
+  ]
+}

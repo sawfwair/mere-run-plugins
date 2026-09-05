@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "ate-derived-tool-decisions-v0",
+  "version": "0.2.0",
+  "description": "240 authored single-decision cases across 20 ATE server families, with 60 deterministic in-memory fixture executions. No live MCP or model qualification claim.",
+  "case_files": [
+    "cases.jsonl"
+  ],
+  "prompt_sets": [],
+  "arms": [
+    {
+      "id": "base",
+      "model_slot": "base",
+      "adapter_scale": 1
+    }
+  ],
+  "sampling_profiles": [
+    {
+      "id": "deterministic",
+      "temperature": 0,
+      "top_p": 1,
+      "top_k": 1,
+      "min_p": 0,
+      "show_thinking": false
+    }
+  ],
+  "scorer": {
+    "kind": "external-process",
+    "executable": "score.py",
+    "arguments": [],
+    "timeout_seconds": 10
+  },
+  "gates": [
+    {
+      "id": "no-hard-failures",
+      "aggregation": "hard-failure-count",
+      "comparator": "==",
+      "threshold": 0,
+      "required": false
+    },
+    {
+      "id": "held-out-pass-rate",
+      "aggregation": "pass-rate",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "required": false,
+      "filter": {
+        "splits": [
+          "held-out"
+        ]
+      }
+    }
+  ],
+  "defaults": {
+    "trials": 1,
+    "max_tokens": 384,
+    "context_size": 8192,
+    "logprobs": "none",
+    "response_format": "json_object",
+    "top_logprobs": 5
+  },
+  "adapter_requirements": {
+    "require_training_manifest": false,
+    "require_completed_training": false,
+    "require_base_model_match": false
+  }
+}
