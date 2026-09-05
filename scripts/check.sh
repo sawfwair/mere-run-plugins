@@ -93,6 +93,13 @@ if (
 ):
     raise SystemExit("installed Archive Tools package omitted or changed third-party notices")
 
+archive_pi = pathlib.Path("packages/mere-archive-tools/src/mere_archive_tools/resources/pi")
+for source in archive_pi.rglob("*"):
+    if source.is_file():
+        installed = resources.files("mere_archive_tools").joinpath("resources/pi", source.relative_to(archive_pi).as_posix())
+        if not installed.is_file() or installed.read_bytes() != source.read_bytes():
+            raise SystemExit("installed Archive Tools package omitted or changed a Pi resource")
+
 source_notices = pathlib.Path("packages/mere-workflow-tools/src/mere_workflow_tools/THIRD_PARTY_NOTICES.txt")
 installed_notices = resources.files("mere_workflow_tools").joinpath("THIRD_PARTY_NOTICES.txt")
 if not installed_notices.is_file() or installed_notices.read_bytes() != source_notices.read_bytes():

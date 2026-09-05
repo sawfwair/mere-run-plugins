@@ -678,7 +678,7 @@ def search_database(
 ) -> JsonMap:
     if not database_path.is_file():
         raise PluginError(f"archive database doesn't exist: {database_path}", 2)
-    connection = database.connect(database_path)
+    connection = database.connect_readonly(database_path)
     try:
         index_metadata = database.metadata(connection)
         dimensions = int(index_metadata["embedding_dimensions"])
@@ -737,7 +737,7 @@ def search_database(
 
 def command_search(args: argparse.Namespace) -> int:
     if args.output is not None and args.database.is_file():
-        connection = database.connect(args.database)
+        connection = database.connect_readonly(args.database)
         try:
             source_root = database.metadata(connection).get("source_root")
         finally:
@@ -758,14 +758,20 @@ def command_search(args: argparse.Namespace) -> int:
 
 
 def command_investigate(args: argparse.Namespace) -> int:
-    if args.output is not None and args.database.is_file():
-        connection = database.connect(args.database)
+    if args.output == args.database:
+        raise PluginError("--output must differ from the archive database", 2)
+    if args.diagnostics is not None and args.diagnostics in {args.database, args.output}:
+        raise PluginError("--diagnostics must differ from the database and output paths", 2)
+    if args.database.is_file():
+        connection = database.connect_readonly(args.database)
         try:
             source_root = database.metadata(connection).get("source_root")
         finally:
             connection.close()
-        if source_root is not None and is_within(args.output, pathlib.Path(source_root).expanduser().resolve()):
-            raise PluginError("--output must be outside the read-only source tree", 2)
+        for name in ("output", "diagnostics"):
+            path = getattr(args, name)
+            if path is not None and source_root is not None and is_within(path, pathlib.Path(source_root).expanduser().resolve()):
+                raise PluginError(f"--{name} must be outside the read-only source tree", 2)
     config = pi_harness.InvestigationConfig(
         database=args.database,
         question=args.question,
@@ -776,6 +782,9 @@ def command_investigate(args: argparse.Namespace) -> int:
         context_size=args.context_size,
         server_timeout_seconds=args.server_timeout,
         pi_timeout_seconds=args.pi_timeout,
+        first_search_timeout_seconds=args.first_search_timeout,
+        search_timeout_seconds=args.search_timeout,
+        diagnostics=args.diagnostics,
         mere_run_command=args.mere_run_command,
         pi_command=args.pi_command,
         replacement=args.replacement,
@@ -883,7 +892,7 @@ def add_index_args(parser: argparse.ArgumentParser) -> None:
 def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
     if hasattr(args, "mere_run_command") and not args.mere_run_command:
         args.mere_run_command = os.environ.get("MERE_ARCHIVE_TOOLS_MERE_RUN") or DEFAULT_MERE_RUN
-    for name in ("source", "database", "output_dir", "run_manifest", "benchmark_manifest", "output"):
+    for name in ("source", "database", "output_dir", "run_manifest", "benchmark_manifest", "output", "diagnostics"):
         if hasattr(args, name) and getattr(args, name) is not None:
             setattr(args, name, getattr(args, name).expanduser().resolve())
     if hasattr(args, "run_id"):
@@ -965,9 +974,12 @@ def build_parser() -> argparse.ArgumentParser:
     investigate.add_argument("--engine", default=pi_harness.DEFAULT_ENGINE)
     investigate.add_argument("--max-searches", type=int, default=4)
     investigate.add_argument("--top", type=int, default=5)
-    investigate.add_argument("--context-size", type=int, default=8_192)
+    investigate.add_argument("--context-size", type=int, default=16_384)
     investigate.add_argument("--server-timeout", type=int, default=180)
-    investigate.add_argument("--pi-timeout", type=int, default=180)
+    investigate.add_argument("--pi-timeout", type=int, default=300)
+    investigate.add_argument("--first-search-timeout", type=int, default=60)
+    investigate.add_argument("--search-timeout", type=int, default=60)
+    investigate.add_argument("--diagnostics", type=pathlib.Path, help="Write content-free timing and memory observations.")
     investigate.add_argument("--output", type=pathlib.Path)
     investigate.add_argument("--replacement", default="[{label}]")
     investigate.add_argument("--mere-run-command", default="")

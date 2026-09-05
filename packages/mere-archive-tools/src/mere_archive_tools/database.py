@@ -76,6 +76,12 @@ def connect(path: pathlib.Path) -> sqlite3.Connection:
     return connection
 
 
+def connect_readonly(path: pathlib.Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
 def metadata(connection: sqlite3.Connection) -> dict[str, str]:
     return {row["key"]: row["value"] for row in connection.execute("SELECT key, value FROM metadata")}
 

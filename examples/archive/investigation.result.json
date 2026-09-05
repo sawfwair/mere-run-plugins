@@ -1,0 +1,64 @@
+{
+  "contractVersion": "mere.run/archive-investigation.v1",
+  "question": "When does the parts warranty expire, and was labor reimbursed?",
+  "piiReductionApplied": true,
+  "model": "text-chat-bonsai-27b-2bit",
+  "answer": "The parts warranty expires on 2027-06-03. Labor reimbursement is unresolved.",
+  "claims": [
+    {
+      "id": "claim-1",
+      "statement": "The parts warranty expires on 2027-06-03.",
+      "status": "supported",
+      "sources": [
+        "Maintenance/repair.txt"
+      ]
+    },
+    {
+      "id": "claim-2",
+      "statement": "Whether labor was reimbursed is unresolved.",
+      "status": "unresolved",
+      "sources": []
+    }
+  ],
+  "searches": [
+    {
+      "sequence": 1,
+      "query": "parts warranty",
+      "resultPaths": [
+        "Maintenance/repair.txt"
+      ]
+    },
+    {
+      "sequence": 2,
+      "query": "labor reimbursement",
+      "resultPaths": []
+    }
+  ],
+  "unresolvedClaims": [
+    "Whether labor was reimbursed is unresolved."
+  ],
+  "limits": {
+    "maxSearches": 4,
+    "resultsPerSearch": 5
+  },
+  "attempts": 1,
+  "metrics": {
+    "elapsedSeconds": 30,
+    "peakProcessTreeRSSBytes": 1000000000,
+    "memoryMeasurement": "illustrative values only; not a measured run",
+    "events": [
+      {
+        "event": "pi_start",
+        "elapsedSeconds": 3
+      },
+      {
+        "event": "search_start",
+        "elapsedSeconds": 8
+      },
+      {
+        "event": "server_stopped",
+        "elapsedSeconds": 30
+      }
+    ]
+  }
+}

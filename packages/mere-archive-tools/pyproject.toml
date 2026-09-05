@@ -30,5 +30,6 @@ mere_archive_tools = [
   "benchmarks/harbourline/*.png",
   "resources/pi/package.json",
   "resources/pi/extensions/*.ts",
+  "resources/pi/lib/*.ts",
   "resources/pi/prompts/*.md",
 ]

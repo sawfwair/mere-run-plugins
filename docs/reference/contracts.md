@@ -17,6 +17,7 @@ plugins, recipes, and downstream automation.
 | [`plugin-bundle-envelope.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/plugin-bundle-envelope.v1.schema.json) | Signed publisher statement for a plugin bundle |
 | [`archive-benchmark.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-benchmark.v1.schema.json) | Archive benchmark cases, judgments, and change scenarios |
 | [`archive-benchmark-report.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-benchmark-report.v1.schema.json) | Archive benchmark metrics and evaluation results |
+| [`archive-investigation.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-investigation.v1.schema.json) | Bounded investigation results, citation paths, unresolved claims, and optional metrics |
 | [`film-brief.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-brief.v1.schema.json) | User-confirmed film requirements and greenlight readiness |
 | [`film-department-result.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-department-result.v1.schema.json) | Structured proposal returned by a read-only Pi department |
 | [`film-production-plan.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-production-plan.v1.schema.json) | Accepted cast, location, sound, and shot plan |

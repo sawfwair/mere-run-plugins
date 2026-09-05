@@ -126,7 +126,7 @@ class MereArchiveToolsCLITests(unittest.TestCase):
     def test_investigate_command_uses_bounded_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             database_path = pathlib.Path(temporary) / "archive.sqlite3"
-            database_path.touch()
+            cli.database.connect(database_path).close()
             result: dict[str, object] = {
                 "contractVersion": pi_harness.INVESTIGATION_CONTRACT,
                 "question": "Which repair is covered?",

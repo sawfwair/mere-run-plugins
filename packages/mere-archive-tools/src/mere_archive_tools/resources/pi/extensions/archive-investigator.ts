@@ -1,15 +1,15 @@
-import { execFile } from "node:child_process";
-import { appendFile } from "node:fs/promises";
-import { promisify } from "node:util";
+import { readFile, writeFile, rename } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
+import { join } from "node:path";
+import { setTimeout } from "node:timers/promises";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { sanitize, boundedRequest } from "../lib/archive-contract.ts";
 
-const execFileAsync = promisify(execFile);
-const database = process.env.MERE_ARCHIVE_DATABASE;
+const requestDirectory = process.env.MERE_ARCHIVE_REQUEST_DIRECTORY;
 const tracePath = process.env.MERE_ARCHIVE_SEARCH_TRACE;
 const maxSearches = Number.parseInt(process.env.MERE_ARCHIVE_MAX_SEARCHES ?? "4", 10);
-const top = Number.parseInt(process.env.MERE_ARCHIVE_SEARCH_TOP ?? "5", 10);
-const replacement = process.env.MERE_ARCHIVE_REPLACEMENT ?? "[{label}]";
+const eventsPath = process.env.MERE_ARCHIVE_EVENTS;
 let searchCount = 0;
 
 function required(value: string | undefined, name: string): string {
@@ -17,41 +17,10 @@ function required(value: string | undefined, name: string): string {
   return value;
 }
 
-function pluginCommand(): string[] {
-  const encoded = process.env.MERE_ARCHIVE_TOOLS_COMMAND_JSON;
-  if (!encoded) return ["mere-archive-tools"];
-  const value = JSON.parse(encoded) as unknown;
-  if (!Array.isArray(value) || !value.length || !value.every((item) => typeof item === "string")) {
-    throw new Error("MERE_ARCHIVE_TOOLS_COMMAND_JSON must contain a nonempty string array");
-  }
-  return value;
+function event(name: string, fields: Record<string, string | number> = {}): void {
+  if (eventsPath) appendFileSync(eventsPath, `${JSON.stringify({ event: name, ...fields })}\n`, "utf8");
 }
 
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-function sanitize(raw: Record<string, unknown>) {
-  const results = Array.isArray(raw.results) ? raw.results : [];
-  return {
-    contractVersion: raw.contractVersion,
-    query: raw.query,
-    piiReductionApplied: raw.piiReductionApplied,
-    storageTier: raw.storageTier,
-    results: results.map((item) => {
-      const result = item as Record<string, unknown>;
-      return {
-        rank: result.rank,
-        score: result.score,
-        modality: result.modality,
-        kind: result.kind,
-        snippet: result.snippet,
-        keywords: result.keywords,
-        paths: stringArray(result.paths),
-      };
-    }),
-  };
-}
 
 function response(payload: Record<string, unknown>) {
   return {
@@ -60,7 +29,36 @@ function response(payload: Record<string, unknown>) {
   };
 }
 
-export default function archiveInvestigator(pi: ExtensionAPI) {
+export default async function archiveInvestigator(pi: ExtensionAPI) {
+  const prior = await readFile(required(tracePath, "MERE_ARCHIVE_SEARCH_TRACE"), "utf8")
+    .catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return ""; throw error; });
+  searchCount = prior.split("\n").filter(Boolean).length;
+  pi.on("session_start", () => { event("session_start"); });
+  pi.on("before_provider_request", (request) => {
+    const payload = request.payload as Record<string, unknown>;
+    event("provider_request", {
+      requestedOutputTokens: Number(payload.max_completion_tokens ?? payload.max_tokens ?? 0),
+      messageCount: Array.isArray(payload.messages) ? payload.messages.length : 0,
+    });
+    // Bound generation without overriding the runtime capability contract.
+    return boundedRequest(payload, searchCount, maxSearches, process.env.MERE_ARCHIVE_FINAL_JSON === "1",
+      process.env.MERE_ARCHIVE_REPAIR === "1");
+  });
+  pi.on("after_provider_response", (response) => { event("provider_response", { status: response.status }); });
+  pi.on("message_end", (message) => {
+    if (message.message.role === "assistant") {
+      event("assistant_complete", {
+        outputTokens: message.message.usage.output,
+        inputTokens: message.message.usage.input,
+        cacheReadTokens: message.message.usage.cacheRead,
+        stopReason: message.message.stopReason,
+      });
+    }
+  });
+  let firstToken = true;
+  pi.on("message_update", () => {
+    if (firstToken) { event("first_token"); firstToken = false; }
+  });
   pi.registerTool({
     name: "archive_search",
     label: "Search the archive",
@@ -75,36 +73,22 @@ export default function archiveInvestigator(pi: ExtensionAPI) {
         throw new Error(`archive_search reached its ${maxSearches}-search limit`);
       }
       searchCount += 1;
-      const command = pluginCommand();
-      const args = [
-        ...command.slice(1),
-        "search",
-        "--database",
-        required(database, "MERE_ARCHIVE_DATABASE"),
-        "--query",
-        params.query,
-        "--top",
-        String(top),
-        "--replacement",
-        replacement,
-      ];
-      const { stdout, stderr } = await execFileAsync(command[0], args, {
-        cwd: process.cwd(),
-        timeout: 60_000,
-        maxBuffer: 4 * 1024 * 1024,
-        env: process.env,
-      });
-      if (stderr.trim()) process.stderr.write(stderr);
-      const sanitized = sanitize(JSON.parse(stdout) as Record<string, unknown>);
-      const resultPaths = sanitized.results.flatMap((item) => item.paths);
-      const trace = {
-        sequence: searchCount,
-        query: sanitized.query,
-        purpose: params.purpose,
-        resultPaths: [...new Set(resultPaths)],
-      };
-      await appendFile(required(tracePath, "MERE_ARCHIVE_SEARCH_TRACE"), `${JSON.stringify(trace)}\n`, "utf8");
-      return response(sanitized);
+      event("search_start");
+      const directory = required(requestDirectory, "MERE_ARCHIVE_REQUEST_DIRECTORY");
+      const sequence = searchCount;
+      const request = join(directory, `request-${sequence}.json`);
+      await writeFile(`${request}.tmp`, JSON.stringify({ query: params.query }), "utf8");
+      await rename(`${request}.tmp`, request);
+      const responsePath = join(directory, `response-${sequence}.json`);
+      // The launcher owns deadlines, search budgets, tracing, and process cleanup.
+      let encoded: string | undefined;
+      while (encoded === undefined) {
+        encoded = await readFile(responsePath, "utf8")
+          .catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error; });
+        if (encoded === undefined) await setTimeout(50);
+      }
+      const sanitized = sanitize(JSON.parse(encoded) as Record<string, unknown>);
+      return response({ ...sanitized, remainingSearches: maxSearches - searchCount });
     },
   });
 }

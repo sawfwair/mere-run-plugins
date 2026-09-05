@@ -1,4 +1,5 @@
 import { createProvider, openAICompletionsApi, type Model } from "@earendil-works/pi-ai/compat";
+import { appendFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 interface MereRunModel {
@@ -17,6 +18,8 @@ interface MereRunModel {
     supports_finish_reason: boolean;
     max_tokens_field: "max_tokens" | "max_completion_tokens";
     supports_strict_mode: boolean;
+    thinking_format?: "qwen" | "zai" | "deepseek";
+    thinking_level_map?: Record<string, string | null>;
     requires_reasoning_content_on_assistant_messages: boolean;
   };
 }
@@ -30,12 +33,13 @@ function mapModel(model: MereRunModel, baseUrl: string): Model<"openai-completio
     provider: "mere-run-archive",
     baseUrl,
     reasoning: model.reasoning ?? false,
+    thinkingLevelMap: compat?.thinking_level_map,
     input: (model.modalities?.input ?? ["text"]).filter(
       (value): value is "text" | "image" => value === "text" || value === "image",
     ),
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: model.limit?.context ?? 8_192,
-    maxTokens: model.limit?.output ?? 2_048,
+    maxTokens: Math.min(model.limit?.output ?? 2_048, 4_096),
     compat: compat
       ? {
           supportsStore: compat.supports_store,
@@ -45,6 +49,7 @@ function mapModel(model: MereRunModel, baseUrl: string): Model<"openai-completio
           supportsFinishReason: compat.supports_finish_reason,
           maxTokensField: compat.max_tokens_field,
           supportsStrictMode: compat.supports_strict_mode,
+          thinkingFormat: compat.thinking_format,
           requiresReasoningContentOnAssistantMessages:
             compat.requires_reasoning_content_on_assistant_messages,
         }
@@ -68,6 +73,8 @@ export default async function mereRunArchiveProvider(pi: ExtensionAPI) {
   const baseUrl = process.env.MERERUN_BASE_URL ?? "http://127.0.0.1:8080/v1";
   const apiKey = process.env.MERERUN_API_KEY ?? "mere-run";
   const models = await discoverModels(baseUrl, apiKey, AbortSignal.timeout(2_000));
+  const eventsPath = process.env.MERE_ARCHIVE_EVENTS;
+  if (eventsPath) appendFileSync(eventsPath, JSON.stringify({ event: "provider_ready" }) + "\n", "utf8");
   pi.registerProvider(
     createProvider({
       id: "mere-run-archive",
