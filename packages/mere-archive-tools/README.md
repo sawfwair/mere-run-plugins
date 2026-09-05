@@ -35,6 +35,20 @@ mere-archive-tools search \
   --query "Halifax installation photos"
 ```
 
+For a question that requires evidence from multiple files, run the bounded
+local investigator:
+
+```bash
+mere-archive-tools investigate \
+  --database ./archive.sqlite3 \
+  --question "Was the Freezer 3 repair covered by warranty, and when does that warranty expire?"
+```
+
+The command starts a temporary loopback `mere.run` server with the 1-bit
+Bonsai model. Pi can call only the archive search tool, up to four times. The
+result separates supported claims from unresolved claims and cites only paths
+returned by those searches.
+
 Create a fictional mixed-file benchmark before you point the plugin at a real
 shared drive:
 

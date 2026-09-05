@@ -164,7 +164,7 @@
     {
       "id": "mere-archive-tools",
       "name": "Archive Tools",
-      "description": "Build and search a local PII-reduced shared-drive index without modifying source files.",
+      "description": "Build, search, and investigate a local PII-reduced shared-drive index without modifying source files.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-archive-tools",
       "subdirectory": "packages/mere-archive-tools",
@@ -179,6 +179,8 @@
         "multimodal-embeddings",
         "semantic-search",
         "full-text-search",
+        "bounded-investigation",
+        "pi-agent",
         "sqlite",
         "deduplication",
         "archive-benchmark"
