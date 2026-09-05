@@ -1,71 +1,67 @@
-# Remaining archive investigator work
+# Archive investigator completion status
 
-This checklist is for contributors who complete the bounded Pi investigator in
-Archive Tools. The implementation, unit tests, package resources, and developer
-documentation are present. The repository gate passes.
+This checklist records the follow-up to merged PR #53. See [the acceptance
+report](ACCEPTANCE.md) for model revisions, source paths, measurements, failed
+comparisons, and reproduction commands.
 
-## Complete runtime acceptance
+## Runtime acceptance
 
-- [ ] Run `mere-archive-tools investigate` to completion against the Harbourline
-  safe-content index with `text-chat-bonsai-27b-1bit`.
-- [ ] Confirm that Pi calls `archive_search` within the configured timeout. In
-  the first live attempt, the API server loaded Bonsai and Pi connected, but no
-  search trace appeared during approximately three minutes before the run was
-  interrupted.
-- [ ] Confirm that the Freezer 3 question retrieves the repair record, invoice,
-  and vendor warranty agreement through separate query refinements.
-- [ ] Confirm that the final JSON marks unsupported facts as `unresolved` and
-  cites only paths recorded in the authoritative search trace.
-- [ ] Record cold-start time, time to first search, total latency, peak memory,
-  search count, and cited paths for the acceptance run.
+- [x] Run the 1-bit model to completion against the Harbourline safe-content
+  index and assess its answer. It returned valid JSON but failed evidence
+  acceptance: it missed the agreement and inferred noncoverage from an invoice.
+- [x] Compare the 2-bit model on the same case. It passed the compound retrieval
+  and answer-quality test and replaces 1-bit as the default.
+- [x] Verify that Pi starts `archive_search` within the first-search deadline.
+  The passing run reached it 10.686 seconds after Pi launch.
+- [x] Retrieve the repair record, invoice, and vendor agreement through query
+  refinements. The passing run used four searches.
+- [x] Return only recorded citation paths, support the parts expiry date, and
+  leave repair reimbursement and labor coverage unresolved.
+- [x] Record API-ready time, first-search time, total latency, sampled process
+  memory, search count, and citation paths. The passing run took 223.766 seconds
+  on an M4 Max with 128 GiB of unified memory.
 
-Use this acceptance question:
+## Process lifecycle and diagnosis
 
-```bash
-mere-archive-tools investigate \
-  --database ./harbourline-safe.sqlite3 \
-  --question "Was the Freezer 3 repair covered by warranty, and when does that warranty expire?"
-```
+- [x] Own process groups for preflight, question reduction, the temporary API,
+  Pi, and nested searches. Stop them after success, error, SIGINT, or SIGTERM.
+- [x] Test interruption during server readiness and active Pi execution,
+  including a grandchild process.
+- [x] Bound server readiness, first search, each search, both Pi attempts, and
+  shutdown. Contract repair reuses prior evidence without restarting retrieval.
+- [x] Record content-free timing and request metadata. Ignore hidden reasoning
+  and earlier assistant turns when parsing the final result.
+- [x] Diagnose reproducible integration and generation delays. The original
+  interrupted three-minute run had no retained timeline, so its unique cause
+  remains unknown. Follow-up traces distinguish fast extension loading from
+  later generation delays and bounded timeout failures.
+- [x] Prevent a failed memory observation from aborting inference; report missed
+  samples explicitly.
 
-## Tighten process lifecycle behavior
+## Admission and hardware
 
-- [ ] Add signal handling that stops the temporary `mere.run api serve` process
-  when the launcher receives `SIGINT` or `SIGTERM`. The interrupted live test
-  required an explicit stop for the orphaned API server.
-- [ ] Add a test that interrupts the launcher and verifies that Pi and the API
-  server both exit.
-- [ ] Preserve the existing bounded waits for server readiness, Pi completion,
-  search execution, and server shutdown.
+- [x] Use current capacity, queues, memory pressure, and available memory to
+  decide whether the search can run alongside the API. On this 128 GiB host,
+  four permits allow the two-permit API and standard search work to coexist.
+- [x] Release the investigator's idle server when another workload queues after
+  a search starts, avoiding a FIFO admission deadlock.
+- [x] Retain runtime memory guards and enforce deadlines on constrained-capacity
+  paths. Test them with deterministic fake processes.
+- [x] Document RSS and latency as observations on the tested hardware, without
+  treating process RSS as total unified-memory demand.
+- [ ] Run on an actual 16 GB Apple Silicon Mac and verify the full workflow
+  against its memory guard. No such machine is available; the owner accepted
+  recording this validation gap in the follow-up PR.
 
-## Diagnose time to first search
+## Regression coverage and contracts
 
-- [ ] Capture Pi diagnostics and the local API request timeline without storing
-  hidden reasoning or archive content.
-- [ ] Determine whether the delay comes from model generation, provider
-  metadata, tool schema processing, or extension loading.
-- [ ] Set a practical first-search deadline or select a faster qualified default
-  model if Bonsai can't meet the acceptance target.
-- [ ] Re-run the investigation with `text-chat-bonsai-27b-2bit` as a comparison
-  while keeping the less-than-16-GB deployment target.
-
-## Validate constrained retrieval on smaller machines
-
-- [ ] Run the acceptance case on an Apple Silicon Mac with 16 GB of unified
-  memory.
-- [ ] Verify that the chat model, PII reducer, and embedding workflow stay within
-  the memory guard instead of waiting indefinitely for machine admission.
-- [ ] If nested `mere.run` search commands contend with the API server, route
-  query embeddings through the temporary loopback API or another single-process
-  path.
-- [ ] Document measured memory and latency as observations tied to the tested
-  hardware and model revision.
-
-## Add end-to-end regression coverage
-
-- [ ] Add a deterministic fake-Pi test that makes multiple `archive_search`
-  calls and returns a valid investigation contract.
-- [ ] Add rejection tests for a missing search trace, a fabricated citation, an
-  exceeded search budget, invalid JSON, and a timed-out tool call.
-- [ ] Add an opt-in Harbourline acceptance test that uses installed local models.
-- [ ] Keep `./scripts/check.sh` passing before the pull request leaves draft
-  status.
+- [x] Test multiple searches through the real supervisor and search CLI with
+  fake native inference and Pi processes.
+- [x] Reject missing searches, invented citation paths, exceeded budgets,
+  malformed final JSON, truncated output, and timed-out tools.
+- [x] Preserve source files and the database; open search connections read-only
+  and reject output or diagnostics paths that overlap protected inputs.
+- [x] Validate the published result schema and illustrative example, including
+  optional metrics. Verify bundled Pi resources in the installed wheel.
+- [x] Add opt-in installed-model Harbourline acceptance and Pi adapter tests.
+- [x] Pass the repository gate and docs checks before opening the follow-up PR.

@@ -44,10 +44,20 @@ mere-archive-tools investigate \
   --question "Was the Freezer 3 repair covered by warranty, and when does that warranty expire?"
 ```
 
-The command starts a temporary loopback `mere.run` server with the 1-bit
-Bonsai model. Pi can call only the archive search tool, up to four times. The
-result separates supported claims from unresolved claims and cites only paths
-returned by those searches.
+The command starts a temporary loopback `mere.run` server with the 2-bit
+Bonsai model. Pi can call only the archive search tool, up to four times across
+both attempts. The launcher checks current inference admission capacity before
+each search and releases its server when capacity is constrained. It stops owned
+processes on completion, interruption, or timeout. The result separates supported
+claims from unresolved claims and cites only returned paths. Citation validation
+checks path membership; review the snippets to assess factual support.
+
+Use `--diagnostics ./investigation-metrics.json` to record content-free timing
+and sampled process-tree memory. The default first-search and tool deadlines
+are 60 seconds; the Pi loop has 300 seconds and a 16,384-token context.
+The 2-bit default passed the compound Harbourline acceptance case. The 1-bit
+comparison failed evidence acceptance. See [the acceptance report](ACCEPTANCE.md)
+for observations on the 128 GiB test host and the untested 16 GB target.
 
 Create a fictional mixed-file benchmark before you point the plugin at a real
 shared drive:

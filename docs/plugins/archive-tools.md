@@ -142,7 +142,7 @@ Install Pi and the default local model before the first investigation:
 
 ```bash
 mere.run agent onboard --install-pi
-mere.run model pull text-chat-bonsai-27b-1bit
+mere.run model pull text-chat-bonsai-27b-2bit
 ```
 
 To investigate the Freezer 3 repair, run the following command:
@@ -156,24 +156,54 @@ mere-archive-tools investigate \
 The command performs these actions:
 
 1. It reduces PII in the question.
-2. It starts a temporary loopback `mere.run` server with the 1-bit Bonsai
+2. It starts a temporary loopback `mere.run` server with the 2-bit Bonsai
    model.
 3. It gives Pi only the `archive_search` tool. Pi can't read arbitrary files,
    run shell commands, or change the archive.
 4. It permits up to four searches with five results per search.
-5. It validates every supported claim against paths returned by those searches.
+5. It checks the claim structure and requires citations to match returned paths.
 6. It stops the temporary server and returns structured JSON.
+
+Before each search, the launcher checks current machine admission capacity,
+queued work, and memory pressure. It keeps the chat server resident when a
+search can run. When capacity is constrained, it stops its own server, runs
+the search, and restarts the server before Pi continues. The runtime's admission
+and memory guards remain active.
 
 The result includes the reduced question, the model ID, the authoritative
 search trace, supported or unresolved claims, and the enforced limits. The
-validator rejects fabricated citations. A supported citation means that a
-returned snippet supports the claim; it doesn't prove that the archive contains
-no conflicting or missing record.
+validator rejects fabricated citation paths. It doesn't determine whether a
+snippet entails a claim or whether conflicting or missing records exist.
+Review the cited evidence before relying on the answer.
 
 To change the investigation budget, use `--max-searches` and `--top`. The
 launcher accepts at most eight searches and 10 results per search. The default
-model is `text-chat-bonsai-27b-1bit`; pass `--model` and `--engine` together to
+model is `text-chat-bonsai-27b-2bit`; pass `--model` and `--engine` together to
 use another installed tool-capable model.
+
+The default context contains 16,384 tokens. The first search must start within
+60 seconds of Pi startup, and each search has a 60-second deadline. The entire
+Pi loop, including one contract-repair retry, has a 300-second deadline. Use
+`--first-search-timeout`, `--search-timeout`, and `--pi-timeout` to change these
+limits. Server preflight and each startup have a separate `--server-timeout`
+limit, with restarts also bounded by the remaining Pi deadline.
+
+Use `--diagnostics ./investigation-metrics.json` to save timing events and
+sampled peak process-tree memory, including on failure. Diagnostics omit the
+question, search terms, archive text, citations, and hidden reasoning. Successful
+JSON results include the same metrics. RSS measurements include the launcher,
+Pi, and its inference processes; they exclude other applications and macOS.
+`missedMemorySamples` counts failed RSS observations without aborting inference.
+
+The result follows the
+[Archive Investigation contract](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/archive-investigation.v1.schema.json).
+See the [illustrative result](https://github.com/sawfwair/mere-run-plugins/blob/main/examples/archive/investigation.result.json)
+and [acceptance report](https://github.com/sawfwair/mere-run-plugins/blob/main/packages/mere-archive-tools/ACCEPTANCE.md)
+for the output shape and measured validation limits.
+
+The launcher cleans up its process groups on completion, errors, timeouts,
+Ctrl-C, and `SIGTERM`. It reads the index through a read-only connection and
+rejects output paths inside the source tree.
 
 ## Resume and inspect indexing
 

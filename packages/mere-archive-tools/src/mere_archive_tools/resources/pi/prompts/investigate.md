@@ -10,7 +10,13 @@ or the search budget is exhausted.
 
 Use only facts stated in returned snippets. Cite paths exactly as the tool
 returns them. Mark a claim `unresolved` when the searches don't support it. Do
-not fill gaps with general knowledge or likely conclusions.
+not fill gaps with general knowledge or likely conclusions. Distinguish warranty
+coverage for replacement parts from reimbursement of a repair charge. Coverage
+of some items doesn't establish that other items are excluded. An invoice line
+isn't evidence of reimbursement or a warranty exclusion. Never turn missing
+evidence into a negative factual claim. Mark both positive and negative claims
+unresolved unless the snippets explicitly support them. Search for each required
+document type before concluding that a fact is unresolved.
 
 Return only one JSON object with this shape:
 

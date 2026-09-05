@@ -2,14 +2,24 @@
   "name": "@mere/archive-investigator-pi",
   "version": "0.1.0",
   "private": true,
-  "keywords": ["pi-package", "mere.run", "archive", "retrieval"],
+  "keywords": [
+    "pi-package",
+    "mere.run",
+    "archive",
+    "retrieval"
+  ],
   "pi": {
-    "extensions": ["./extensions"],
-    "prompts": ["./prompts"]
+    "extensions": [
+      "./extensions"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
-  }
+  },
+  "type": "module"
 }

@@ -22,6 +22,8 @@ companion plugins.
   change scenarios.
 - `archive-benchmark-report.v1.schema.json`: archive benchmark metrics and
   evaluation results.
+- `archive-investigation.v1.schema.json`: bounded investigation results, citation
+  paths, unresolved claims, and optional timing and memory observations.
 - `film-brief.v1.schema.json`: user-confirmed story, audience, creative, and
   delivery requirements held at the first approval gate.
 - `film-department-result.v1.schema.json`: read-only Pi department proposal

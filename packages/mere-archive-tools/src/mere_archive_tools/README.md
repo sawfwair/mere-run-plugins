@@ -11,7 +11,10 @@ This package implements the `mere-archive-tools` companion CLI.
 - `runtime.py` calls local `mere.run` captioning, OCR, PII reduction, and
   multimodal embedding commands.
 - `pi_harness.py` runs bounded, read-only investigations through the bundled Pi
-  extensions and validates source-linked claims.
+  extensions, schedules searches using current admission capacity, and validates
+  the result contract and citation paths.
+- `investigation_processes.py` owns process groups, signal cleanup, bounded
+  subprocess calls, and sampled process-tree memory.
 
 Source files remain read-only. Unreduced extracted text stays in memory or a
 temporary caption directory and is removed before the index stores derived
