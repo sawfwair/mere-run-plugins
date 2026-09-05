@@ -132,6 +132,49 @@ matching content record.
 The source drive must remain mounted to open results. The `available` field in
 each path record reports whether the source file is present during the search.
 
+## Investigate a compound question
+
+Use the investigator when one question requires evidence from several files.
+The command uses Pi to refine archive searches and assemble source-linked
+claims. It doesn't replace the index or guarantee complete retrieval.
+
+Install Pi and the default local model before the first investigation:
+
+```bash
+mere.run agent onboard --install-pi
+mere.run model pull text-chat-bonsai-27b-1bit
+```
+
+To investigate the Freezer 3 repair, run the following command:
+
+```bash
+mere-archive-tools investigate \
+  --database ./archive.sqlite3 \
+  --question "Was the Freezer 3 repair covered by warranty, and when does that warranty expire?"
+```
+
+The command performs these actions:
+
+1. It reduces PII in the question.
+2. It starts a temporary loopback `mere.run` server with the 1-bit Bonsai
+   model.
+3. It gives Pi only the `archive_search` tool. Pi can't read arbitrary files,
+   run shell commands, or change the archive.
+4. It permits up to four searches with five results per search.
+5. It validates every supported claim against paths returned by those searches.
+6. It stops the temporary server and returns structured JSON.
+
+The result includes the reduced question, the model ID, the authoritative
+search trace, supported or unresolved claims, and the enforced limits. The
+validator rejects fabricated citations. A supported citation means that a
+returned snippet supports the claim; it doesn't prove that the archive contains
+no conflicting or missing record.
+
+To change the investigation budget, use `--max-searches` and `--top`. The
+launcher accepts at most eight searches and 10 results per search. The default
+model is `text-chat-bonsai-27b-1bit`; pass `--model` and `--engine` together to
+use another installed tool-capable model.
+
 ## Resume and inspect indexing
 
 The plugin compares each file's size and modification time before it runs

@@ -23,4 +23,12 @@ mere-archive-tools = "mere_archive_tools.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_archive_tools = ["py.typed", "THIRD_PARTY_NOTICES.txt", "benchmarks/*.json", "benchmarks/harbourline/*.png"]
+mere_archive_tools = [
+  "py.typed",
+  "THIRD_PARTY_NOTICES.txt",
+  "benchmarks/*.json",
+  "benchmarks/harbourline/*.png",
+  "resources/pi/package.json",
+  "resources/pi/extensions/*.ts",
+  "resources/pi/prompts/*.md",
+]

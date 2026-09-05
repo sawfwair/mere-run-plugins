@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
-from mere_archive_tools import benchmark, cli, extractors, runtime
+from mere_archive_tools import benchmark, cli, extractors, pi_harness, runtime
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -91,12 +91,80 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             "cleanup",
             "index",
             "search",
+            "investigate",
             "stats",
             "benchmark",
         }
         self.assertTrue(required.issubset(names))
         self.assertIn("pii-reduction", manifest["capabilities"])
+        self.assertIn("bounded-investigation", manifest["capabilities"])
         self.assertEqual(manifest["security"]["createsPaidResources"], False)
+
+    def test_investigation_contract_rejects_unsupported_citations(self) -> None:
+        payload: dict[str, object] = {
+            "contractVersion": pi_harness.INVESTIGATION_CONTRACT,
+            "answer": "The invoice supports the repair date.",
+            "claims": [
+                {
+                    "id": "claim-1",
+                    "statement": "The repair occurred on June 3.",
+                    "status": "supported",
+                    "sources": ["Maintenance/repair.pdf"],
+                }
+            ],
+        }
+        pi_harness.validate_model_result(payload, {"Maintenance/repair.pdf"})
+        with self.assertRaisesRegex(pi_harness.InvestigationError, "weren't returned"):
+            pi_harness.validate_model_result(payload, {"Finance/invoice.pdf"})
+
+    def test_investigation_parser_accepts_fenced_json(self) -> None:
+        payload = pi_harness.parse_json_output(
+            '```json\n{"contractVersion":"mere.run/archive-investigation.v1","answer":"A","claims":[]}\n```'
+        )
+        self.assertEqual(payload["answer"], "A")
+
+    def test_investigate_command_uses_bounded_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database_path = pathlib.Path(temporary) / "archive.sqlite3"
+            database_path.touch()
+            result: dict[str, object] = {
+                "contractVersion": pi_harness.INVESTIGATION_CONTRACT,
+                "question": "Which repair is covered?",
+                "piiReductionApplied": True,
+                "model": pi_harness.DEFAULT_MODEL,
+                "answer": "The evidence is unresolved.",
+                "claims": [
+                    {
+                        "id": "claim-1",
+                        "statement": "Warranty coverage isn't established.",
+                        "status": "unresolved",
+                        "sources": [],
+                    }
+                ],
+                "searches": [{"sequence": 1, "query": "repair warranty", "resultPaths": []}],
+                "unresolvedClaims": ["Warranty coverage isn't established."],
+                "limits": {"maxSearches": 4, "resultsPerSearch": 5},
+                "attempts": 1,
+            }
+            with patch.object(pi_harness, "investigate", return_value=result) as investigate:
+                exit_code, payload, diagnostic = invoke(
+                    [
+                        "investigate",
+                        "--database",
+                        str(database_path),
+                        "--question",
+                        "Which repair is covered?",
+                        "--mere-run-command",
+                        sys.executable,
+                    ]
+                )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload, result)
+            self.assertIn("up to 4 archive searches", diagnostic)
+            config = investigate.call_args.args[0]
+            self.assertEqual(config.max_searches, 4)
+            self.assertEqual(config.top, 5)
+            self.assertEqual(config.model, pi_harness.DEFAULT_MODEL)
 
     def test_plan_defaults_to_safe_content_and_rejects_source_writes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

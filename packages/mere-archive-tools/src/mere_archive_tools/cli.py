@@ -13,7 +13,7 @@ import sys
 from collections import Counter
 from typing import cast
 
-from . import __version__, benchmark, database, extractors
+from . import __version__, benchmark, database, extractors, pi_harness
 from .runtime import InferenceError, MereRunClient, split_command
 
 PLUGIN_NAME = "mere-archive-tools"
@@ -181,6 +181,7 @@ def plugin_manifest() -> JsonMap:
         ("cleanup", "Record cleanup without changing the source or deleting the index."),
         ("index", "Plan and run a resumable shared-drive index."),
         ("search", "Search the archive with a PII-reduced text query."),
+        ("investigate", "Answer a compound archive question with bounded, source-linked searches."),
         ("stats", "Report index coverage and retention settings."),
         ("benchmark", "Prepare, mutate, and evaluate archive benchmark datasets."),
     ]
@@ -205,6 +206,8 @@ def plugin_manifest() -> JsonMap:
             "multimodal-embeddings",
             "semantic-search",
             "full-text-search",
+            "bounded-investigation",
+            "pi-agent",
             "sqlite",
             "deduplication",
             "archive-benchmark",
@@ -754,6 +757,38 @@ def command_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_investigate(args: argparse.Namespace) -> int:
+    if args.output is not None and args.database.is_file():
+        connection = database.connect(args.database)
+        try:
+            source_root = database.metadata(connection).get("source_root")
+        finally:
+            connection.close()
+        if source_root is not None and is_within(args.output, pathlib.Path(source_root).expanduser().resolve()):
+            raise PluginError("--output must be outside the read-only source tree", 2)
+    config = pi_harness.InvestigationConfig(
+        database=args.database,
+        question=args.question,
+        model=args.model,
+        engine=args.engine,
+        max_searches=args.max_searches,
+        top=args.top,
+        context_size=args.context_size,
+        server_timeout_seconds=args.server_timeout,
+        pi_timeout_seconds=args.pi_timeout,
+        mere_run_command=args.mere_run_command,
+        pi_command=args.pi_command,
+        replacement=args.replacement,
+    )
+    pi_harness.validate_config(config)
+    eprint(f"Investigating with {args.model}; the agent can run up to {args.max_searches} archive searches.")
+    payload = pi_harness.investigate(config)
+    if args.output is not None:
+        write_json(args.output, payload)
+    print_json(payload)
+    return 0
+
+
 def command_stats(args: argparse.Namespace) -> int:
     if not args.database.is_file():
         raise PluginError(f"archive database doesn't exist: {args.database}", 2)
@@ -920,6 +955,25 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--mere-run-command", default="")
     search.set_defaults(func=command_search)
 
+    investigate = sub.add_parser(
+        "investigate",
+        help="Answer a compound archive question with a bounded local Pi search loop.",
+    )
+    investigate.add_argument("--database", required=True, type=pathlib.Path)
+    investigate.add_argument("--question", required=True)
+    investigate.add_argument("--model", default=pi_harness.DEFAULT_MODEL)
+    investigate.add_argument("--engine", default=pi_harness.DEFAULT_ENGINE)
+    investigate.add_argument("--max-searches", type=int, default=4)
+    investigate.add_argument("--top", type=int, default=5)
+    investigate.add_argument("--context-size", type=int, default=8_192)
+    investigate.add_argument("--server-timeout", type=int, default=180)
+    investigate.add_argument("--pi-timeout", type=int, default=180)
+    investigate.add_argument("--output", type=pathlib.Path)
+    investigate.add_argument("--replacement", default="[{label}]")
+    investigate.add_argument("--mere-run-command", default="")
+    investigate.add_argument("--pi-command", default=os.environ.get("MERE_ARCHIVE_TOOLS_PI", ""))
+    investigate.set_defaults(func=command_investigate)
+
     stats = sub.add_parser("stats", help="Report archive database statistics.")
     stats.add_argument("--database", required=True, type=pathlib.Path)
     stats.set_defaults(func=command_stats)
@@ -958,9 +1012,18 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = normalize_args(args)
         return int(args.func(args))
-    except (PluginError, benchmark.BenchmarkError, InferenceError, extractors.ExtractionError, ValueError) as exc:
+    except (
+        PluginError,
+        benchmark.BenchmarkError,
+        InferenceError,
+        extractors.ExtractionError,
+        pi_harness.InvestigationError,
+        ValueError,
+    ) as exc:
         eprint(f"Error: {exc}")
-        return exc.exit_code if isinstance(exc, PluginError) else 1
+        if isinstance(exc, (PluginError, pi_harness.InvestigationError)):
+            return exc.exit_code
+        return 1
     except KeyboardInterrupt:
         eprint("Interrupted.")
         return 130
