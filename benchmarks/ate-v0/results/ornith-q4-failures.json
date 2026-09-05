@@ -1,0 +1,347 @@
+[
+  {
+    "case_id": "ate-v0.browser.ambiguous-button",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "which Save button to click (#save-profile or #save-payment)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "clarify",
+        "missing": [
+          "selector"
+        ]
+      },
+      "rationale": "Identical labels do not identify a unique target."
+    },
+    "hard_failures": [],
+    "review_status": "clarification wording review candidate; original failure retained"
+  },
+  {
+    "case_id": "ate-v0.calendar.duration-missing",
+    "response": {
+      "action": "call",
+      "tool": "calendar.create_event",
+      "arguments": {
+        "calendar_id": "cal-1",
+        "title": "Review",
+        "start": "2026-10-15T09:00:00Z"
+      }
+    },
+    "gold": {
+      "decision": {
+        "action": "clarify",
+        "missing": [
+          "end"
+        ]
+      },
+      "rationale": "A start does not determine the required end."
+    },
+    "hard_failures": [
+      "invalid-decision-or-fixture-operation"
+    ],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.calendar.invite-unavailable",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "calendar_id",
+        "event_id"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "This catalog exposes no attendee invitation operation."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.calendar.recurring-unavailable",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "start time",
+        "duration in minutes",
+        "timezone/UTC offset for start and end"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "These event adapters have no recurrence field."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.captions.edit-captions",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "video_id (vid_K7 is ambiguous; confirm the exact id)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "Retrieval does not edit caption tracks."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.documents.missing-input",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "url or html"
+      ]
+    },
+    "gold": {
+      "accepted_alternatives": [
+        {
+          "action": "clarify",
+          "missing": [
+            "url"
+          ]
+        }
+      ],
+      "decision": {
+        "action": "clarify",
+        "missing": [
+          "html"
+        ]
+      },
+      "rationale": "Either supplied HTML or a page URL resolves the missing input; asking for either is acceptable."
+    },
+    "hard_failures": [],
+    "review_status": "clarification wording review candidate; original failure retained"
+  },
+  {
+    "case_id": "ate-v0.filesystem.ambiguous-occurrence",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "which occurrence to replace"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "clarify",
+        "missing": [
+          "old"
+        ]
+      },
+      "rationale": "The replacement value is known; request an old span that uniquely identifies the intended occurrence."
+    },
+    "hard_failures": [],
+    "review_status": "clarification wording review candidate; original failure retained"
+  },
+  {
+    "case_id": "ate-v0.filesystem.delete-unsupported",
+    "response": {
+      "action": "call",
+      "tool": "scheduling.cancel_task",
+      "arguments": {
+        "task_id": "/work/old.txt"
+      }
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "No delete adapter exists."
+    },
+    "hard_failures": [
+      "called-when-no-call-was-correct"
+    ],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.git.merge-unsupported",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "target branch name to merge (e.g., feature)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "This catalog does not expose merge."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.images.ocr-unavailable",
+    "response": {
+      "action": "call",
+      "tool": "images.edit_image",
+      "arguments": {
+        "sources": [
+          "/fixtures/sign.png"
+        ],
+        "prompt": "Extract every printed word and return the transcription text."
+      }
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "Image generation and editing do not expose OCR."
+    },
+    "hard_failures": [
+      "called-when-no-call-was-correct"
+    ],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.issues.branch-not-sha",
+    "response": {
+      "action": "unavailable"
+    },
+    "gold": {
+      "decision": {
+        "action": "clarify",
+        "missing": [
+          "sha"
+        ]
+      },
+      "rationale": "This adapter requires an exact SHA."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.issues.no-post",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "task_id"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "no_tool"
+      },
+      "rationale": "The latest instruction requests no action."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.mail.draft-unavailable",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "format"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "Sending would violate the draft-only request; no draft adapter exists."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.metrics.disk",
+    "response": {
+      "action": "call",
+      "tool": "metrics.get_disk_usage"
+    },
+    "gold": {
+      "decision": {
+        "action": "call",
+        "arguments": {},
+        "tool": "metrics.get_disk_usage"
+      },
+      "rationale": "Disk capacity is not RAM or swap use."
+    },
+    "hard_failures": [
+      "invalid-decision-or-fixture-operation"
+    ],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.metrics.restart-unavailable",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "restart action (kill then relaunch, or scheduling restart)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "Termination alone is not restart."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.notes.unsupported-update",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "notes.kura_update (no update tool in catalog)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "This catalog has no update operation; delete/recreate violates the request."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.scheduling.recurrence-unsupported",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "at (single instant required by schedule_task; cannot express a recurring weekday schedule)"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "This intentionally bounded adapter has no recurrence field."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  },
+  {
+    "case_id": "ate-v0.storage.rename-unsupported",
+    "response": {
+      "action": "clarify",
+      "missing": [
+        "no atomic rename tool available; only set_value/delete_value exist"
+      ]
+    },
+    "gold": {
+      "decision": {
+        "action": "unavailable"
+      },
+      "rationale": "No single adapter supplies atomic rename."
+    },
+    "hard_failures": [],
+    "review_status": "original failure retained"
+  }
+]

@@ -44,6 +44,7 @@ fi
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-perform/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-vfx-tools/tests
 "$PYTHON" -m coverage report
+"$PYTHON" -m unittest discover -s benchmarks/ate-v0 -p 'test_*.py'
 "$PYTHON" scripts/check_structure.py
 "$PYTHON" scripts/validate_repo.py
 "$PYTHON" scripts/check_plugin_bundles.py

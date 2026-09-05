@@ -61,6 +61,8 @@ mypy_path = [
   "packages/mere-geo-tools/src",
 ]
 files = [
+  "benchmarks/ate-v0/score.py",
+  "benchmarks/ate-v0/test_cases.py",
   "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
