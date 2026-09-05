@@ -35,6 +35,15 @@ checks, then tests document graph catalog/preflight/execution conformance. A sca
 case verifies that hosted OCR remains disabled. Python 3.9 runs the base
 package and mocked boundary tests without installing AnyDoc.
 
+## Model benchmark
+
+To evaluate tool selection, arguments, clarification, and bounded fixture
+outcomes with local inference, follow the
+[ATE benchmark guide](/guide/ate-benchmark). It covers all 240 cases, an
+eight-case smoke run, checkpoint resume, and the first model baseline. The
+repository's fixture tests validate the scorer and expected decisions; they do
+not run model inference or qualify a model for release.
+
 ## Docs gate
 
 Run:

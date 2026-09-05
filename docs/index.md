@@ -30,8 +30,8 @@ features:
     details: Use stable manifests, graph providers, JSON output, artifact hashes, and resumable run records.
     link: /guide/artifacts-and-runs
   - title: Evaluate models
-    details: Compare local agents with a pinned Terminal-Bench dataset and explicit Docker storage limits.
-    link: /plugins/terminal-bench
+    details: Check tool selection, arguments, clarification, and fixture outcomes with 240 ATE-derived cases.
+    link: /guide/ate-benchmark
   - title: Extend the system
     details: Implement a companion executable against language-neutral plugin, graph, recipe, and run contracts.
     link: /plugins/contract
