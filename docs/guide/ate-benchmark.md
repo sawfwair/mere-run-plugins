@@ -181,9 +181,36 @@ Cases received authoring-assistant review and deterministic checks; independent
 human review and a second complete model baseline remain pending. Diagnostic
 gates do not qualify a model for release.
 
-[Source and reuse notes](https://github.com/sawfwair/mere-run-plugins/blob/main/benchmarks/ate-v0/SOURCES.md)
-pin the ATE snapshot and explain the provenance boundary. Upstream descriptions
-and O*NET task text are not redistributed in the pack.
+## Citation and license scope
+
+This benchmark credits Cohere Labs' Agentic Task Ecosystem (ATE) and its
+accompanying publication:
+
+Zanele Munyikwa, Campbell Lund, Thomas Euyang, Aidan Peppin, and Marzieh Fadaee.
+2026. [Automation's Early Footprint: Where AI Agents Are (and Aren't) Being Built](https://cohere.com/blog/automations-early-footprint).
+Cohere Labs. Dataset: [ATE](https://huggingface.co/datasets/CohereLabs/ATE),
+revision `4b567ba98acc6ddf27b2abb9004844581083c5d8`.
+
+The repository's [MIT license](https://github.com/sawfwair/mere-run-plugins/blob/main/LICENSE)
+applies to its original benchmark code and authored materials. It does not
+relicense ATE, upstream server material, or O\*NET content, and grants no
+additional rights to those sources.
+
+The [ATE dataset card at this revision](https://huggingface.co/datasets/CohereLabs/ATE/blob/4b567ba98acc6ddf27b2abb9004844581083c5d8/README.md#data-sources-and-attribution)
+does not specify a dataset-level license. Upstream repository licenses govern
+reuse of verbatim tool descriptions; O\*NET task text remains CC BY 4.0. This
+pack excludes raw ATE files, upstream descriptions, O\*NET task text, and judge
+rationales. Retained identifiers and provenance are not a claim of unrestricted
+ATE reuse or confirmed legal clearance. Attribution alone does not establish
+reuse permission.
+
+When publishing or adapting the benchmark, we recommend retaining the citation,
+source revision, upstream references, and adaptation notes. This recommendation
+does not add conditions to the MIT license. Verify the applicable
+license or obtain permission before adding further source material. The
+[source and reuse notes](https://github.com/sawfwair/mere-run-plugins/blob/main/benchmarks/ate-v0/SOURCES.md)
+describe these boundaries. This benchmark does not claim endorsement by Cohere
+Labs, the cited authors, or upstream server developers.
 
 For agent execution in containerized tasks, see
 [Terminal-Bench](/plugins/terminal-bench). For repository and docs validation,

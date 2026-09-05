@@ -71,7 +71,7 @@ Gates are diagnostic and establish no release qualification.
 
 [Source identifiers and hashes](sources.json) pin ATE revision
 `4b567ba98acc6ddf27b2abb9004844581083c5d8`. The sample is deliberately small
-and nonrepresentative. Upstream description text and O*NET task text are not
+and nonrepresentative. Upstream description text and O\*NET task text are not
 redistributed. See [source and reuse notes](SOURCES.md).
 
 Cases received an authoring-assistant review and deterministic checks.
@@ -80,3 +80,26 @@ The [first model baseline](BASELINE.md) records Ornith Q4 at 222/240 cases
 comparison against another model remain pending.
 See the [validation record](VALIDATION.md) for the checked pack identity and
 completed local checks.
+
+## Citation and license scope
+
+This benchmark credits Cohere Labs' Agentic Task Ecosystem (ATE) and its
+accompanying publication:
+
+Zanele Munyikwa, Campbell Lund, Thomas Euyang, Aidan Peppin, and Marzieh Fadaee.
+2026. [Automation's Early Footprint: Where AI Agents Are (and Aren't) Being Built](https://cohere.com/blog/automations-early-footprint).
+Cohere Labs. Dataset: [ATE](https://huggingface.co/datasets/CohereLabs/ATE),
+revision `4b567ba98acc6ddf27b2abb9004844581083c5d8`.
+
+The repository's [MIT license](../../LICENSE) applies to its original benchmark
+code and authored materials. It does not relicense ATE, upstream server
+material, or O\*NET content. ATE has no dataset-level license specified at this
+revision; attribution alone does not establish reuse permission. This is an
+independently authored benchmark, without endorsement by Cohere Labs or the
+upstream server developers.
+
+When publishing or adapting the pack, we recommend retaining the citation,
+source revision, upstream references, and adaptation notes. See
+[Sources and reuse](SOURCES.md)
+for the third-party license boundaries and checks needed before adding further
+source material.
