@@ -159,6 +159,19 @@ class InvestigationTests(unittest.TestCase):
         self.assertEqual(payload['attempts'], 2)
         self.assertEqual(len(payload['searches']), 2)
 
+    def test_frozen_runtime_dispatches_nested_searches_by_reviewed_module(self) -> None:
+        executable = self.root / 'frozen-runtime'
+        executable.write_text(f'#!{sys.executable}\n'
+                              'import sys\n'
+                              'assert sys.argv.pop(1) == "mere_archive_tools.cli"\n'
+                              'from mere_archive_tools.cli import main\n'
+                              'raise SystemExit(main())\n')
+        executable.chmod(0o755)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(sys, 'executable', str(executable)):
+            result = self.launch('success')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(json.loads(result.stdout)['searches']), 2)
+
     def test_memory_sampling_timeout_does_not_cancel_work(self) -> None:
         processes = Processes()
         with patch('mere_archive_tools.investigation_processes.subprocess.run',
@@ -273,8 +286,10 @@ class HarbourlineAcceptance(unittest.TestCase):
     def test_compound_warranty_question(self) -> None:
         database = os.environ['MERE_ARCHIVE_HARBOURLINE_DATABASE']
         model = os.environ.get('MERE_ARCHIVE_ACCEPTANCE_MODEL', DEFAULT_MODEL)
+        entrypoint = shlex.split(os.environ['MERE_ARCHIVE_ACCEPTANCE_COMMAND']) if os.environ.get('MERE_ARCHIVE_ACCEPTANCE_COMMAND') else [
+            sys.executable, '-m', 'mere_archive_tools']
         command = [
-            sys.executable, '-m', 'mere_archive_tools', 'investigate', '--database', database, '--model', model,
+            *entrypoint, 'investigate', '--database', database, '--model', model,
             '--question', 'Was the Freezer 3 repair covered by warranty, and when does that warranty expire?',
         ]
         output_dir = os.environ.get('MERE_ARCHIVE_ACCEPTANCE_OUTPUT_DIR')

@@ -88,6 +88,13 @@ def resource_root() -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parent / "resources" / "pi"
 
 
+def archive_command() -> list[str]:
+    if getattr(sys, "frozen", False):
+        # The bundle executable accepts reviewed module names, not Python's -m.
+        return [sys.executable, "mere_archive_tools.cli"]
+    return [sys.executable, "-m", "mere_archive_tools"]
+
+
 def _as_map(value: object, label: str) -> JsonMap:
     if isinstance(value, dict):
         return cast(JsonMap, value)
@@ -502,7 +509,7 @@ def run_pi(config: InvestigationConfig, processes: Processes, metrics: RunMetric
 
         try:
             completed = processes.run([
-                sys.executable, "-m", "mere_archive_tools", "search",
+                *archive_command(), "search",
                 "--database", str(config.database.resolve()), "--query", query,
                 "--top", str(config.top), "--replacement", config.replacement,
                 "--mere-run-command", config.mere_run_command,

@@ -168,3 +168,9 @@ PYTHONPATH=packages/mere-archive-tools/src:packages/mere-archive-tools/tests \
 Set `MERE_ARCHIVE_ACCEPTANCE_MODEL=text-chat-bonsai-27b-1bit` for the comparison.
 The acceptance test is skipped by default. Keep local result and diagnostic
 bundles outside Git; this report records their relevant observations.
+
+Set `MERE_ARCHIVE_ACCEPTANCE_COMMAND` to the installed bundle entrypoint to
+validate the distributed executable. Frozen bundles dispatch nested searches
+through the reviewed `mere_archive_tools.cli` module; Python installations use
+`python -m mere_archive_tools`. A regression test exercises both searches through
+the frozen dispatcher contract.
