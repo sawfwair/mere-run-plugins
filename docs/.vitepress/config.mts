@@ -64,6 +64,7 @@ export default defineConfig({
             { text: 'Lifecycle', link: '/guide/lifecycle' },
             { text: 'Artifacts and runs', link: '/guide/artifacts-and-runs' },
             { text: 'Graph providers', link: '/guide/graph-providers' },
+            { text: 'Evaluate tool decisions', link: '/guide/ate-benchmark' },
           ],
         },
         {
