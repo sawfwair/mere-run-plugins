@@ -4,18 +4,16 @@
 
 ## Setup
 
-On a current `mere.run`, `plugin install --yes` installs the package and runs its setup command to install the pinned, signed Cua Driver 0.28.2 app. `setup` previews the source and SHA-256; `setup --yes` also works directly on older CLIs. Pi is also required. Grant Accessibility and Screen Recording to `CuaDriver.app` through macOS, then start a loopback mere.run vision-chat API with an installed, licensed model:
+On a current `mere.run`, `plugin install --yes` installs the package and runs its setup command to install the pinned, signed Cua Driver 0.28.2 app. `setup` previews the source and SHA-256; `setup --yes` also works directly on older CLIs. Pi is also required. Grant Accessibility and Screen Recording to `CuaDriver.app` through macOS:
 
 ```sh
 mere.run plugin install mere-computer-use --yes
 cua-driver permissions grant
-mere.run api serve --engine text-chat-muse-glimmer --model vision-chat-muse-glimmer-30b
 mere-computer-use doctor
 mere-computer-use windows
 ```
 
-The model is not downloaded or licensed by this plugin. Muse Glimmer uses Apache-2.0 and retains Meta's usage policy; inspect and accept both through mere.run before running the server.
-`doctor` checks the local model endpoint, Driver daemon, and the app-attributed Accessibility and Screen Recording grants without requesting permissions.
+The model is not downloaded or licensed by this plugin. Muse Glimmer uses Apache-2.0 and retains Meta's usage policy; inspect its terms with `mere.run model info vision-chat-muse-glimmer-30b` before accepting them. On a current mere.run, `mere.run model pull vision-chat-muse-glimmer-30b --accept-model-license` records acceptance for an installed model without downloading it again. `doctor` checks the API preflight and model receipt when no API is listening. It reports whether a run can start the API without requesting permissions or starting a server.
 
 ## Run
 
@@ -27,9 +25,11 @@ mere-computer-use run ./computer-run/run.json
 mere-computer-use resume ./computer-run/run.json
 ```
 
+`run` reuses a compatible API already on the selected loopback port. Otherwise it preflights the installed Muse Glimmer model, requires an acknowledged model receipt, starts `mere.run api serve`, waits for image and tool capability discovery, then stops only the server it started when Pi exits. It never pulls a model or accepts terms. An incompatible or unauthorized server already on the port is left alone. Use `--api-start-timeout` to change the default 300-second startup limit. The run record identifies server ownership and writes server diagnostics to `api-server.log`.
+
 The agent is restricted to that window, a maximum number of actions, and the bundled observe/click/type/key tools. Accessibility tokens are preferred; pixel actions require coordinates and the latest screenshot capture ID. Each action needs a fresh observation, and the final action needs a subsequent observation. Actions default to Cua Driver's background delivery. The run records action counts and a model report, but cannot independently certify task success. Screenshots are passed in memory to Pi and are not written to the run directory.
 
-`--base-url` must be loopback. Set `MERE_COMPUTER_USE_API_KEY` for a protected local server. `cleanup` only marks the local run record; the plugin does not own or stop the mere.run server or Cua daemon.
+`--base-url` must be loopback. Set `MERE_COMPUTER_USE_API_KEY` for a protected local server. Automatic start supports the default Muse Glimmer model; other models require a compatible API started separately. `cleanup` only marks the local run record and does not stop external servers or the Cua daemon.
 
 ## License boundary
 
