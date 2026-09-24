@@ -7,7 +7,6 @@ On a current `mere.run`, `plugin install --yes` installs the plugin and its pinn
 ```sh
 mere.run plugin install mere-computer-use --yes
 mere.run model info vision-chat-muse-glimmer-30b
-# After reviewing the model terms:
 mere.run model pull vision-chat-muse-glimmer-30b --accept-model-license
 cua-driver permissions grant
 mere-computer-use doctor
