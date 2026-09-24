@@ -21,7 +21,7 @@ class DriverSetupTests(unittest.TestCase):
         for patcher in (
             mock.patch.object(driver_setup, "APP", self.app),
             mock.patch.object(driver_setup, "BIN_LINK", self.link),
-            mock.patch.object(driver_setup.sys, "platform", "darwin"),
+            mock.patch.object(driver_setup.platform, "system", return_value="Darwin"),
             mock.patch.object(driver_setup.platform, "machine", return_value="arm64"),
         ):
             patcher.start()

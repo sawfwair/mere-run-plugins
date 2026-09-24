@@ -9,7 +9,6 @@ import platform
 import re
 import shutil
 import subprocess
-import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -56,7 +55,7 @@ def download(archive: pathlib.Path) -> None:
 
 
 def setup(install: bool) -> dict[str, object]:
-    if sys.platform != "darwin" or platform.machine() != "arm64":
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
         raise SetupError("Cua Driver setup currently supports Apple Silicon macOS")
     binary = APP / "Contents/MacOS/cua-driver"
     link = BIN_LINK
