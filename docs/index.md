@@ -4,7 +4,7 @@ layout: home
 hero:
   name: 'mere.run plugins'
   text: 'Build repeatable workflows around local inference'
-  tagline: Plan work, run local or user-owned resources, preserve artifacts, and clean up through 18 official companion commands.
+  tagline: Plan work, run local or user-owned resources, preserve artifacts, and clean up through 19 official companion commands.
   actions:
     - theme: brand
       text: Install a plugin
