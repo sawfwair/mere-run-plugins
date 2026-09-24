@@ -13,7 +13,7 @@ mere-computer-use doctor
 mere-computer-use windows
 ```
 
-The model is not downloaded or licensed by this plugin. Muse Glimmer uses Apache-2.0 and retains Meta's usage policy; inspect its terms with `mere.run model info vision-chat-muse-glimmer-30b` before accepting them. On a current mere.run, `mere.run model pull vision-chat-muse-glimmer-30b --accept-model-license` records acceptance for an installed model without downloading it again. `doctor` checks the API preflight and model receipt when no API is listening. It reports whether a run can start the API without requesting permissions or starting a server.
+The model is not downloaded or licensed by this plugin. Muse Glimmer uses Apache-2.0 and retains Meta's usage policy; inspect its terms with `mere.run model info vision-chat-muse-glimmer-30b` before accepting them. On a current mere.run, `mere.run model pull vision-chat-muse-glimmer-30b --accept-model-license` records acceptance for an installed model without downloading it again. The installed Ornith Q4 vision bundle is another supported choice: pass `--model text-agent-ornith-35b-mlx-4bit` to `plan` and `doctor`. Its target and vision component are MIT; its optional MTP head is Apache-2.0. Ornith computer use requires a mere.run build with Qwen-family image data URL support; the 0.50.0 API fails on screenshot requests. `doctor` checks the API preflight and any model receipt when no API is listening. It reports whether a run can start the API without requesting permissions or starting a server.
 
 ## Run
 
@@ -25,11 +25,11 @@ mere-computer-use run ./computer-run/run.json
 mere-computer-use resume ./computer-run/run.json
 ```
 
-`run` reuses a compatible API already on the selected loopback port. Otherwise it preflights the installed Muse Glimmer model, requires an acknowledged model receipt, starts `mere.run api serve`, waits for image and tool capability discovery, then stops only the server it started when Pi exits. It never pulls a model or accepts terms. An incompatible or unauthorized server already on the port is left alone. Use `--api-start-timeout` to change the default 300-second startup limit. The run record identifies server ownership and writes server diagnostics to `api-server.log`.
+`run` reuses a compatible API already on the selected loopback port. Otherwise it preflights the installed Muse Glimmer or Ornith Q4 model, checks any usage-terms receipt, starts `mere.run api serve`, waits for image and tool capability discovery, then stops only the server it started when Pi exits. It never pulls a model or accepts terms. An incompatible or unauthorized server already on the port is left alone. Use `--api-start-timeout` to change the default 300-second startup limit. The run record identifies server ownership and writes server diagnostics to `api-server.log`.
 
-The agent is restricted to that window, a maximum number of actions, and the bundled observe/click/type/key tools. Accessibility tokens are preferred; pixel actions require coordinates and the latest screenshot capture ID. Each action needs a fresh observation, and the final action needs a subsequent observation. Actions default to Cua Driver's background delivery. The run records action counts and a model report, but cannot independently certify task success. Screenshots are passed in memory to Pi and are not written to the run directory.
+The agent is restricted to that window, a maximum number of actions, and the bundled observe/click/type/key tools. Accessibility tokens are preferred; pixel actions require coordinates and the latest screenshot snapshot ID. Each action needs a fresh observation, and the final action needs a subsequent observation. Actions default to Cua Driver's background delivery. The run records action counts and a model report, but cannot independently certify task success. Screenshots are passed in memory to Pi and are not written to the run directory.
 
-`--base-url` must be loopback. Set `MERE_COMPUTER_USE_API_KEY` for a protected local server. Automatic start supports the default Muse Glimmer model; other models require a compatible API started separately. `cleanup` only marks the local run record and does not stop external servers or the Cua daemon.
+`--base-url` must be loopback. Set `MERE_COMPUTER_USE_API_KEY` for a protected local server. Automatic start supports Muse Glimmer and Ornith Q4; other models require a compatible API started separately. `cleanup` only marks the local run record and does not stop external servers or the Cua daemon.
 
 ## License boundary
 

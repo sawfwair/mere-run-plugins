@@ -45,7 +45,7 @@ async function discover(baseUrl: string, apiKey: string, signal: AbortSignal): P
         input: ["text", "image"] as ("text" | "image")[],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.limit?.context ?? 8_192,
-        maxTokens: Math.min(model.limit?.output ?? 2_048, 4_096),
+        maxTokens: Math.min(model.limit?.output ?? 2_048, 2_048),
         compat: compat ? {
           supportsStore: compat.supports_store,
           supportsDeveloperRole: compat.supports_developer_role,
