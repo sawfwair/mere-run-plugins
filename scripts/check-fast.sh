@@ -8,7 +8,7 @@ MERE_PLUGIN_PYTHON="${MERE_PLUGIN_PYTHON:-python3}"
 FAST_TMP="$(mktemp -d "${TMPDIR:-/tmp}/mere-run-plugins-fast.XXXXXX")"
 trap 'rm -rf "$FAST_TMP"' EXIT
 
-export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-computer-use/src:$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$MERE_PLUGIN_PYTHON" -m ruff check .
 "$MERE_PLUGIN_PYTHON" -m mypy
@@ -17,6 +17,7 @@ export PYTHONPATH="$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-b
 "$MERE_PLUGIN_PYTHON" scripts/validate_repo.py
 
 suites=(
+  mere-computer-use
   mere-runpod
   mere-terminal-bench
   mere-image-tools

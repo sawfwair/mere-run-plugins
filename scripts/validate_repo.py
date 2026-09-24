@@ -220,6 +220,7 @@ def validate_catalog() -> None:
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
+        ROOT / "packages" / "mere-computer-use" / "src",
         ROOT / "packages" / "mere-archive-tools" / "src",
         ROOT / "packages" / "mere-runpod" / "src",
         ROOT / "packages" / "mere-terminal-bench" / "src",
@@ -271,6 +272,10 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_computer_use", "mere-computer-use",
+        {"manifest", "doctor", "windows", "plan", "run", "resume", "cleanup"},
+    )
     validate_plugin_manifest(
         "mere_archive_tools",
         "mere-archive-tools",

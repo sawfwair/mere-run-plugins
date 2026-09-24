@@ -11,6 +11,7 @@ complete workflow.
 | Search mixed files on a shared drive | [Archive Tools](/plugins/archive-tools) | Uses read-only traversal, sensitive-data reduction, retention policies, and local hybrid search |
 | Rotoscope, key, track, relight, restore, extend, or reconstruct a shot | [VFX Tools](/plugins/vfx-tools) | Produces shot-oriented workflows and verified handoff artifacts |
 | Remove the background from a still image | [Image Tools](/plugins/image-tools) | Provides a focused SAM 3.1 knockout and matte-cleanup workflow |
+| Operate one macOS app window with a local vision model | [Computer Use](/plugins/computer-use) | Grounds each action in a fresh screenshot and accessibility snapshot |
 | Build shot, character, voice, set, or delivery kits | [Animatic Tools](/plugins/animatic-tools) | Produces artifact bundles for animatic workflows |
 | Develop and produce a governed short film | [Film Studio](/plugins/film-tools) | Separates proposals, approvals, local media generation, review, and delivery |
 | Perform with a local generative music model | [Perform](/plugins/perform) | Adds MIDI control, a stage interface, event logs, and audio capture |
