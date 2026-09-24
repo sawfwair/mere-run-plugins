@@ -2,9 +2,11 @@
 
 `mere-computer-use` uses a local mere.run vision model and the separately installed MIT-licensed Cua Driver CLI to act in one selected macOS window. It packages no Cua code or weights.
 
-Install the plugin with `mere.run plugin install mere-computer-use --yes`, then install Cua Driver 0.28.2 or later and Pi. Run `CuaDriver.app` and grant its macOS Accessibility and Screen Recording permissions. Start a local mere.run vision-chat server with a model you have installed and licensed:
+On a current `mere.run`, `plugin install --yes` installs the plugin and its pinned, signed MIT Cua Driver app. On older CLIs, run `mere-computer-use setup --yes` after installation. Install Pi and grant `CuaDriver.app` macOS Accessibility and Screen Recording permissions. Start a local mere.run vision-chat server with a model you have installed and licensed:
 
 ```sh
+mere.run plugin install mere-computer-use --yes
+cua-driver permissions grant
 mere.run api serve --engine text-chat-muse-glimmer --model vision-chat-muse-glimmer-30b
 mere-computer-use doctor
 mere-computer-use windows

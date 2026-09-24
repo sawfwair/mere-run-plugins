@@ -4,9 +4,11 @@
 
 ## Setup
 
-Install the package with `mere.run plugin install mere-computer-use --yes`, plus Cua Driver 0.28.2 or later and Pi. Start Cua Driver through `CuaDriver.app` so macOS can grant Accessibility and Screen Recording to the app. Start a loopback mere.run vision-chat API with an installed, licensed model, for example:
+On a current `mere.run`, `plugin install --yes` installs the package and runs its setup command to install the pinned, signed Cua Driver 0.28.2 app. `setup` previews the source and SHA-256; `setup --yes` also works directly on older CLIs. Pi is also required. Grant Accessibility and Screen Recording to `CuaDriver.app` through macOS, then start a loopback mere.run vision-chat API with an installed, licensed model:
 
 ```sh
+mere.run plugin install mere-computer-use --yes
+cua-driver permissions grant
 mere.run api serve --engine text-chat-muse-glimmer --model vision-chat-muse-glimmer-30b
 mere-computer-use doctor
 mere-computer-use windows
@@ -31,4 +33,4 @@ The agent is restricted to that window, a maximum number of actions, and the bun
 
 ## License boundary
 
-This package is MIT. Cua Driver is an external MIT prerequisite. Cua perception and SoM packages, model artifacts, and Ultralytics are excluded because their reviewed distribution has AGPL components. See [Cua's own licenses](https://github.com/trycua/cua) before installing optional components.
+This package is MIT. Setup installs the external MIT Cua Driver release only. Cua perception and SoM packages, model artifacts, and Ultralytics are excluded because their reviewed distribution has AGPL components. See [Cua's own licenses](https://github.com/trycua/cua) before installing optional components.

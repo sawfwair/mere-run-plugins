@@ -16,7 +16,7 @@ import urllib.request
 from importlib import resources
 from typing import cast
 
-from . import __version__
+from . import __version__, driver_setup
 
 JsonMap = dict[str, object]
 DEFAULT_MODEL = "vision-chat-muse-glimmer-30b"
@@ -125,6 +125,7 @@ def model_ready(base_url: str, model: str) -> bool:
 def plugin_manifest() -> JsonMap:
     commands = [
         ("manifest", "Describe this plugin."),
+        ("setup", "Install the verified, MIT-licensed Cua Driver macOS app."),
         ("doctor", "Check local tools and the mere.run model endpoint."),
         ("windows", "List Cua Driver windows for target selection."),
         ("plan", "Create a local window-scoped run manifest."),
@@ -384,6 +385,7 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="mere-computer-use")
     sub = root.add_subparsers(dest="command", required=True)
     sub.add_parser("manifest").add_argument("--json", action="store_true")
+    sub.add_parser("setup").add_argument("--yes", action="store_true")
     doctor_parser = sub.add_parser("doctor")
     doctor_parser.add_argument("--model", default=DEFAULT_MODEL)
     doctor_parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -418,6 +420,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "manifest":
             result = plugin_manifest()
+        elif args.command == "setup":
+            result = driver_setup.setup(args.yes)
         elif args.command == "doctor":
             result = doctor(args)
         elif args.command == "windows":
@@ -434,6 +438,6 @@ def main(argv: list[str] | None = None) -> int:
             result = tool(args.manifest.expanduser().resolve(), args)
         emit(result)
         return 0
-    except (PluginError, OSError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
+    except (PluginError, driver_setup.SetupError, OSError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
         sys.stderr.write(str(exc) + "\n")
         return 1
