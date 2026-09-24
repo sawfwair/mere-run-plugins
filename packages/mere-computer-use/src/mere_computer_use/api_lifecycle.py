@@ -49,13 +49,13 @@ def server_environment() -> dict[str, str]:
     return environment
 
 
-def serve_command(base_url: str, model: str) -> list[str]:
+def serve_command(base_url: str, model_path: str) -> list[str]:
     host, port = server_address(base_url)
     return [mere_run_command(), "api", "serve", "--engine", AUTOSTART_ENGINE,
-            "--model", model, "--host", host, "--port", str(port)]
+            "--model", model_path, "--host", host, "--port", str(port)]
 
 
-def preflight(base_url: str, model: str) -> JsonMap:
+def preflight(base_url: str, model: str) -> pathlib.Path:
     if model != AUTOSTART_MODEL:
         raise APIServerError(f"automatic API start supports {AUTOSTART_MODEL}; start {model} separately")
     command = [*serve_command(base_url, model), "--preflight", "--json"]
@@ -73,8 +73,12 @@ def preflight(base_url: str, model: str) -> JsonMap:
     if result.returncode or report.get("status") != "ok" or not isinstance(model_detail, dict) \
             or model_detail.get("id") != model or model_detail.get("installed") is not True:
         raise APIServerError(f"mere.run API preflight did not approve the installed {model} model")
+    model_path = model_detail.get("path")
+    if not isinstance(model_path, str) or not pathlib.Path(model_path).is_absolute() \
+            or not pathlib.Path(model_path).is_dir():
+        raise APIServerError(f"mere.run API preflight returned no installed path for {model}")
     require_acknowledged_terms(model)
-    return report
+    return pathlib.Path(model_path)
 
 
 def require_acknowledged_terms(model: str) -> None:
@@ -122,11 +126,11 @@ def ensure_model(base_url: str, model: str, ready: ModelReady,
     except urllib.error.URLError as exc:
         if not connection_refused(exc):
             raise APIServerError(f"existing API is unreachable or rejected access: {exc}") from exc
-    preflight(base_url, model)
+    model_path = preflight(base_url, model)
     log_path = run_dir / "api-server.log"
     log = log_path.open("a", encoding="utf-8")
     try:
-        process = subprocess.Popen(serve_command(base_url, model), stdout=log, stderr=subprocess.STDOUT,
+        process = subprocess.Popen(serve_command(base_url, str(model_path)), stdout=log, stderr=subprocess.STDOUT,
                                    text=True, env=server_environment(), start_new_session=True)
     except OSError:
         log.close()

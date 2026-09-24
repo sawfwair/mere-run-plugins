@@ -30,12 +30,16 @@ if args[:2] == ["model", "info"]:
     print(json.dumps({"id": args[2], "usageTerms": [{"component": "Muse Glimmer"}],
                       "usageTermsAcknowledged": os.environ.get("FAKE_TERMS_ACK") != "0"}))
     raise SystemExit(0)
-model = args[args.index("--model") + 1]
+model_arg = args[args.index("--model") + 1]
+model = "vision-chat-muse-glimmer-30b"
 if "--preflight" in args:
     installed = os.environ.get("FAKE_MODEL_INSTALLED") != "0"
     print(json.dumps({"status": "ok" if installed else "blocked",
-                      "result": {"model": {"id": model, "installed": installed}}}))
+                      "result": {"model": {"id": model_arg, "installed": installed,
+                                           "path": os.getcwd()}}}))
     raise SystemExit(0 if installed else 1)
+if not os.path.isabs(model_arg) or not os.path.isdir(model_arg):
+    raise SystemExit("API serve requires an installed model path")
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
