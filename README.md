@@ -46,7 +46,7 @@ For task-specific installation and first-run instructions, see the
 
 ## Choose a plugin
 
-The catalog contains 18 companion executables:
+The catalog contains 19 companion executables:
 
 | Task | Plugin |
 | --- | --- |
@@ -54,6 +54,7 @@ The catalog contains 18 companion executables:
 | Index and search faces in a photo library | [Face Tools](https://plugins-docs.mere.run/plugins/face-tools) |
 | Index and search a shared drive | [Archive Tools](https://plugins-docs.mere.run/plugins/archive-tools) |
 | Create visual-effects shot artifacts | [VFX Tools](https://plugins-docs.mere.run/plugins/vfx-tools) |
+| Operate a selected macOS window locally | [Computer Use](https://plugins-docs.mere.run/plugins/computer-use) |
 | Remove a still-image background | [Image Tools](https://plugins-docs.mere.run/plugins/image-tools) |
 | Produce animatic assets | [Animatic Tools](https://plugins-docs.mere.run/plugins/animatic-tools) |
 | Produce a governed short film | [Film Studio](https://plugins-docs.mere.run/plugins/film-tools) |

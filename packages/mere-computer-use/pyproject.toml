@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mere-computer-use"
+version = "0.1.0"
+description = "Window-scoped local computer use with mere.run and Cua Driver"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Sawfwair Inc. and mere.run contributors" }]
+dependencies = []
+
+[project.scripts]
+mere-computer-use = "mere_computer_use.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mere_computer_use = ["py.typed", "resources/pi/package.json", "resources/pi/extensions/*.ts"]

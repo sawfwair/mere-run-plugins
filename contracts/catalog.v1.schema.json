@@ -99,6 +99,9 @@
                   "type": "string",
                   "pattern": "^[A-Za-z0-9_.-]+$"
                 },
+                "setup": {
+                  "type": "boolean"
+                },
                 "bundles": {
                   "type": "object",
                   "minProperties": 1,

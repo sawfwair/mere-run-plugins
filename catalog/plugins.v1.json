@@ -1,8 +1,32 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-09-05T18:29:41Z",
+  "updatedAt": "2026-09-24T03:27:17Z",
   "defaultChannel": "main",
   "plugins": [
+    {
+      "id": "mere-computer-use",
+      "name": "Computer Use",
+      "description": "Operate one selected macOS window with a local mere.run vision model and the MIT Cua Driver CLI.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-computer-use",
+      "subdirectory": "packages/mere-computer-use",
+      "entrypoint": "mere-computer-use",
+      "capabilities": [
+        "computer-use",
+        "window-scoped",
+        "vision-agent",
+        "accessibility",
+        "local-artifact-custody"
+      ],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-computer-use",
+          "setup": true
+        }
+      }
+    },
     {
       "id": "mere-identity-tools",
       "name": "Identity Tools",
