@@ -14,6 +14,12 @@ companion plugins.
   results and pairwise task outcomes.
 - `run-manifest.v1.schema.json`: durable execution record written before remote
   resources are created.
+- `frontier-handoff-request.v1.schema.json`: neutral chat or agent request for a
+  user-authenticated CLI.
+- `frontier-handoff-run.v1.schema.json`: plan and status record for one frontier
+  handoff.
+- `frontier-handoff-result.v1.schema.json`: local response and provenance
+  receipt returned by a frontier handoff.
 - `artifact-bundle.v1.schema.json`: fetched result bundle inventory.
 - `plugin-bundle.v1.schema.json`: installable signed-plugin bundle.
 - `plugin-bundle-envelope.v1.schema.json`: signed publisher statement for a

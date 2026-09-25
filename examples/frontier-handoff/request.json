@@ -1,0 +1,7 @@
+{
+  "contractVersion": "mere.run/frontier-handoff-request.v1",
+  "backend": "codex",
+  "mode": "chat",
+  "prompt": "Summarize three options for scheduling a team workshop. Return a JSON object with an options array and a recommendation.",
+  "outputFormat": "json"
+}

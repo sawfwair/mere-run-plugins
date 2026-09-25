@@ -12,6 +12,9 @@ plugins, recipes, and downstream automation.
 | [`terminal-bench-recipe.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/terminal-bench-recipe.v1.schema.json) | Pinned Terminal-Bench comparison recipe |
 | [`terminal-bench-report.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/terminal-bench-report.v1.schema.json) | Matched Terminal-Bench results and pairwise outcomes |
 | [`run-manifest.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/run-manifest.v1.schema.json) | Durable execution state |
+| [`frontier-handoff-request.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/frontier-handoff-request.v1.schema.json) | Generic chat or agent request to a user-authenticated CLI |
+| [`frontier-handoff-run.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/frontier-handoff-run.v1.schema.json) | Durable frontier handoff plan and status |
+| [`frontier-handoff-result.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/frontier-handoff-result.v1.schema.json) | Local response and provenance receipt |
 | [`artifact-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/artifact-bundle.v1.schema.json) | Fetched result inventory |
 | [`plugin-bundle.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/plugin-bundle.v1.schema.json) | Installable signed-plugin bundle |
 | [`plugin-bundle-envelope.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/plugin-bundle-envelope.v1.schema.json) | Signed publisher statement for a plugin bundle |

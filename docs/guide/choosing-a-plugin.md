@@ -12,6 +12,7 @@ complete workflow.
 | Rotoscope, key, track, relight, restore, extend, or reconstruct a shot | [VFX Tools](/plugins/vfx-tools) | Produces shot-oriented workflows and verified handoff artifacts |
 | Remove the background from a still image | [Image Tools](/plugins/image-tools) | Provides a focused SAM 3.1 knockout and matte-cleanup workflow |
 | Operate one macOS app window with a local vision model | [Computer Use](/plugins/computer-use) | Grounds each action in a fresh screenshot and accessibility snapshot |
+| Hand off a bounded chat or agent task to a signed-in frontier CLI | [Frontier Handoff](/plugins/frontier-handoff) | Records a plan, a private result, and a request-bound receipt |
 | Build shot, character, voice, set, or delivery kits | [Animatic Tools](/plugins/animatic-tools) | Produces artifact bundles for animatic workflows |
 | Develop and produce a governed short film | [Film Studio](/plugins/film-tools) | Separates proposals, approvals, local media generation, review, and delivery |
 | Perform with a local generative music model | [Perform](/plugins/perform) | Adds MIDI control, a stage interface, event logs, and audio capture |
@@ -46,6 +47,7 @@ additional boundary:
 - ShotGrid Tools writes to Autodesk Flow Production Tracking.
 - RunPod Runner creates resources in the user's RunPod account.
 - Terminal-Bench uses the Docker context that you select.
+- Frontier Handoff submits task context through the Claude Code or Codex account that you select.
 
 Before you start a paid or remote workflow, read [Provider
 safety](/operations/provider-safety).

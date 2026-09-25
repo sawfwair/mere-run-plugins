@@ -3,6 +3,7 @@ target-version = "py39"
 line-length = 120
 src = [
   "packages/mere-computer-use/src",
+  "packages/mere-frontier-handoff/src",
   "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
@@ -49,6 +50,7 @@ warn_unreachable = true
 explicit_package_bases = true
 mypy_path = [
   "packages/mere-computer-use/src",
+  "packages/mere-frontier-handoff/src",
   "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
@@ -64,6 +66,7 @@ mypy_path = [
 ]
 files = [
   "packages/mere-computer-use/src",
+  "packages/mere-frontier-handoff/src",
   "benchmarks/ate-v0/score.py",
   "benchmarks/ate-v0/test_cases.py",
   "packages/mere-archive-tools/src",
@@ -103,6 +106,7 @@ ignore_missing_imports = true
 [tool.coverage.run]
 source = [
   "packages/mere-computer-use/src/mere_computer_use",
+  "packages/mere-frontier-handoff/src/mere_frontier_handoff",
   "packages/mere-archive-tools/src/mere_archive_tools",
   "packages/mere-animatic-tools/src/mere_animatic_tools",
   "packages/mere-image-tools/src/mere_image_tools",

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/frontier-handoff-request.v1.schema.json",
+  "title": "mere.run Frontier Handoff Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "backend", "mode", "prompt", "outputFormat"],
+  "properties": {
+    "contractVersion": { "const": "mere.run/frontier-handoff-request.v1" },
+    "backend": { "enum": ["claude", "codex"] },
+    "mode": { "enum": ["chat", "agent"] },
+    "prompt": { "type": "string", "minLength": 1 },
+    "outputFormat": { "enum": ["text", "json"] },
+    "model": { "type": "string", "minLength": 1 },
+    "workspace": { "type": "string", "minLength": 1 },
+    "access": { "enum": ["read-only", "workspace-write"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "agent" } } },
+      "then": { "required": ["workspace"] },
+      "else": {
+        "not": { "anyOf": [{ "required": ["workspace"] }, { "required": ["access"] }] }
+      }
+    },
+    {
+      "if": { "properties": { "access": { "const": "workspace-write" } }, "required": ["access"] },
+      "then": { "properties": { "mode": { "const": "agent" } } }
+    }
+  ]
+}

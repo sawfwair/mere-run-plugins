@@ -1,8 +1,25 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-09-24T03:27:17Z",
+  "updatedAt": "2026-09-25T14:00:00Z",
   "defaultChannel": "main",
   "plugins": [
+    {
+      "id": "mere-frontier-handoff",
+      "name": "Frontier Handoff",
+      "description": "Run bounded chat or agent tasks with a user-authenticated Claude Code or Codex CLI and retain a local result receipt.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-frontier-handoff",
+      "subdirectory": "packages/mere-frontier-handoff",
+      "entrypoint": "mere-frontier-handoff",
+      "capabilities": ["frontier-handoff", "structured-proposal", "local-agent", "durable-receipt"],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-frontier-handoff"
+        }
+      }
+    },
     {
       "id": "mere-computer-use",
       "name": "Computer Use",

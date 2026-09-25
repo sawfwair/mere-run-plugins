@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/frontier-handoff-result.v1.schema.json",
+  "title": "mere.run Frontier Handoff Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "runId", "backend", "mode", "outputFormat", "output", "receipt"],
+  "properties": {
+    "contractVersion": { "const": "mere.run/frontier-handoff-result.v1" },
+    "runId": { "type": "string" },
+    "backend": { "enum": ["claude", "codex"] },
+    "mode": { "enum": ["chat", "agent"] },
+    "outputFormat": { "enum": ["text", "json"] },
+    "output": {},
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestSha256", "outputSha256", "cliVersion", "startedAt", "completedAt"],
+      "properties": {
+        "requestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "outputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cliVersion": { "type": "string" },
+        "requestedModel": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
