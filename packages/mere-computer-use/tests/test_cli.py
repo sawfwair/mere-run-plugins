@@ -187,6 +187,21 @@ class ComputerUseTests(unittest.TestCase):
             result = cli.run_plan(path, 10)
         self.assertEqual(result["verification"], "incomplete-or-unobserved")
 
+    def test_observation_without_action_is_reported(self) -> None:
+        path = self.planned()
+
+        def fake_pi(*args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            cli.tool(path, self.tool_args("observe"))
+            return subprocess.CompletedProcess(args[0], 0, stdout="I clicked the window", stderr="")
+
+        with mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \
+             mock.patch.object(cli, "model_ready", return_value=True), \
+             mock.patch.object(cli, "driver_call", side_effect=self.fake_driver), \
+             mock.patch.object(cli.subprocess, "run", side_effect=fake_pi):
+            result = cli.run_plan(path, 10)
+        self.assertEqual(result["actionCount"], 0)
+        self.assertEqual(result["verification"], "observation-only")
+
     def test_run_requires_driver_permissions_before_pi(self) -> None:
         path = self.planned()
         with mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \

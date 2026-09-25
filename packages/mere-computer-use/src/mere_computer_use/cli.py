@@ -411,11 +411,12 @@ def run_plan(path: pathlib.Path, timeout: int, api_start_timeout: int = 300) -> 
         final = load(path)
         final["status"] = "finished" if result.returncode == 0 else "failed"
         final["result"] = result.stdout.strip()[:8000]
-        final["verification"] = (
-            "model-report-with-final-observation"
-            if result.returncode == 0 and final.get("needsObservation") is False
-            else "incomplete-or-unobserved"
-        )
+        if result.returncode != 0 or final.get("needsObservation") is not False:
+            final["verification"] = "incomplete-or-unobserved"
+        elif as_int(final.get("actionCount"), "actionCount") == 0:
+            final["verification"] = "observation-only"
+        else:
+            final["verification"] = "model-report-with-final-observation"
         if result.returncode != 0:
             final["error"] = result.stderr.strip()[-2000:]
         save(path, final)
