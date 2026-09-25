@@ -220,6 +220,7 @@ def validate_catalog() -> None:
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
+        ROOT / "packages" / "mere-frontier-handoff" / "src",
         ROOT / "packages" / "mere-computer-use" / "src",
         ROOT / "packages" / "mere-archive-tools" / "src",
         ROOT / "packages" / "mere-runpod" / "src",
@@ -272,6 +273,10 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_frontier_handoff", "mere-frontier-handoff",
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup"},
+    )
     validate_plugin_manifest(
         "mere_computer_use", "mere-computer-use",
         {"manifest", "doctor", "windows", "plan", "run", "resume", "cleanup"},
@@ -1084,6 +1089,25 @@ def validate_volume_dry_run() -> None:
         fail("volume ensure --dry-run should include the planned data center")
 
 
+def validate_frontier_handoff_plan() -> None:
+    request_path = ROOT / "examples" / "frontier-handoff" / "request.json"
+    validate_schema(request_path, contract_schema("frontier-handoff-request.v1.schema.json"), load_json(request_path))
+    with tempfile.TemporaryDirectory(prefix="mere-frontier-plan-") as directory:
+        output = pathlib.Path(directory) / "run"
+        process = subprocess.run(
+            [sys.executable, "-m", "mere_frontier_handoff", "plan", "--request", str(request_path),
+             "--output", str(output), "--run-id", "validation"],
+            cwd=ROOT, env=plugin_env(), text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        )
+        manifest = as_map(json.loads(process.stdout), "frontier handoff plan")
+        validate_schema(output / "run.json", contract_schema("frontier-handoff-run.v1.schema.json"), manifest)
+        if manifest["status"] != "planned" or (output / "result.json").exists():
+            fail("frontier handoff plan executed a model or did not remain planned")
+        if "Summarize three options" in (output / "run.json").read_text():
+            fail("frontier handoff run manifest disclosed the request prompt")
+
+
 def main() -> int:
     validate_contracts()
     validate_catalog()
@@ -1094,6 +1118,7 @@ def main() -> int:
     validate_terminal_bench_recipes()
     validate_graph_templates()
     validate_plugin_manifests()
+    validate_frontier_handoff_plan()
     validate_graph_provider()
     validate_runpod_plan()
     validate_terminal_bench_plan()

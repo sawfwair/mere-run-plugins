@@ -92,6 +92,7 @@ export default defineConfig({
             { text: 'Perform', link: '/plugins/perform' },
             { text: 'Image Tools', link: '/plugins/image-tools' },
             { text: 'Computer Use', link: '/plugins/computer-use' },
+            { text: 'Frontier Handoff', link: '/plugins/frontier-handoff' },
             { text: 'Animatic Tools', link: '/plugins/animatic-tools' },
             { text: 'Film Studio', link: '/plugins/film-tools' },
             { text: 'ShotGrid Tools', link: '/plugins/shotgrid-tools' },
