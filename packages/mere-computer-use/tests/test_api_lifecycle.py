@@ -27,7 +27,7 @@ import sys
 
 args = sys.argv[1:]
 if args[:2] == ["model", "info"]:
-    terms = [{"component": "model"}] if "glimmer" in args[2] or "lfm25" in args[2] else []
+    terms = [{"component": "Muse Glimmer"}] if "glimmer" in args[2] else []
     print(json.dumps({"id": args[2], "usageTerms": terms,
                       "usageTermsAcknowledged": os.environ.get("FAKE_TERMS_ACK") != "0"}))
     raise SystemExit(0)
@@ -102,19 +102,6 @@ http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
             assert server is not None
             self.assertTrue(cli.model_ready(self.base_url, model))
             server.stop()
-
-    def test_starts_lfm25_with_acknowledged_usage_terms(self) -> None:
-        model = "vision-chat-lfm25-3b-bf16"
-        self.assertEqual(api_lifecycle.serve_command(self.base_url, model, model)[4], "text-chat-lfm2")
-        with self.environment(), mock.patch.dict(os.environ, {"FAKE_MODEL_ID": model}):
-            server = api_lifecycle.ensure_model(self.base_url, model, cli.model_ready, self.root, 10)
-            self.assertIsNotNone(server)
-            assert server is not None
-            self.assertTrue(cli.model_ready(self.base_url, model))
-            server.stop()
-        with self.environment(), mock.patch.dict(os.environ, {"FAKE_MODEL_ID": model, "FAKE_TERMS_ACK": "0"}):
-            with self.assertRaisesRegex(api_lifecycle.APIServerError, "unacknowledged upstream usage terms"):
-                api_lifecycle.ensure_model(self.base_url, model, cli.model_ready, self.root, 10)
 
     def test_startup_retries_transient_readiness_timeout(self) -> None:
         attempts = 0

@@ -202,6 +202,16 @@ class ComputerUseTests(unittest.TestCase):
         self.assertEqual(result["actionCount"], 0)
         self.assertEqual(result["verification"], "observation-only")
 
+    def test_driver_call_reports_plain_text_action_failure(self) -> None:
+        completed = subprocess.CompletedProcess(
+            ["cua-driver"], 0,
+            stdout="AX action failed: AXUIElementPerformAction(AXPress) returned -25206\n",
+            stderr="",
+        )
+        with mock.patch.object(cli.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(cli.PluginError, "AX action failed"):
+                cli.driver_call("click", {"pid": 101, "window_id": 202})
+
     def test_run_requires_driver_permissions_before_pi(self) -> None:
         path = self.planned()
         with mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \

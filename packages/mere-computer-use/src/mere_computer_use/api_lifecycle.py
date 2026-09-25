@@ -17,7 +17,6 @@ AUTOSTART_MODEL = "vision-chat-muse-glimmer-30b"
 AUTOSTART_ENGINES = {
     AUTOSTART_MODEL: "text-chat-muse-glimmer",
     "text-agent-ornith-35b-mlx-4bit": "text-chat-q36",
-    "vision-chat-lfm25-3b-bf16": "text-chat-lfm2",
 }
 ModelReady = Callable[[str, str], bool]
 JsonMap = dict[str, object]

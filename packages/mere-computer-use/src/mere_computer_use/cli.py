@@ -108,7 +108,12 @@ def driver_call(tool: str, arguments: JsonMap) -> JsonMap:
     )
     if result.returncode != 0:
         raise PluginError(f"Cua Driver {tool} failed: {result.stderr.strip() or result.stdout.strip()}")
-    return as_map(json.loads(result.stdout), f"Cua Driver {tool} response")
+    try:
+        response = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        detail = result.stdout.strip() or result.stderr.strip() or "empty response"
+        raise PluginError(f"Cua Driver {tool} returned no JSON: {detail[:500]}") from exc
+    return as_map(response, f"Cua Driver {tool} response")
 
 
 def model_ready(base_url: str, model: str) -> bool:

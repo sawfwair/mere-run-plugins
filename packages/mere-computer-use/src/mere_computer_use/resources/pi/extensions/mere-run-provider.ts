@@ -46,7 +46,6 @@ async function discover(baseUrl: string, apiKey: string, signal: AbortSignal): P
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.limit?.context ?? 8_192,
         maxTokens: Math.min(model.limit?.output ?? 2_048, 2_048),
-        samplingParams: model.id === "vision-chat-lfm25-3b-bf16" ? { temperature: 0 } : undefined,
         compat: compat ? {
           supportsStore: compat.supports_store,
           supportsDeveloperRole: compat.supports_developer_role,
