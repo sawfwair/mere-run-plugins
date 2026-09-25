@@ -290,7 +290,12 @@ def command_for_request(request: JsonMap, binary: str, cwd: pathlib.Path, last_m
     ]
     if fmt == "json":
         schema_path = last_message.parent / "output-schema.json"
-        write_private(schema_path, {"type": "object"})
+        write_private(schema_path, {
+            "type": "object",
+            "properties": {"output": {"type": "string"}},
+            "required": ["output"],
+            "additionalProperties": False,
+        })
         command.extend(["--output-schema", str(schema_path)])
     if isinstance(model, str):
         command.extend(["--model", model])
@@ -305,13 +310,13 @@ def invoke(command: list[str], prompt: str, cwd: pathlib.Path, timeout: int, *, 
             cwd=cwd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE if capture_stdout else subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             start_new_session=True,
         )
     except OSError as error:
         raise HandoffError(f"could not start frontier CLI: {type(error).__name__}", 4) from error
     try:
-        stdout, _ = process.communicate(input=prompt.encode("utf-8"), timeout=timeout)
+        stdout, stderr = process.communicate(input=prompt.encode("utf-8"), timeout=timeout)
     except subprocess.TimeoutExpired as error:
         os.killpg(process.pid, signal.SIGKILL)
         process.communicate()
@@ -321,7 +326,21 @@ def invoke(command: list[str], prompt: str, cwd: pathlib.Path, timeout: int, *, 
         process.communicate()
         raise
     if process.returncode != 0:
-        raise HandoffError(f"frontier CLI exited {process.returncode}; inspect its local sign-in and permissions", 4)
+        if capture_stdout:
+            try:
+                envelope = json.loads(stdout or b"")
+                status = envelope.get("api_error_status") if isinstance(envelope, dict) else None
+                if isinstance(status, int) and 400 <= status <= 599:
+                    raise HandoffError(f"Claude API returned HTTP {status}", 4)
+            except (UnicodeError, json.JSONDecodeError):
+                pass
+        else:
+            diagnostic = (stderr or b"").decode("utf-8", errors="replace")[-8192:]
+            code = re.search(r'"code"\s*:\s*"([a-z_]+)"', diagnostic)
+            status = re.search(r'"status"\s*:\s*(\d{3})', diagnostic)
+            if code and status:
+                raise HandoffError(f"Codex API returned HTTP {status.group(1)} ({code.group(1)})", 4)
+        raise HandoffError(f"frontier CLI exited {process.returncode}", 4)
     if len(stdout or b"") > MAX_RESPONSE_BYTES:
         raise HandoffError("frontier CLI response exceeded the 8 MB limit", 4)
     try:
@@ -344,6 +363,14 @@ def parse_output(backend: str, raw: str, last_message: pathlib.Path, output_form
             value = last_message.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
             raise HandoffError("Codex did not write a final response", 4) from error
+        if output_format == "json":
+            try:
+                wrapper = json.loads(value)
+            except json.JSONDecodeError as error:
+                raise HandoffError("Codex returned invalid JSON wrapper", 4) from error
+            if not isinstance(wrapper, dict) or not isinstance(wrapper.get("output"), str):
+                raise HandoffError("Codex returned no JSON output field", 4)
+            value = wrapper["output"]
     if output_format == "text":
         if not isinstance(value, str) or not value.strip():
             raise HandoffError("frontier CLI returned no text", 4)
@@ -382,7 +409,11 @@ def run(path: pathlib.Path, timeout: int) -> JsonMap:
             cwd = pathlib.Path(cast(str, manifest["workspace"])) if mode == "agent" else pathlib.Path(temporary)
             last_message = pathlib.Path(temporary) / "last-message.txt"
             command = command_for_request(request, binary, cwd, last_message)
-            raw = invoke(command, cast(str, request["prompt"]), cwd, timeout, capture_stdout=backend == "claude")
+            prompt = cast(str, request["prompt"])
+            if backend == "codex" and request["outputFormat"] == "json":
+                prompt += ("\n\nReturn the requested JSON object serialized as a compact JSON string "
+                           "in the output field. The output field is only a response container.")
+            raw = invoke(command, prompt, cwd, timeout, capture_stdout=backend == "claude")
             output = parse_output(backend, raw, last_message, cast(str, request["outputFormat"]))
         encoded_output = json.dumps(output, sort_keys=True, ensure_ascii=False).encode("utf-8")
         if len(encoded_output) > MAX_RESPONSE_BYTES:

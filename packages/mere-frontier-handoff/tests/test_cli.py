@@ -75,6 +75,9 @@ class FrontierHandoffTests(unittest.TestCase):
         self.assertEqual(codex[codex.index("--sandbox") + 1], "read-only")
         self.assertIn("--ephemeral", codex)
         self.assertEqual(codex[-1], "-")
+        schema = json.loads((temp / "output-schema.json").read_text())
+        self.assertEqual(schema["additionalProperties"], False)
+        self.assertEqual(schema["required"], ["output"])
         write_codex = cli.command_for_request(request("codex", "agent", workspace=str(self.root), access="workspace-write"), "codex", self.root, last)
         self.assertEqual(write_codex[write_codex.index("--sandbox") + 1], "workspace-write")
 
@@ -114,6 +117,38 @@ class FrontierHandoffTests(unittest.TestCase):
         self.assertEqual(json.loads((self.output / "result.json").read_text())["output"], "Done.")
         with self.assertRaisesRegex(cli.HandoffError, "only a planned"):
             cli.run(self.output / "run.json", 10)
+
+    def test_codex_json_run_unwraps_strict_output(self) -> None:
+        self.write_request(request("codex"))
+        cli.plan(self.request_file, self.output, "unit-json")
+        readiness = {"backend": "codex", "installed": True, "authenticated": True, "version": "codex 1.0"}
+
+        def fake_invoke(command: list[str], prompt: str, cwd: pathlib.Path, timeout: int, *, capture_stdout: bool) -> str:
+            del cwd, timeout
+            self.assertFalse(capture_stdout)
+            self.assertIn("serialized as a compact JSON string", prompt)
+            pathlib.Path(command[command.index("--output-last-message") + 1]).write_text(
+                json.dumps({"output": '{"choice":"A"}'})
+            )
+            return ""
+
+        with mock.patch.object(cli, "backend_readiness", return_value=readiness):
+            with mock.patch.object(cli, "executable", return_value="/fake/codex"):
+                with mock.patch.object(cli, "invoke", side_effect=fake_invoke):
+                    result = cli.run(self.output / "run.json", 10)
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(json.loads((self.output / "result.json").read_text())["output"], {"choice": "A"})
+
+    def test_claude_api_failure_reports_status_without_response_text(self) -> None:
+        process = mock.Mock()
+        process.returncode = 1
+        process.communicate.return_value = (json.dumps({
+            "is_error": True, "api_error_status": 429, "result": "private provider message",
+        }).encode(), b"")
+        with mock.patch.object(cli.subprocess, "Popen", return_value=process):
+            with self.assertRaisesRegex(cli.HandoffError, "Claude API returned HTTP 429") as caught:
+                cli.invoke(["claude", "--print"], "test", self.root, 10, capture_stdout=True)
+        self.assertNotIn("private provider message", str(caught.exception))
 
     def test_failure_does_not_claim_success_or_retry_on_resume(self) -> None:
         self.write_request(request())
