@@ -27,15 +27,20 @@ import sys
 
 args = sys.argv[1:]
 if args[:2] == ["model", "info"]:
-    print(json.dumps({"id": args[2], "usageTerms": [{"component": "Muse Glimmer"}],
+    terms = [{"component": "Muse Glimmer"}] if "glimmer" in args[2] else []
+    print(json.dumps({"id": args[2], "usageTerms": terms,
                       "usageTermsAcknowledged": os.environ.get("FAKE_TERMS_ACK") != "0"}))
     raise SystemExit(0)
-model = args[args.index("--model") + 1]
+model_arg = args[args.index("--model") + 1]
+model = os.environ.get("FAKE_MODEL_ID", "vision-chat-muse-glimmer-30b")
 if "--preflight" in args:
     installed = os.environ.get("FAKE_MODEL_INSTALLED") != "0"
     print(json.dumps({"status": "ok" if installed else "blocked",
-                      "result": {"model": {"id": model, "installed": installed}}}))
+                      "result": {"model": {"id": model_arg, "installed": installed,
+                                           "path": os.getcwd()}}}))
     raise SystemExit(0 if installed else 1)
+if not os.path.isabs(model_arg) or not os.path.isdir(model_arg):
+    raise SystemExit("API serve requires an installed model path")
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -87,6 +92,35 @@ http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
                 self.assertIsNone(server.process.poll())
             finally:
                 server.stop()
+
+    def test_starts_ornith_without_separate_usage_terms(self) -> None:
+        model = "text-agent-ornith-35b-mlx-4bit"
+        self.assertEqual(api_lifecycle.serve_command(self.base_url, model, model)[4], "text-chat-q36")
+        with self.environment(), mock.patch.dict(os.environ, {"FAKE_MODEL_ID": model, "FAKE_TERMS_ACK": "0"}):
+            server = api_lifecycle.ensure_model(self.base_url, model, cli.model_ready, self.root, 10)
+            self.assertIsNotNone(server)
+            assert server is not None
+            self.assertTrue(cli.model_ready(self.base_url, model))
+            server.stop()
+
+    def test_startup_retries_transient_readiness_timeout(self) -> None:
+        attempts = 0
+
+        def readiness(base_url: str, model: str) -> bool:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
+            if attempts == 2:
+                raise TimeoutError("timed out")
+            return cli.model_ready(base_url, model)
+
+        with self.environment():
+            server = api_lifecycle.ensure_model(self.base_url, cli.DEFAULT_MODEL, readiness, self.root, 10)
+            self.assertIsNotNone(server)
+            assert server is not None
+            self.assertGreaterEqual(attempts, 3)
+            server.stop()
 
     def test_preflight_refuses_missing_model_and_incompatible_endpoint(self) -> None:
         with self.environment(), mock.patch.dict(os.environ, {"FAKE_MODEL_INSTALLED": "0"}):

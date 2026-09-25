@@ -29,7 +29,7 @@ class ComputerUseTests(unittest.TestCase):
                                   text=values.get("text"), key=values.get("key"),
                                   x=float(values["x"]) if "x" in values else None,
                                   y=float(values["y"]) if "y" in values else None,
-                                  capture_id=values.get("capture_id"))
+                                  snapshot_id=values.get("snapshot_id"), modifier=None)
 
     @staticmethod
     def fake_driver(tool: str, _arguments: cli.JsonMap) -> cli.JsonMap:
@@ -75,6 +75,8 @@ class ComputerUseTests(unittest.TestCase):
         ]) as driver:
             observed = cli.tool(path, self.tool_args("observe"))
             self.assertEqual(observed["screenshot_png_b64"], "AA==")
+            with self.assertRaisesRegex(cli.PluginError, "latest observation is current"):
+                cli.tool(path, self.tool_args("observe"))
             clicked = cli.tool(path, self.tool_args("click", element_token="token"))
             self.assertEqual(clicked["effect"], "unverifiable")
             with self.assertRaises(cli.PluginError):
@@ -96,21 +98,58 @@ class ComputerUseTests(unittest.TestCase):
             with self.assertRaises(cli.PluginError):
                 cli.verify_target(cli.load(path))
 
-    def test_pixel_click_requires_latest_capture(self) -> None:
+    def test_observation_keeps_only_selected_window_elements(self) -> None:
+        path = self.planned()
+        run = cli.load(path)
+        run["status"] = "running"
+        cli.save(path, run)
+        raw = {
+            "snapshot_id": "s00000002", "screenshot_png_b64": "AA==", "tree_markdown": "recent private file",
+            "elements": [
+                {"element_index": 0, "role": "AXWindow", "label": "Selected"},
+                {"element_index": 1, "parent_index": 0, "role": "AXTextArea", "value": "hello"},
+                {"element_index": 2, "role": "AXMenuBar"},
+                {"element_index": 3, "parent_index": 2, "role": "AXMenuItem", "label": "recent private file"},
+            ],
+        }
+        with mock.patch.object(cli, "driver_call", return_value=raw) as driver:
+            observed = cli.tool(path, self.tool_args("observe"))
+        self.assertEqual([item["element_index"] for item in observed["elements"]], [0, 1])
+        self.assertNotIn("tree_markdown", observed)
+        self.assertNotIn("recent private file", json.dumps(observed))
+        self.assertEqual(observed["snapshot_id"], "s00000002")
+        self.assertEqual(driver.call_args.args[1]["max_dimension"], 960)
+        self.assertNotIn("max_image_dimension", driver.call_args.args[1])
+
+    def test_pixel_click_requires_latest_screenshot_snapshot(self) -> None:
         path = self.planned()
         run = cli.load(path)
         run["status"] = "running"
         cli.save(path, run)
         with mock.patch.object(cli, "driver_call", side_effect=[
-            {"capture_id": "cap-1", "screenshot_png_b64": "AA=="},
+            {"snapshot_id": "s00000002", "screenshot_png_b64": "AA=="},
             {"effect": "unverifiable"},
         ]) as driver:
             cli.tool(path, self.tool_args("observe"))
             with self.assertRaises(cli.PluginError):
-                cli.tool(path, self.tool_args("click", x="10", y="20", capture_id="old"))
-            cli.tool(path, self.tool_args("click", x="10", y="20", capture_id="cap-1"))
-        self.assertEqual(driver.call_args_list[1].args[1]["capture_id"], "cap-1")
+                cli.tool(path, self.tool_args("click", x="10", y="20", snapshot_id="old"))
+            cli.tool(path, self.tool_args("click", x="10", y="20", snapshot_id="s00000002"))
+        self.assertNotIn("snapshot_id", driver.call_args_list[1].args[1])
         self.assertEqual(driver.call_args_list[1].args[1]["x"], 10.0)
+
+    def test_key_passes_command_modifier_to_driver(self) -> None:
+        path = self.planned()
+        run = cli.load(path)
+        run["status"] = "running"
+        run["needsObservation"] = False
+        cli.save(path, run)
+        arguments = cli.parser().parse_args([
+            "_tool", str(path), "key", "--key", "s", "--modifier", "cmd",
+        ])
+        with mock.patch.object(cli, "driver_call", return_value={"effect": "unverifiable"}) as driver:
+            cli.tool(path, arguments)
+        self.assertEqual(driver.call_args.args[0], "press_key")
+        self.assertEqual(driver.call_args.args[1]["modifiers"], ["cmd"])
 
     def test_run_records_final_observation_without_claiming_independent_success(self) -> None:
         path = self.planned()
@@ -147,6 +186,31 @@ class ComputerUseTests(unittest.TestCase):
              mock.patch.object(cli.subprocess, "run", side_effect=fake_pi):
             result = cli.run_plan(path, 10)
         self.assertEqual(result["verification"], "incomplete-or-unobserved")
+
+    def test_observation_without_action_is_reported(self) -> None:
+        path = self.planned()
+
+        def fake_pi(*args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            cli.tool(path, self.tool_args("observe"))
+            return subprocess.CompletedProcess(args[0], 0, stdout="I clicked the window", stderr="")
+
+        with mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \
+             mock.patch.object(cli, "model_ready", return_value=True), \
+             mock.patch.object(cli, "driver_call", side_effect=self.fake_driver), \
+             mock.patch.object(cli.subprocess, "run", side_effect=fake_pi):
+            result = cli.run_plan(path, 10)
+        self.assertEqual(result["actionCount"], 0)
+        self.assertEqual(result["verification"], "observation-only")
+
+    def test_driver_call_reports_plain_text_action_failure(self) -> None:
+        completed = subprocess.CompletedProcess(
+            ["cua-driver"], 0,
+            stdout="AX action failed: AXUIElementPerformAction(AXPress) returned -25206\n",
+            stderr="",
+        )
+        with mock.patch.object(cli.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(cli.PluginError, "AX action failed"):
+                cli.driver_call("click", {"pid": 101, "window_id": 202})
 
     def test_run_requires_driver_permissions_before_pi(self) -> None:
         path = self.planned()
