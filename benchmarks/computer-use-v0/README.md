@@ -26,6 +26,10 @@ python3 benchmarks/computer-use-v0/run.py \
 
 Use `--engine` for a different image/tool model. `--case button` selects one case; `--repeat 3` repeats the selected cases with new codes. Pass the same `--seed` to two model runs for identical codes. `--timeout` limits each Pi run, and `--startup-timeout` limits API startup. The runner compiles the fixture, starts one loopback API for the selected model, runs each case in a fresh window, and stops only processes it started. It uses the plugin source in this checkout and writes the complete `run.json`, fixture state, API log, and aggregate `report.json` to an ignored `runs/computer-use-v0/` directory. Exit codes are 0 for all passes, 2 for scored failures, and 1 for setup failure.
 
-Compare models with identical case selections, repeat counts, runtime binary, and machine conditions. Review individual failure reasons and logs before drawing conclusions. Startup and per-case durations are recorded, but this is not a controlled throughput benchmark.
+Wall time is a primary result. Each case's `durationSeconds` measures from fixture launch through window selection, planning, Pi execution, and fixture shutdown. `agentWallTimeSeconds` measures the plugin `run` call alone; it is `null` if the agent never started. `outcomeWallTimeSeconds` measures when the correct app state was written, or when the exact read result returned. It is `null` if the outcome was not reached. App-state timing uses the fixture file's wall-clock timestamp; the other elapsed durations use the monotonic clock. `outcomeReached` and `passed` are separate: a timeout can leave the app in the correct state while failing the bounded agent run.
 
-See [VALIDATION.md](./VALIDATION.md) for the first matched local run.
+The aggregate report records `apiStartupWallTimeSeconds` from server launch until the model is ready, `setupWallTimeSeconds` from runner start until the first case, and `benchmarkWallTimeSeconds` through server shutdown. A fast failed case is still a failure.
+
+Compare models with identical case selections, repeat counts, runtime binary, and machine conditions. Review individual failure reasons and logs before drawing conclusions. A single local run is not a controlled throughput benchmark.
+
+See [VALIDATION.md](./VALIDATION.md) for the matched local runs.

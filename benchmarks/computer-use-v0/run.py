@@ -81,6 +81,26 @@ def score_case(case_id: str, nonce: str, state: JsonMap, run: JsonMap) -> list[s
     return failures
 
 
+def outcome_reached(case_id: str, nonce: str, state: JsonMap, run: JsonMap) -> bool:
+    """Judge the task outcome independently of agent shutdown and final prose."""
+    if state.get("caseID") != case_id or state.get("nonce") != nonce:
+        return False
+    actions = run.get("actionCount")
+    if not isinstance(actions, int):
+        return False
+    if case_id == "read-code":
+        observations = run.get("observationCount")
+        return actions == 0 and isinstance(observations, int) and observations >= 1 \
+            and str(run.get("result", "")).strip() == nonce
+    if case_id == "button":
+        return actions >= 1 and state.get("recordCount") == 1 \
+            and state.get("resetCount") == 0 and state.get("cancelCount") == 0
+    if case_id == "form":
+        return actions >= 2 and state.get("submitCount") == 1 \
+            and state.get("submittedText") == nonce and state.get("discardCount") == 0
+    raise ValueError(f"unknown case: {case_id}")
+
+
 def task_for(case_id: str) -> str:
     tasks = {
         "read-code": "Read the six-digit reference code visible in this window. Do not change anything. "
@@ -192,10 +212,13 @@ def run_case(case_id: str, iteration: int, args: argparse.Namespace, app: pathli
     case_dir.mkdir()
     nonce = code_for(args.seed, case_id, iteration)
     state_path = case_dir / "fixture-state.json"
+    started = time.monotonic()
+    wall_started_ns = time.time_ns()
+    agent_started: float | None = None
+    agent_finished: float | None = None
     with (case_dir / "fixture.log").open("w", encoding="utf-8") as log:
         fixture = subprocess.Popen([str(app), case_id, nonce, str(state_path)], stdout=log,
                                    stderr=subprocess.STDOUT, text=True, start_new_session=True)
-        started = time.monotonic()
         run_path = case_dir / "run.json"
         error = None
         try:
@@ -204,24 +227,41 @@ def run_case(case_id: str, iteration: int, args: argparse.Namespace, app: pathli
                                          "--task", task_for(case_id), "--output", str(case_dir),
                                          "--model", args.model, "--base-url", base_url,
                                          "--max-actions", "8"], env)
-            plugin_command(args.python, ["run", str(run_path), "--timeout", str(args.timeout),
-                                         "--api-start-timeout", str(args.startup_timeout)],
-                           env, timeout=args.timeout + args.startup_timeout + 30)
+            agent_started = time.monotonic()
+            try:
+                plugin_command(args.python, ["run", str(run_path), "--timeout", str(args.timeout),
+                                             "--api-start-timeout", str(args.startup_timeout)],
+                               env, timeout=args.timeout + args.startup_timeout + 30)
+            finally:
+                agent_finished = time.monotonic()
         except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
             error = str(exc)
         finally:
             stop(fixture)
+    case_finished = time.monotonic()
     state = read_json(state_path) if state_path.is_file() else {}
     run = read_json(run_path) if run_path.is_file() else {}
     failures = score_case(case_id, nonce, state, run)
     if error:
         failures.insert(0, error)
+    reached = outcome_reached(case_id, nonce, state, run)
+    outcome_seconds: float | None = None
+    if reached and case_id == "read-code" and agent_finished is not None:
+        outcome_seconds = round(agent_finished - started, 3)
+    elif reached and state_path.is_file():
+        elapsed = (state_path.stat().st_mtime_ns - wall_started_ns) / 1_000_000_000
+        if 0 <= elapsed <= case_finished - started + 2:
+            outcome_seconds = round(elapsed, 3)
     result: JsonMap = {
         "case": case_id,
         "iteration": iteration,
         "passed": not failures,
+        "outcomeReached": reached,
+        "outcomeWallTimeSeconds": outcome_seconds,
         "failures": failures,
-        "durationSeconds": round(time.monotonic() - started, 3),
+        "durationSeconds": round(case_finished - started, 3),
+        "agentWallTimeSeconds": round(agent_finished - agent_started, 3)
+        if agent_started is not None and agent_finished is not None else None,
         "actionCount": run.get("actionCount"),
         "observationCount": run.get("observationCount"),
         "runStatus": run.get("status"),
@@ -251,6 +291,7 @@ def main() -> int:
     engine = args.engine or ENGINES.get(args.model)
     if engine is None:
         parser.error("unknown model engine; provide --engine")
+    benchmark_started = time.monotonic()
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output = (args.output or ROOT / "runs" / "computer-use-v0" / f"{stamp}-{args.model}").resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -279,15 +320,19 @@ def main() -> int:
                                                      capture_output=True, check=True).stdout.strip()}
     write_json(output / "report.json", report)
     server: subprocess.Popen[str] | None = None
+    api_started: float | None = None
     try:
         preflight(args.mere_run, engine, args.model, port)
         subprocess.run(["swiftc", str(HERE / "EvalApp.swift"), "-o", str(app)], check=True,
                        text=True, capture_output=True, timeout=60)
         with (output / "api-server.log").open("w", encoding="utf-8") as log:
+            api_started = time.monotonic()
             server = subprocess.Popen([args.mere_run, "api", "serve", "--engine", engine,
                                        "--model", args.model, "--host", "127.0.0.1", "--port", str(port)],
                                       stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
             wait_for_model(server, base_url, args.model, args.startup_timeout)
+            report["apiStartupWallTimeSeconds"] = round(time.monotonic() - api_started, 3)
+            report["setupWallTimeSeconds"] = round(time.monotonic() - benchmark_started, 3)
             for iteration in range(1, args.repeat + 1):
                 for case_id in args.case or CASES:
                     result = run_case(case_id, iteration, args, app, base_url, environment, output)
@@ -300,9 +345,14 @@ def main() -> int:
     finally:
         if server:
             stop(server)
+        if api_started is not None and "apiStartupWallTimeSeconds" not in report:
+            report["apiStartupWallTimeSeconds"] = round(time.monotonic() - api_started, 3)
+        if "setupWallTimeSeconds" not in report:
+            report["setupWallTimeSeconds"] = round(time.monotonic() - benchmark_started, 3)
     if report["status"] == "running":
         cases = cast(list[JsonMap], report["cases"])
         report["status"] = "passed" if cases and all(case["passed"] for case in cases) else "failed"
+    report["benchmarkWallTimeSeconds"] = round(time.monotonic() - benchmark_started, 3)
     report["finishedAt"] = dt.datetime.now(dt.timezone.utc).isoformat()
     write_json(output / "report.json", report)
     sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")

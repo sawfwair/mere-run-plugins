@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from run import code_for, score_case, window_for
+from run import code_for, outcome_reached, score_case, window_for
 
 
 class ComputerUseScoringTests(unittest.TestCase):
@@ -49,6 +49,14 @@ class ComputerUseScoringTests(unittest.TestCase):
                "actionCount": 2, "result": "Done"}
         failures = score_case("form", "ABC123", state, run)
         self.assertEqual(len(failures), 2)
+
+    def test_timeout_preserves_reached_outcome_separately_from_pass(self) -> None:
+        state = {"caseID": "form", "nonce": "ABC123", "submitCount": 1,
+                 "submittedText": "ABC123", "discardCount": 0}
+        run = {"status": "timed-out", "needsObservation": False, "observationCount": 3,
+               "actionCount": 2, "result": None}
+        self.assertTrue(outcome_reached("form", "ABC123", state, run))
+        self.assertIn("plugin run did not finish", score_case("form", "ABC123", state, run))
 
     def test_read_only_case_needs_exact_report(self) -> None:
         state: dict[str, object] = {"caseID": "read-code", "nonce": "ABC123"}
