@@ -30,6 +30,8 @@ Wall time is a primary result. Each case's `durationSeconds` measures from fixtu
 
 The aggregate report records `apiStartupWallTimeSeconds` from server launch until the model is ready, `setupWallTimeSeconds` from runner start until the first case, and `benchmarkWallTimeSeconds` through server shutdown. A fast failed case is still a failure.
 
+Each case also records `decode` from the API's runtime statistics: completed model requests, generated tokens, decode seconds, and generated tokens per decode second. The runner takes snapshots around each case, so a later case does not include an earlier case's tokens. `decode` is `null` when the server does not expose statistics or no request completed. Decode throughput measures model generation only; task wall time also includes screenshots, prompt processing, tool calls, and agent overhead.
+
 Compare models with identical case selections, repeat counts, runtime binary, and machine conditions. Review individual failure reasons and logs before drawing conclusions. A single local run is not a controlled throughput benchmark.
 
 See [VALIDATION.md](./VALIDATION.md) for the matched local runs.

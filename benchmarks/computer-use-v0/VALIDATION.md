@@ -32,3 +32,9 @@ A second matched run used seed `cu-v0-wall-20260925` and suite SHA-256 `9cec18b5
 After adding `outcomeReached` and `outcomeWallTimeSeconds`, a separate Ornith form run with the same seed reached the correct submitted value at **98.123 seconds**, finished the agent run at **131.922 seconds**, and closed the case at **133.497 seconds**. Its API startup was 21.502 seconds, setup 40.453 seconds, and full one-case run 174.423 seconds. This run used suite SHA-256 `07053ec7cf52724c98a803f6c228fc81c6529ba87c0575673f3e0081e4744062`. The difference between 98.123 and 131.922 seconds is time spent after the app reached the goal, including the final observation and agent response.
 
 These runs show material wall-time variation and an outcome/agent-completion gap. They are not a controlled speed comparison or a reliability estimate. The complete local manifests, fixture states, and API logs remain under ignored `runs/computer-use-v0/` on the validating machine; they are not packaged with the plugin.
+
+## Ornith decode throughput probe
+
+The instrumented runner repeated the Record-button case with seed `cu-v0-wall-20260925` on the same machine and runtime binary. Suite SHA-256 was `56f545d91a5c2d6d95a8ee9cec9b7d2b59dedd0673c734dd42f8d8e10ea3c09a`. Ornith passed with one action and two observations. The API runtime counters reported **400 generated tokens over 54.580 seconds of decode across five completed requests, or 7.33 tokens/second**. The correct app outcome occurred at 61.968 seconds; agent time was 82.201 seconds, case time was 83.003 seconds, API startup was 18.394 seconds, and the full one-case run was 117.442 seconds. The local report is `runs/computer-use-v0/20260925T150659Z-text-agent-ornith-35b-mlx-4bit/report.json`.
+
+The decode rate excludes prompt processing, screenshot and accessibility capture, desktop actions, and Pi overhead. The five-request total is a single CUA-case sample, not a sustained throughput benchmark.

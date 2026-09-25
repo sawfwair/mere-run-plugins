@@ -5,10 +5,21 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from run import code_for, outcome_reached, score_case, window_for
+from run import JsonMap, code_for, decode_delta, outcome_reached, score_case, window_for
 
 
 class ComputerUseScoringTests(unittest.TestCase):
+    def test_decode_rate_uses_only_requests_from_this_case(self) -> None:
+        before: JsonMap = {"completedRequests": 2, "generatedTokens": 100,
+                           "averageDecodeSeconds": 1.0}
+        after: JsonMap = {"completedRequests": 4, "generatedTokens": 340,
+                          "averageDecodeSeconds": 1.5}
+        self.assertEqual(decode_delta(before, after), {
+            "completedRequests": 2, "generatedTokens": 240,
+            "decodeSeconds": 4.0, "tokensPerSecond": 60.0,
+        })
+        self.assertIsNone(decode_delta(None, after))
+
     def test_seed_replays_same_case_inputs_across_models(self) -> None:
         self.assertEqual(code_for("comparison", "form", 1), code_for("comparison", "form", 1))
         self.assertNotEqual(code_for("comparison", "form", 1), code_for("comparison", "form", 2))

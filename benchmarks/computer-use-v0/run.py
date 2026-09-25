@@ -181,6 +181,53 @@ def wait_for_model(server: subprocess.Popen[str], base_url: str, model: str, tim
     raise RuntimeError(f"mere.run API did not offer image/tool model within {timeout} seconds")
 
 
+def model_benchmark_stats(base_url: str, model: str) -> JsonMap | None:
+    request = urllib.request.Request(base_url.removesuffix("/v1") + "/runtime/status",
+                                     headers={"Authorization": "Bearer mere-run"})
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            payload = object_map(json.load(response))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
+        return None
+    models = payload.get("models")
+    if isinstance(models, list):
+        for item in models:
+            if isinstance(item, dict) and item.get("id") == model \
+                    and isinstance(item.get("benchmarkStats"), dict):
+                return object_map(item["benchmarkStats"])
+    return None
+
+
+def decode_delta(before: JsonMap | None, after: JsonMap | None) -> JsonMap | None:
+    if before is None or after is None:
+        return None
+    completed = after.get("completedRequests")
+    generated = after.get("generatedTokens")
+    average = after.get("averageDecodeSeconds")
+    if not isinstance(completed, int) or not isinstance(generated, int) \
+            or not isinstance(average, (int, float)):
+        return None
+    previous_completed_value = before.get("completedRequests")
+    previous_generated_value = before.get("generatedTokens")
+    previous_average = before.get("averageDecodeSeconds")
+    if not isinstance(previous_completed_value, int) or not isinstance(previous_generated_value, int):
+        return None
+    previous_completed = previous_completed_value
+    previous_generated = previous_generated_value
+    previous_seconds = 0.0
+    if previous_completed:
+        if not isinstance(previous_average, (int, float)):
+            return None
+        previous_seconds = float(previous_average) * previous_completed
+    requests = completed - previous_completed
+    tokens = generated - previous_generated
+    seconds = float(average) * completed - previous_seconds
+    if requests < 1 or tokens < 0 or seconds <= 0:
+        return None
+    return {"completedRequests": requests, "generatedTokens": tokens,
+            "decodeSeconds": round(seconds, 3), "tokensPerSecond": round(tokens / seconds, 2)}
+
+
 def window_for(python: str, env: dict[str, str], pid: int, case_id: str, timeout: int) -> int:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -335,7 +382,9 @@ def main() -> int:
             report["setupWallTimeSeconds"] = round(time.monotonic() - benchmark_started, 3)
             for iteration in range(1, args.repeat + 1):
                 for case_id in args.case or CASES:
+                    before_stats = model_benchmark_stats(base_url, args.model)
                     result = run_case(case_id, iteration, args, app, base_url, environment, output)
+                    result["decode"] = decode_delta(before_stats, model_benchmark_stats(base_url, args.model))
                     cast(list[JsonMap], report["cases"]).append(result)
                     write_json(output / "report.json", report)
                     sys.stderr.write(f"{case_id} #{iteration}: {'pass' if result['passed'] else 'fail'}\n")
