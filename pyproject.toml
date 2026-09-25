@@ -66,6 +66,8 @@ files = [
   "packages/mere-computer-use/src",
   "benchmarks/ate-v0/score.py",
   "benchmarks/ate-v0/test_cases.py",
+  "benchmarks/computer-use-v0/run.py",
+  "benchmarks/computer-use-v0/test_run.py",
   "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",
