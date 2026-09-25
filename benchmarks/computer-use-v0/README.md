@@ -14,6 +14,8 @@ The fixture writes its own state to disk after each button press. Scoring checks
 
 On Apple Silicon macOS, install and grant Accessibility and Screen Recording to Cua Driver, install Pi, and have the model already installed and its usage terms acknowledged. Run from the repository root:
 
+Use a release build of `mere.run` when comparing speed. A debug binary can materially slow model decoding, even when the same checkpoint and task pass.
+
 ```bash
 python3 benchmarks/computer-use-v0/run.py \
   --model text-agent-ornith-35b-mlx-4bit \
