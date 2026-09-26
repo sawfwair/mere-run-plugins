@@ -11,6 +11,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from importlib import resources
 from typing import NoReturn, cast
 
 from . import __version__
@@ -172,13 +173,15 @@ def manifest() -> JsonMap:
     commands = [("manifest", "Describe this plugin"), ("doctor", "Check instance JSON search"),
                 ("search", "Search directly"), ("plan", "Save a search plan"), ("run", "Execute a saved search"),
                 ("resume", "Read a completed search"), ("cleanup", "Record cleanup"),
-                ("instance", "Install and manage a local SearXNG instance")]
+                ("instance", "Install and manage a local SearXNG instance"),
+                ("pi-extension", "Locate the bundled Pi search tool")]
     return {
         "contractVersion": "mere.run/plugin.v1", "name": "mere-searxng-search", "version": __version__,
         "executable": "mere-searxng-search", "description": "Search a user-configured SearXNG instance",
         "homepage": "https://github.com/searxng/searxng",
-        "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management"],
-        "commands": [{"name": name, "description": description, "stdout": "json"} for name, description in commands],
+        "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management", "pi-tool"],
+        "commands": [{"name": name, "description": description,
+                      "stdout": "paths" if name == "pi-extension" else "json"} for name, description in commands],
         "stdout": {"machineReadableByDefault": True, "diagnostics": "stderr"},
         "security": {"usesUserCredentials": False, "storesSecrets": False, "createsPaidResources": False,
                      "cleanupDefault": "none"},
@@ -240,6 +243,7 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="mere-searxng-search")
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("manifest").add_argument("--json", action="store_true")
+    commands.add_parser("pi-extension")
     doctor = commands.add_parser("doctor")
     doctor.add_argument("--instance")
     doctor.add_argument("--state-dir")
@@ -269,6 +273,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "manifest":
             print_json(manifest())
+        elif args.command == "pi-extension":
+            extension = pathlib.Path(str(resources.files("mere_searxng_search"))) / "resources" / "pi" / "extensions" / "searxng-search.ts"
+            if not extension.is_file():
+                fail("bundled Pi extension is missing")
+            sys.stdout.write(str(extension) + "\n")
         elif args.command == "doctor":
             probe = argparse.Namespace(query="searxng", instance=args.instance, page=1, limit=1,
                                        language=None, categories=None, time_range=None, safe_search=1,

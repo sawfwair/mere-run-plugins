@@ -56,6 +56,7 @@ fi
 unset PYTHONPATH
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-searxng-search
 "$CHECK_TMP/venv/bin/mere-searxng-search" manifest --json >/dev/null
+test -f "$("$CHECK_TMP/venv/bin/mere-searxng-search" pi-extension)"
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-frontier-handoff
 "$CHECK_TMP/venv/bin/mere-frontier-handoff" manifest --json >/dev/null
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-computer-use

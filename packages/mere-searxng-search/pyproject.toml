@@ -19,4 +19,4 @@ mere-searxng-search = "mere_searxng_search.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_searxng_search = ["py.typed"]
+mere_searxng_search = ["py.typed", "resources/pi/package.json", "resources/pi/extensions/*.ts"]

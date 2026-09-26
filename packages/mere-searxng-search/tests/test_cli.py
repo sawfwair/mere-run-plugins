@@ -68,6 +68,14 @@ def invoke(*args: str) -> tuple[int, str, str]:
 
 
 class SearchTests(unittest.TestCase):
+    def test_pi_extension_is_bundled(self) -> None:
+        code, output, error = invoke("pi-extension")
+        self.assertEqual((code, error), (0, ""))
+        extension = pathlib.Path(output.strip())
+        self.assertEqual(extension.name, "searxng-search.ts")
+        self.assertTrue(extension.is_file())
+        self.assertIn('name: "searxng_search"', extension.read_text())
+
     def test_search_and_lifecycle(self) -> None:
         with server() as instance, tempfile.TemporaryDirectory() as directory:
             code, output, error = invoke("search", "sample query", "--instance", instance, "--limit", "1",

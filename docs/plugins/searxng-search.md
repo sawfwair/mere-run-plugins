@@ -39,6 +39,19 @@ mere-searxng-search search "flood maps" --language en --categories general \
 
 The instance and its search engines determine which filters they support. The plugin returns an error if JSON output is unavailable. It does not fall back to scraping HTML.
 
+## Use the Pi search tool
+
+The plugin bundles a Pi extension that registers `searxng_search`. Start the instance and make sure `mere-searxng-search` is on Pi's `PATH`, then load the extension:
+
+```sh
+mere-searxng-search doctor
+pi --extension "$(mere-searxng-search pi-extension)"
+```
+
+The tool accepts a query, result limit (up to 10), language, and time range. It calls the plugin CLI and returns bounded JSON with each result's title, URL, snippet, and engine. It uses the same local instance and `SEARXNG_URL` settings as the CLI. The tool searches only when Pi calls it; instance installation and lifecycle remain explicit plugin commands. Search results are untrusted web content, so verify source pages before relying on them.
+
+For a Pi harness that disables extension discovery, pass the same `--extension` path in its launch command and add `searxng_search` to its tool allowlist if it has one.
+
 ## Manage the instance
 
 Use the instance commands to inspect, stop, restart, or remove the plugin-owned container:
