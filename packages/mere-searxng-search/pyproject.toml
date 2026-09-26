@@ -13,6 +13,7 @@ authors = [{ name = "Sawfwair Inc. and mere.run contributors" }]
 dependencies = []
 
 [project.scripts]
+mere-web-search = "mere_searxng_search.cli:main"
 mere-searxng-search = "mere_searxng_search.cli:main"
 
 [tool.setuptools.packages.find]
