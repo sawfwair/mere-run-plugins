@@ -159,7 +159,10 @@ def _open_image(path: pathlib.Path) -> Image.Image:
         with Image.open(path) as source:
             if source.width * source.height > MAX_PIXELS:
                 raise GraphProviderError("image exceeds the 16 megapixel finishing limit")
-            return cast(Image.Image, source.convert("RGBA"))
+            converted = source.convert("RGBA")
+            if not isinstance(converted, Image.Image):
+                raise GraphProviderError("image conversion did not return an image")
+            return converted
     except (OSError, UnidentifiedImageError) as exc:
         raise GraphProviderError(f"could not read image: {path.name}") from exc
 
@@ -168,7 +171,10 @@ def _mask_image(path: pathlib.Path, size: tuple[int, int]) -> Image.Image:
     with Image.open(path) as source:
         if source.size != size:
             raise GraphProviderError("mask dimensions must match the source image")
-        return cast(Image.Image, source.convert("L"))
+        converted = source.convert("L")
+        if not isinstance(converted, Image.Image):
+            raise GraphProviderError("mask conversion did not return an image")
+        return converted
 
 
 def _inpaint(source: Image.Image, mask: Image.Image) -> Image.Image:
