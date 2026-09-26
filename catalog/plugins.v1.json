@@ -27,7 +27,7 @@
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-searxng-search",
       "subdirectory": "packages/mere-searxng-search",
-      "entrypoint": "mere-searxng-search",
+      "entrypoint": "mere-web-search",
       "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management"],
       "channels": {
         "main": {

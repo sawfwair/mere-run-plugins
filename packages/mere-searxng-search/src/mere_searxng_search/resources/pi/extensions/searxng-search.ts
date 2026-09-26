@@ -4,7 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const execFileAsync = promisify(execFile);
-const command = process.env.MERE_SEARXNG_SEARCH_COMMAND || "mere-searxng-search";
+const command = process.env.MERE_SEARXNG_SEARCH_COMMAND || "mere-web-search";
 
 interface SearchResult {
   title: string;
