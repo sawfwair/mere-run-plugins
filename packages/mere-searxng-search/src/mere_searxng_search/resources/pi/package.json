@@ -1,0 +1,12 @@
+{
+  "name": "@mere/searxng-search-pi",
+  "version": "0.1.0",
+  "private": true,
+  "keywords": ["pi-package", "mere.run", "searxng", "web-search"],
+  "pi": { "extensions": ["./extensions"] },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "type": "module"
+}

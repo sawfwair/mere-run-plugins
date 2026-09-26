@@ -1,6 +1,6 @@
 # Official plugins
 
-The live catalog contains 20 official companion executables.
+The live catalog contains 21 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
@@ -13,6 +13,7 @@ The live catalog contains 20 official companion executables.
 | [Image Tools](/plugins/image-tools) | `mere-image-tools` | Subject knockout and matte cleanup | Local |
 | [Computer Use](/plugins/computer-use) | `mere-computer-use` | Selected-window desktop agent with local vision | Local macOS |
 | [Frontier Handoff](/plugins/frontier-handoff) | `mere-frontier-handoff` | Bounded chat and agent tasks through a signed-in Claude Code or Codex CLI | Local handoff to a user account |
+| [SearXNG Search](/plugins/searxng-search) | `mere-searxng-search` | Install a local SearXNG instance and search the web | Local Docker and SearXNG engines |
 | [Animatic Tools](/plugins/animatic-tools) | `mere-animatic-tools` | Animatic production kits and delivery prep | Local |
 | [Film Studio](/plugins/film-tools) | `mere-film-tools` | Pi-directed short-film development, local production, review, and delivery | Local plus user-selected Pi provider |
 | [ShotGrid Tools](/plugins/shotgrid-tools) | `mere-shotgrid-tools` | Production tracking and review publishing | User-controlled provider |

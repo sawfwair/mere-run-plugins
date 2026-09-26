@@ -46,7 +46,7 @@ For task-specific installation and first-run instructions, see the
 
 ## Choose a plugin
 
-The catalog contains 20 companion executables:
+The catalog contains 21 companion executables:
 
 | Task | Plugin |
 | --- | --- |
@@ -56,6 +56,7 @@ The catalog contains 20 companion executables:
 | Create visual-effects shot artifacts | [VFX Tools](https://plugins-docs.mere.run/plugins/vfx-tools) |
 | Operate a selected macOS window locally | [Computer Use](https://plugins-docs.mere.run/plugins/computer-use) |
 | Hand off bounded chat or agent work | [Frontier Handoff](https://plugins-docs.mere.run/plugins/frontier-handoff) |
+| Install local SearXNG and search the web | [SearXNG Search](https://plugins-docs.mere.run/plugins/searxng-search) |
 | Remove a still-image background | [Image Tools](https://plugins-docs.mere.run/plugins/image-tools) |
 | Produce animatic assets | [Animatic Tools](https://plugins-docs.mere.run/plugins/animatic-tools) |
 | Produce a governed short film | [Film Studio](https://plugins-docs.mere.run/plugins/film-tools) |

@@ -220,6 +220,7 @@ def validate_catalog() -> None:
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
+        ROOT / "packages" / "mere-searxng-search" / "src",
         ROOT / "packages" / "mere-frontier-handoff" / "src",
         ROOT / "packages" / "mere-computer-use" / "src",
         ROOT / "packages" / "mere-archive-tools" / "src",
@@ -273,6 +274,10 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_searxng_search", "mere-searxng-search",
+        {"manifest", "doctor", "search", "plan", "run", "resume", "cleanup", "instance"},
+    )
     validate_plugin_manifest(
         "mere_frontier_handoff", "mere-frontier-handoff",
         {"manifest", "doctor", "plan", "run", "resume", "cleanup"},
