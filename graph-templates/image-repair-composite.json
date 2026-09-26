@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "Repair and composite an image",
+  "inputs": {
+    "source": {"type": "asset", "required": true},
+    "mask": {"type": "asset", "required": true},
+    "overlay": {"type": "asset", "required": true},
+    "left": {"type": "integer", "default": 0},
+    "top": {"type": "integer", "default": 0},
+    "opacity": {"type": "number", "default": 1}
+  },
+  "nodes": [
+    {"id": "repair", "kind": "image.inpaint", "provider": "mere-image-compose",
+      "arguments": {"source": {"$ref": "inputs.source"}, "mask": {"$ref": "inputs.mask"}}},
+    {"id": "composite", "kind": "image.composite", "provider": "mere-image-compose",
+      "arguments": {"base": {"$ref": "nodes.repair.outputs.image"}, "overlay": {"$ref": "inputs.overlay"},
+        "left": {"$ref": "inputs.left"}, "top": {"$ref": "inputs.top"}, "opacity": {"$ref": "inputs.opacity"}}}
+  ],
+  "outputs": {
+    "repaired": {"$ref": "nodes.repair.outputs.image"},
+    "finished": {"$ref": "nodes.composite.outputs.image"}
+  },
+  "metadata": {"template_id": "image-repair-composite"}
+}

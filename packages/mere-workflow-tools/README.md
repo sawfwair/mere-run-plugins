@@ -30,6 +30,7 @@ source-checkout binary.
 - `mere-dataset-tools`: `mere.run vision caption`, optional OCR sidecars, and a contact sheet
 - `mere-transcript-tools`: `mere.run speech transcribe` plus optional PII redaction
 - `mere-image-compose`: `mere.run image generate` with ref image and LoRA flags recorded
+  and portable graph nodes for cropping, masking, compositing, and small-area inpainting
 - `mere-batch-runner`: JSONL batch runner for explicit `mere.run` argv lists
 
 Every command supports:
