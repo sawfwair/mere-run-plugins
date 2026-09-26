@@ -41,16 +41,18 @@ The instance and its search engines determine which filters they support. The pl
 
 ## Use the Pi search tool
 
-The plugin bundles a Pi extension that registers `searxng_search`. Start the instance and make sure `mere-searxng-search` is on Pi's `PATH`, then load the extension:
+`mere.run agent start` launches Pi with a local mere.run model. The SearXNG plugin supplies the separate `searxng_search` tool. After installing the local instance, enable the tool once in mere.run's Pi home:
 
 ```sh
-mere-searxng-search doctor
-pi --extension "$(mere-searxng-search pi-extension)"
+mere-searxng-search pi enable
+mere.run agent start
 ```
 
-The tool accepts a query, result limit (up to 10), language, and time range. It calls the plugin CLI and returns bounded JSON with each result's title, URL, snippet, and engine. It uses the same local instance and `SEARXNG_URL` settings as the CLI. The tool searches only when Pi calls it; instance installation and lifecycle remain explicit plugin commands. Search results are untrusted web content, so verify source pages before relying on them.
+Future `mere.run agent start` sessions discover the tool automatically. The enable command adds a link to the plugin's installed extension; it does not change the mere.run CLI or its provider extension. Use `mere-searxng-search pi status` to check the link and `mere-searxng-search pi disable` to remove it. Neither command stops the SearXNG instance.
 
-For a Pi harness that disables extension discovery, pass the same `--extension` path in its launch command and add `searxng_search` to its tool allowlist if it has one.
+The tool accepts a query, result limit (up to 10), language, and time range. It calls the plugin CLI and returns bounded JSON with each result's title, URL, snippet, and engine. It uses the same local instance and `SEARXNG_URL` settings as the CLI. Search results are untrusted web content, so verify source pages before relying on them.
+
+If another Pi harness disables extension discovery, pass the path printed by `mere-searxng-search pi-extension` with Pi's `--extension` option and include `searxng_search` in any tool allowlist.
 
 ## Manage the instance
 

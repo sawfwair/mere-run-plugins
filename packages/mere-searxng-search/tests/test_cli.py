@@ -75,6 +75,7 @@ class SearchTests(unittest.TestCase):
         self.assertEqual(extension.name, "searxng-search.ts")
         self.assertTrue(extension.is_file())
         self.assertIn('name: "searxng_search"', extension.read_text())
+        self.assertEqual(cli.parser().parse_args(["pi", "enable"]).pi_command, "enable")
 
     def test_search_and_lifecycle(self) -> None:
         with server() as instance, tempfile.TemporaryDirectory() as directory:
