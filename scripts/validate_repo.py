@@ -275,7 +275,7 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 def validate_plugin_manifests() -> None:
     validate_plugin_manifest(
-        "mere_searxng_search", "mere-searxng-search",
+        "mere_searxng_search", "mere-web-search",
         {"manifest", "doctor", "search", "plan", "run", "resume", "cleanup", "instance"},
     )
     validate_plugin_manifest(

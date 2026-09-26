@@ -68,6 +68,12 @@ def invoke(*args: str) -> tuple[int, str, str]:
 
 
 class SearchTests(unittest.TestCase):
+    def test_primary_command_name(self) -> None:
+        code, output, error = invoke("manifest", "--json")
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(json.loads(output)["executable"], "mere-web-search")
+        self.assertEqual(cli.parser().prog, "mere-web-search")
+
     def test_pi_extension_is_bundled(self) -> None:
         code, output, error = invoke("pi-extension")
         self.assertEqual((code, error), (0, ""))

@@ -179,7 +179,7 @@ def manifest() -> JsonMap:
                 ("pi", "Enable or disable the tool in mere.run's Pi agent")]
     return {
         "contractVersion": "mere.run/plugin.v1", "name": "mere-searxng-search", "version": __version__,
-        "executable": "mere-searxng-search", "description": "Search a user-configured SearXNG instance",
+        "executable": "mere-web-search", "description": "Search a user-configured SearXNG instance",
         "homepage": "https://github.com/searxng/searxng",
         "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management", "pi-tool"],
         "commands": [{"name": name, "description": description,
@@ -247,7 +247,7 @@ def pi_extension_path() -> pathlib.Path:
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(prog="mere-searxng-search")
+    root = argparse.ArgumentParser(prog="mere-web-search")
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("manifest").add_argument("--json", action="store_true")
     commands.add_parser("pi-extension")
