@@ -502,6 +502,38 @@ result = subprocess.run(
 if '"status": "passed"' not in result.stdout or '"dataset.prepare"' not in result.stdout:
     raise SystemExit("installed graph provider conformance smoke failed")
 
+from PIL import Image
+
+image_cli = pathlib.Path(sys.executable).with_name("mere-image-compose")
+source_image = root / "source.png"
+overlay_image = root / "overlay.png"
+mask_image = root / "mask.png"
+Image.new("RGB", (5, 5), (100, 120, 140)).save(source_image)
+Image.new("RGBA", (2, 2), (255, 0, 0, 255)).save(overlay_image)
+mask = Image.new("L", (5, 5), 0)
+mask.putpixel((2, 2), 255)
+mask.save(mask_image)
+for kind, arguments in [
+    ("image.crop", {"source": str(source_image), "left": 1, "top": 1, "width": 2, "height": 3}),
+    ("image.mask", {"source": str(source_image), "mask": str(mask_image)}),
+    ("image.composite", {"base": str(source_image), "overlay": str(overlay_image)}),
+    ("image.inpaint", {"source": str(source_image), "mask": str(mask_image)}),
+]:
+    fixture = {"contract_version": "mere.run/plugin-graph-invocation.v1",
+               "job_id": "b8d28f0b-2e31-4fde-9199-6fd1ec7df29e", "node_id": "finish",
+               "kind": kind, "arguments": arguments,
+               "outputs": {"image": {"type": "asset", "path": "artifacts/finished.png"}}}
+    fixture_path = root / f"{kind}.invocation.json"
+    fixture_path.write_text(json.dumps(fixture))
+    result = subprocess.run(
+        [str(conformance_cli), "--provider", str(image_cli), "--invocation", str(fixture_path),
+         "--run-dir", str(root / kind), "--execute", "--json"],
+        cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    receipt = json.loads(result.stdout)
+    if receipt["status"] != "passed" or not receipt["fixture"]["executed"]:
+        raise SystemExit(f"installed image graph execution conformance failed: {kind}")
+
 if sys.version_info >= (3, 10):
     from unittest.mock import patch
 

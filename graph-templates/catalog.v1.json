@@ -2,6 +2,13 @@
   "contract_version": "mere.run/graph-template-catalog.v1",
   "templates": [
     {
+      "id": "image-repair-composite",
+      "title": "Repair and composite an image",
+      "description": "Fill a small masked defect from neighboring pixels, then place an overlay. Uses the mere-image-compose provider without a model.",
+      "path": "image-repair-composite.json",
+      "tags": ["image", "mask", "composite", "local"]
+    },
+    {
       "id": "document-to-markdown",
       "title": "Convert a document to Markdown",
       "description": "Convert a local document with AnyDoc and preserve Markdown, reusable text, hashes, and a run manifest. No model or hosted OCR is used.",

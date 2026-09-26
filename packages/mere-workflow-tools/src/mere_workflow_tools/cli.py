@@ -24,6 +24,7 @@ from . import (
     graph_compiler,
     graph_provider,
     graph_templates,
+    image_graph_provider,
 )
 from .graph_sdk import GraphProviderError
 
@@ -282,7 +283,7 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             "cleanupDefault": "none",
         },
     }
-    if spec.kind in {"doc", "dataset"}:
+    if spec.kind in {"doc", "dataset", "image_compose"}:
         commands.append({"name": "graph", "description": "Expose portable graph nodes.", "stdout": "json"})
         capabilities.append("graph-node-provider-v1")
         manifest["graphProvider"] = {"contractVersion": graph_provider.CONTRACT_VERSION}
@@ -796,13 +797,13 @@ def command_cleanup(_spec: ToolSpec, args: argparse.Namespace) -> int:
 
 
 def command_graph_catalog(spec: ToolSpec, _args: argparse.Namespace) -> int:
-    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
+    provider = doc_graph_provider if spec.kind == "doc" else image_graph_provider if spec.kind == "image_compose" else graph_provider
     print_json(provider.graph_catalog(spec.plugin_name, __version__))
     return 0
 
 
 def command_graph_preflight(spec: ToolSpec, args: argparse.Namespace) -> int:
-    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
+    provider = doc_graph_provider if spec.kind == "doc" else image_graph_provider if spec.kind == "image_compose" else graph_provider
     try:
         invocation = provider.load_invocation(args.request)
         print_json(provider.graph_preflight(invocation, args.graph_run_dir))
@@ -812,7 +813,7 @@ def command_graph_preflight(spec: ToolSpec, args: argparse.Namespace) -> int:
 
 
 def command_graph_execute(spec: ToolSpec, args: argparse.Namespace) -> int:
-    provider = doc_graph_provider if spec.kind == "doc" else graph_provider
+    provider = doc_graph_provider if spec.kind == "doc" else image_graph_provider if spec.kind == "image_compose" else graph_provider
     try:
         invocation = provider.load_invocation(args.request)
 
@@ -1017,7 +1018,7 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     cleanup.add_argument("run_manifest", type=pathlib.Path)
     cleanup.set_defaults(func=command_cleanup)
 
-    if spec.kind in {"doc", "dataset"}:
+    if spec.kind in {"doc", "dataset", "image_compose"}:
         graph = sub.add_parser("graph", help="Expose portable graph nodes.")
         graph_sub = graph.add_subparsers(dest="graph_command", required=True)
 
