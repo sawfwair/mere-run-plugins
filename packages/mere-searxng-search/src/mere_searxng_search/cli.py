@@ -14,6 +14,7 @@ import urllib.request
 from typing import NoReturn, cast
 
 from . import __version__
+from . import instance as local_instance
 
 JsonMap = dict[str, object]
 MAX_RESPONSE_BYTES = 4_000_000
@@ -79,9 +80,11 @@ def instance_url(raw: str) -> str:
 
 
 def request_from_args(args: argparse.Namespace) -> JsonMap:
-    instance = args.instance or os.environ.get("SEARXNG_URL", "")
+    instance = args.instance or os.environ.get("SEARXNG_URL", "") or local_instance.instance_url(
+        local_instance.state_dir(args.state_dir)
+    )
     if not instance:
-        fail("set --instance or SEARXNG_URL")
+        fail("install a local instance or set --instance or SEARXNG_URL")
     query = args.query.strip()
     if not query:
         fail("query must be nonempty")
@@ -168,11 +171,13 @@ def search(request: JsonMap) -> JsonMap:
 def manifest() -> JsonMap:
     commands = [("manifest", "Describe this plugin"), ("doctor", "Check instance JSON search"),
                 ("search", "Search directly"), ("plan", "Save a search plan"), ("run", "Execute a saved search"),
-                ("resume", "Read a completed search"), ("cleanup", "Record cleanup")]
+                ("resume", "Read a completed search"), ("cleanup", "Record cleanup"),
+                ("instance", "Install and manage a local SearXNG instance")]
     return {
         "contractVersion": "mere.run/plugin.v1", "name": "mere-searxng-search", "version": __version__,
         "executable": "mere-searxng-search", "description": "Search a user-configured SearXNG instance",
-        "homepage": "https://github.com/searxng/searxng", "capabilities": ["web-search", "searxng", "json-results"],
+        "homepage": "https://github.com/searxng/searxng",
+        "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management"],
         "commands": [{"name": name, "description": description, "stdout": "json"} for name, description in commands],
         "stdout": {"machineReadableByDefault": True, "diagnostics": "stderr"},
         "security": {"usesUserCredentials": False, "storesSecrets": False, "createsPaidResources": False,
@@ -221,6 +226,7 @@ def execute(path: pathlib.Path) -> JsonMap:
 def add_search_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("query")
     parser.add_argument("--instance")
+    parser.add_argument("--state-dir")
     parser.add_argument("--page", type=int, default=1)
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--language")
@@ -236,6 +242,7 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("manifest").add_argument("--json", action="store_true")
     doctor = commands.add_parser("doctor")
     doctor.add_argument("--instance")
+    doctor.add_argument("--state-dir")
     doctor.add_argument("--timeout", type=float, default=15.0)
     add_search_args(commands.add_parser("search"))
     plan = commands.add_parser("plan")
@@ -243,6 +250,17 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--output", required=True)
     for command in ("run", "resume", "cleanup"):
         commands.add_parser(command).add_argument("run_manifest")
+    instance = commands.add_parser("instance")
+    actions = instance.add_subparsers(dest="instance_command", required=True)
+    for command in ("plan", "install", "start", "status", "stop", "uninstall"):
+        action = actions.add_parser(command)
+        action.add_argument("--state-dir")
+        if command in ("plan", "install"):
+            action.add_argument("--port", type=int, default=8888)
+            action.add_argument("--docker-context")
+            action.add_argument("--image", default=local_instance.DEFAULT_IMAGE)
+        if command == "uninstall":
+            action.add_argument("--purge", action="store_true")
     return root
 
 
@@ -253,9 +271,24 @@ def main(argv: list[str] | None = None) -> int:
             print_json(manifest())
         elif args.command == "doctor":
             probe = argparse.Namespace(query="searxng", instance=args.instance, page=1, limit=1,
-                                       language=None, categories=None, time_range=None, safe_search=1, timeout=args.timeout)
+                                       language=None, categories=None, time_range=None, safe_search=1,
+                                       timeout=args.timeout, state_dir=args.state_dir)
             result = search(request_from_args(probe))
             print_json({"ready": True, "instance": result["instance"], "jsonSearch": True})
+        elif args.command == "instance":
+            directory = local_instance.state_dir(args.state_dir)
+            if args.instance_command == "plan":
+                print_json(local_instance.plan(directory, args.port, args.docker_context, args.image))
+            elif args.instance_command == "install":
+                print_json(local_instance.install(directory, args.port, args.docker_context, args.image))
+            elif args.instance_command == "start":
+                print_json(local_instance.start(directory))
+            elif args.instance_command == "status":
+                print_json(local_instance.status(directory))
+            elif args.instance_command == "stop":
+                print_json(local_instance.stop(directory))
+            elif args.instance_command == "uninstall":
+                print_json(local_instance.uninstall(directory, args.purge))
         elif args.command == "search":
             print_json(search(request_from_args(args)))
         elif args.command == "plan":
@@ -287,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
             record["updatedAt"] = now_iso()
             private_json(path, record)
             print_json(record)
-    except SearchError as error:
+    except (SearchError, local_instance.InstanceError) as error:
         sys.stderr.write(str(error) + "\n")
         return 2
     return 0

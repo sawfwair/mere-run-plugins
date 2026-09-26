@@ -23,12 +23,12 @@
     {
       "id": "mere-searxng-search",
       "name": "SearXNG Search",
-      "description": "Search the web through a user-configured SearXNG instance and return JSON results.",
+      "description": "Install and manage a local SearXNG instance, then search the web with JSON results.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-searxng-search",
       "subdirectory": "packages/mere-searxng-search",
       "entrypoint": "mere-searxng-search",
-      "capabilities": ["web-search", "searxng", "json-results"],
+      "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management"],
       "channels": {
         "main": {
           "manager": "pipx",

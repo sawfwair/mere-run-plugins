@@ -1,3 +1,3 @@
 # SearXNG Search package
 
-`cli.py` owns the command interface, JSON response handling, and local search receipts. The package uses Python's standard HTTP library to call an instance selected by the user. It does not start an instance or import code from SearXNG.
+`cli.py` owns the command interface, JSON response handling, and local search receipts. `instance.py` owns the Docker lifecycle for a loopback-only SearXNG container. The package calls SearXNG through its HTTP API and does not import its code.
