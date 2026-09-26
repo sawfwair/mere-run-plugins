@@ -93,6 +93,7 @@ export default defineConfig({
             { text: 'Image Tools', link: '/plugins/image-tools' },
             { text: 'Computer Use', link: '/plugins/computer-use' },
             { text: 'Frontier Handoff', link: '/plugins/frontier-handoff' },
+            { text: 'SearXNG Search', link: '/plugins/searxng-search' },
             { text: 'Animatic Tools', link: '/plugins/animatic-tools' },
             { text: 'Film Studio', link: '/plugins/film-tools' },
             { text: 'ShotGrid Tools', link: '/plugins/shotgrid-tools' },
