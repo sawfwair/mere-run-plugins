@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "mere-archive-krea-visual-supplement",
+  "createdAt": "2026-09-02T15:03:57Z",
+  "generator": {
+    "command": "mere.run image generate",
+    "mereRunVersion": "0.50.0",
+    "modelId": "image-krea2-turbo",
+    "upstreamRepoId": "krea/Krea-2-Turbo",
+    "modelVariant": "distilled",
+    "precision": "bf16",
+    "steps": 8,
+    "cfgScale": 0,
+    "sigmaShift": 1.15,
+    "device": "MLX/Metal GPU"
+  },
+  "license": {
+    "name": "Krea 2 Community License Agreement v.1",
+    "url": "https://huggingface.co/krea/Krea-2-Turbo/blob/main/LICENSE.pdf",
+    "reviewRequired": false,
+    "commercialUseRevenueThresholdUsd": 1000000,
+    "eligibilityConfirmedByPublisher": true,
+    "redistributionApproved": true
+  },
+  "assets": [
+    {
+      "id": "krea-yellow-generator",
+      "file": "assets/krea2/yellow-generator-red-panel.png",
+      "archivePath": "Facilities/Sydney/2025/yellow-generator-red-panel.png",
+      "sha256": "sha256:295cbaf2f1414d99fbb50ab1d7331024e022d07f2ee92a8fdf206bfbfe4166a6",
+      "width": 1024,
+      "height": 768,
+      "seed": 502001,
+      "prompt": "Photorealistic facilities inspection photo inside a clean industrial mechanical room. A large yellow backup generator is the main subject, with a bright red service panel mounted beside it and a coiled blue hose on the concrete floor. Wide documentary framing, natural overhead utility lighting, realistic wear and materials, no people, no logos, no watermark, no legible text.",
+      "expectedConcepts": [
+        "yellow backup generator",
+        "red service panel",
+        "blue hose",
+        "industrial mechanical room"
+      ],
+      "query": "Find the mechanical-room photo with the yellow generator, red service panel, and blue hose."
+    },
+    {
+      "id": "krea-catch-basin",
+      "file": "assets/krea2/catch-basin-green-flag.png",
+      "archivePath": "Inspections/Moncton/2026/catch-basin-green-flag.png",
+      "sha256": "sha256:64553bf9f153dbd211375527c5810d05dcbc8966d5d520d4fdebc8ef94fa4112",
+      "width": 1024,
+      "height": 768,
+      "seed": 502002,
+      "prompt": "Photorealistic municipal facilities inspection photo after rainfall. A circular stormwater catch basin in wet dark asphalt is the main subject, with a bright green survey flag planted beside the grate and one orange traffic cone leaning nearby. Low documentary camera angle, overcast daylight, realistic puddles and surface texture, no people, no vehicles, no logos, no watermark, no legible text.",
+      "expectedConcepts": [
+        "stormwater catch basin",
+        "green survey flag",
+        "orange traffic cone",
+        "wet asphalt after rain"
+      ],
+      "query": "Find the rainy catch-basin photo with the green survey flag and orange traffic cone."
+    },
+    {
+      "id": "krea-blue-ladder",
+      "file": "assets/krea2/blue-ladder-purple-crates.png",
+      "archivePath": "Inventory/Truro/2024/blue-ladder-purple-crates.png",
+      "sha256": "sha256:277cecd3447f7de37f873614a637ef009ea5d471283eab87d102644d774280df",
+      "width": 1024,
+      "height": 768,
+      "seed": 502003,
+      "prompt": "Photorealistic warehouse inventory photo in a tall industrial aisle. A blue rolling ladder is the main subject, positioned beside a neat stack of purple reusable storage crates, with one yellow manual pallet jack parked in the foreground. Wide documentary framing, cool fluorescent warehouse lighting, realistic concrete and steel textures, no people, no logos, no watermark, no legible text.",
+      "expectedConcepts": [
+        "blue rolling ladder",
+        "purple storage crates",
+        "yellow pallet jack",
+        "warehouse aisle"
+      ],
+      "query": "Find the warehouse photo with the blue rolling ladder, purple crates, and yellow pallet jack."
+    },
+    {
+      "id": "krea-solar-roof",
+      "file": "assets/krea2/solar-roof-orange-cone.png",
+      "archivePath": "Projects/Halifax/2026/solar-roof-orange-cone.png",
+      "sha256": "sha256:8803baa4f0316cc4bbb4475469aedac1049e5681af6a8a57ee0441d661e46568",
+      "width": 1024,
+      "height": 768,
+      "seed": 502004,
+      "prompt": "Photorealistic rooftop maintenance inspection above a foggy Atlantic harbor. Rows of dark blue solar panels fill the roof, with one bright orange safety cone and an open silver metal toolbox placed together near the front row. Wide documentary framing, soft coastal morning light, realistic roof and equipment textures, no people, no logos, no watermark, no legible text.",
+      "expectedConcepts": [
+        "rooftop solar panels",
+        "orange safety cone",
+        "open silver toolbox",
+        "foggy harbor"
+      ],
+      "query": "Find the foggy harbor rooftop photo with solar panels, an orange cone, and a silver toolbox."
+    }
+  ]
+}

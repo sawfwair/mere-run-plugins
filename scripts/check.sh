@@ -336,7 +336,7 @@ result = subprocess.run(
     check=True,
 )
 archive_benchmark_result = json.loads(result.stdout)
-if archive_benchmark_result["sourceFiles"] != 18:
+if archive_benchmark_result["sourceFiles"] != 22:
     raise SystemExit("installed archive-tools benchmark generated the wrong file count")
 
 animatic_cli = pathlib.Path(sys.executable).with_name("mere-animatic-tools")

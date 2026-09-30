@@ -163,15 +163,23 @@ mere-archive-tools benchmark prepare \
 ```
 
 The generator uses only code and data included in the plugin. It doesn't use
-the network. The baseline contains 18 files in nested, inconsistent folders:
+the network. The baseline contains 22 files in nested, inconsistent folders:
 
 - Text, Markdown, JSON, JSON Lines, XML, YAML, reStructuredText, and log files.
 - DOCX, PPTX, XLSX, PDF, RTF, EPUB, and CSV files.
-- Two PNG files with visible labels.
+- Two generated PNG files with visible labels for optical character
+  recognition tests.
+- Four photorealistic PNG files generated locally with Krea 2 Turbo for image
+  captioning and visual retrieval tests.
 - One exact duplicate stored under an old backup path.
 - Two fictional PII canaries: an example email address and an `800-555-01xx`
   phone number.
-- 16 questions with document-level relevance judgments.
+- 20 questions with document-level relevance judgments.
+
+The benchmark manifest records the Krea model identity, prompts, seeds,
+generation settings, expected concepts, and file hashes. Each photorealistic
+image combines several visible details so that a generic object match doesn't
+satisfy its relevance judgment.
 
 Index the generated `source` directory as though it were the shared drive:
 

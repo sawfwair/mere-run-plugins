@@ -420,8 +420,8 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             exit_code, payload, _ = invoke(["benchmark", "prepare", "--output-dir", str(output)])
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["dataset"]["id"], benchmark.SYNTHETIC_DATASET_ID)
-            self.assertEqual(payload["sourceFiles"], 18)
-            self.assertEqual(payload["queries"], 16)
+            self.assertEqual(payload["sourceFiles"], 22)
+            self.assertEqual(payload["queries"], 20)
             manifest_path = output / "benchmark.json"
             manifest = benchmark.load_manifest(manifest_path)
             manifest_schema = json.loads(
@@ -435,6 +435,14 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             copy = source / "Old Backups/Halifax/pump-installation-copy.md"
             self.assertEqual(first.read_bytes(), copy.read_bytes())
             self.assertTrue((source / "Photos/Halifax/2022/blue-pump-204.png").read_bytes().startswith(b"\x89PNG"))
+            self.assertTrue(
+                (source / "Facilities/Sydney/2025/yellow-generator-red-panel.png")
+                .read_bytes()
+                .startswith(b"\x89PNG")
+            )
+            visual_assets = manifest["provenance"]["visualAssets"]
+            self.assertEqual(len(visual_assets["assets"]), 4)
+            self.assertTrue(visual_assets["license"]["eligibilityConfirmedByPublisher"])
 
             second_output = root / "gauntlet-copy"
             self.assertEqual(
@@ -515,7 +523,7 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             exit_code, report, _ = invoke(evaluation)
             self.assertEqual(exit_code, 0)
             self.assertEqual(report["phase"], "baseline")
-            self.assertEqual(report["retrieval"]["queryCount"], 16)
+            self.assertEqual(report["retrieval"]["queryCount"], 20)
             self.assertTrue(report["passed"])
             report_schema = json.loads(
                 (REPO_ROOT / "contracts/archive-benchmark-report.v1.schema.json").read_text()
@@ -536,7 +544,7 @@ class MereArchiveToolsCLITests(unittest.TestCase):
             exit_code, report, _ = invoke(evaluation)
             self.assertEqual(exit_code, 0)
             self.assertEqual(report["phase"], "mutated")
-            self.assertEqual(report["retrieval"]["queryCount"], 18)
+            self.assertEqual(report["retrieval"]["queryCount"], 22)
 
             with sqlite3.connect(database_path) as connection:
                 connection.execute(

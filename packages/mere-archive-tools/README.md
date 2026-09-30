@@ -49,10 +49,14 @@ mere-archive-tools benchmark evaluate \
   --output ./archive-benchmark-safe-report.json
 ```
 
-The generated Mere Archive Gauntlet includes 18 files, office documents,
-images, exact duplicates, fake PII canaries, and 16 retrieval questions. Use
-`benchmark mutate` to apply a controlled rename, edit, deletion, and addition,
-then reindex the same database to test incremental behavior.
+The generated Mere Archive Gauntlet includes 22 files, office documents,
+images, exact duplicates, fake PII canaries, and 20 retrieval questions. Six
+PNG files cover optical character recognition, image captioning, and visual
+retrieval. Four photorealistic facilities images were generated locally with
+Krea 2 Turbo. Their exact prompts, seeds, settings, and hashes are included in
+the benchmark provenance. Use `benchmark mutate` to apply a controlled rename,
+edit, deletion, and addition. Then reindex the same database to test
+incremental behavior.
 
 Image indexing defaults to PII-reduced captions and OCR. Pass `--image-index
 visual` to add embeddings of source pixels. Visual embeddings can preserve

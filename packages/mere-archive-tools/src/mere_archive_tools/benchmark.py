@@ -85,6 +85,16 @@ def source_catalog() -> JsonMap:
     return _as_map(json.loads(catalog.read_text(encoding="utf-8")), "benchmark source catalog")
 
 
+def krea_asset_manifest() -> JsonMap:
+    manifest = resources.files("mere_archive_tools").joinpath("benchmarks/krea2-assets.v1.json")
+    return _as_map(json.loads(manifest.read_text(encoding="utf-8")), "Krea asset manifest")
+
+
+def _benchmark_asset(relative_path: str) -> bytes:
+    asset = resources.files("mere_archive_tools").joinpath(f"benchmarks/{relative_path}")
+    return asset.read_bytes()
+
+
 def load_manifest(path: pathlib.Path) -> JsonMap:
     try:
         manifest = _as_map(json.loads(path.read_text(encoding="utf-8")), "benchmark manifest")
@@ -355,6 +365,18 @@ def _synthetic_files() -> dict[str, bytes]:
         ),
         "Photos/Halifax/2022/blue-pump-204.png": _png("BLUE PUMP HFX 204", (34, 88, 190)),
         "Photos/Dartmouth/2021/red-bay-door-12.png": _png("RED BAY DOOR 12", (194, 52, 45)),
+        "Facilities/Sydney/2025/yellow-generator-red-panel.png": _benchmark_asset(
+            "assets/krea2/yellow-generator-red-panel.png"
+        ),
+        "Inspections/Moncton/2026/catch-basin-green-flag.png": _benchmark_asset(
+            "assets/krea2/catch-basin-green-flag.png"
+        ),
+        "Inventory/Truro/2024/blue-ladder-purple-crates.png": _benchmark_asset(
+            "assets/krea2/blue-ladder-purple-crates.png"
+        ),
+        "Projects/Halifax/2026/solar-roof-orange-cone.png": _benchmark_asset(
+            "assets/krea2/solar-roof-orange-cone.png"
+        ),
         "Misc/2016/server-migration.log": b"2016-03-18 legacy server migration completed for rack LEGACY-2\n",
         "Meeting Notes/2020/regional-roundup.jsonl": (
             b'{"site":"Amherst","topic":"parking lot drainage","ticket":"AMH-31"}\n'
@@ -422,6 +444,10 @@ def _synthetic_documents(mutated: bool) -> list[JsonMap]:
         ("antigonish-safety", ["Manuals/Antigonish/2017/safety-handbook.epub"]),
         ("halifax-pump-photo", ["Photos/Halifax/2022/blue-pump-204.png"]),
         ("dartmouth-door-photo", ["Photos/Dartmouth/2021/red-bay-door-12.png"]),
+        ("krea-yellow-generator", ["Facilities/Sydney/2025/yellow-generator-red-panel.png"]),
+        ("krea-catch-basin", ["Inspections/Moncton/2026/catch-basin-green-flag.png"]),
+        ("krea-blue-ladder", ["Inventory/Truro/2024/blue-ladder-purple-crates.png"]),
+        ("krea-solar-roof", ["Projects/Halifax/2026/solar-roof-orange-cone.png"]),
         ("amherst-drainage", ["Meeting Notes/2020/regional-roundup.jsonl"]),
         ("retention-policy", ["Policies/records-retention.rst"]),
     ]
@@ -446,6 +472,26 @@ def _synthetic_queries(mutated: bool) -> list[JsonMap]:
         ("q-muster", "Where is the Antigonish muster point beside marker ANT-3?", "antigonish-safety"),
         ("q-pump-photo", "Find the photo of the blue Halifax pump marked 204.", "halifax-pump-photo"),
         ("q-door-photo", "Find the image of the red Dartmouth bay door marked 12.", "dartmouth-door-photo"),
+        (
+            "q-krea-yellow-generator",
+            "Find the mechanical-room photo with the yellow generator, red service panel, and blue hose.",
+            "krea-yellow-generator",
+        ),
+        (
+            "q-krea-catch-basin",
+            "Find the rainy catch-basin photo with the green survey flag and orange traffic cone.",
+            "krea-catch-basin",
+        ),
+        (
+            "q-krea-blue-ladder",
+            "Find the warehouse photo with the blue rolling ladder, purple crates, and yellow pallet jack.",
+            "krea-blue-ladder",
+        ),
+        (
+            "q-krea-solar-roof",
+            "Find the foggy harbor rooftop photo with solar panels, an orange cone, and a silver toolbox.",
+            "krea-solar-roof",
+        ),
         ("q-drainage", "Which Amherst note discusses parking lot drainage?", "amherst-drainage"),
         ("q-retention", "Which policy uses the RET-7 seven-year review marker?", "retention-policy"),
     ]
@@ -522,7 +568,11 @@ def prepare_synthetic(output_dir: pathlib.Path) -> JsonMap:
                 "mutated": _phase(_synthetic_mutated_files(), True),
             },
             ["dana@example.com", "800-555-0199"],
-            {"generator": "mere-archive-tools", "networkUsed": False},
+            {
+                "generator": "mere-archive-tools",
+                "networkUsed": False,
+                "visualAssets": krea_asset_manifest(),
+            },
         )
         manifest["mutations"] = [
             {
