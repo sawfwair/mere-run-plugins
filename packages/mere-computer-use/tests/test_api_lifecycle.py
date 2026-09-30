@@ -155,7 +155,8 @@ with urllib.request.urlopen(request, timeout=3) as response:
         pi.chmod(0o755)
         with self.environment(), mock.patch.dict(os.environ, {"MERE_COMPUTER_USE_PI": str(pi)}), \
              mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \
-             mock.patch.object(cli, "permissions", return_value={"accessibility": True, "screen_recording": True}):
+             mock.patch.object(cli, "permissions", return_value={"accessibility": True, "screen_recording": True}), \
+             mock.patch.object(cli, "driver_call", return_value={"activated": True, "exact_window_effect": {"verified": True}}):
             result = cli.run_plan(plan_path, 10, api_start_timeout=10)
         self.assertEqual(result["status"], "finished")
         self.assertEqual(result["result"], cli.DEFAULT_MODEL)
