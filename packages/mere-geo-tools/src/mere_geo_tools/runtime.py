@@ -39,8 +39,9 @@ from .constants import (
     THOR_MODEL_ID,
     THOR_REVISION,
 )
-from .external_types import FloatArray, NumericArray, UInt8Array
+from .external_types import BoolArray, FloatArray, NumericArray, UInt8Array
 from .provider import CandidateResult
+from .validity import aoi_validity_mask
 
 
 @dataclass(frozen=True)
@@ -128,15 +129,39 @@ def execute_hazard_candidate(
     s2 = load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S2L2A")))
     s1 = load_zarr(confined_bundle_path(bundle_root, artifact_path(artifacts, "S1RTC")))
     with rasterio.open(confined_bundle_path(bundle_root, artifact_path(artifacts, "DEM"))) as source:
-        dem = source.read().astype(np.float32)
+        masked_dem = source.read(masked=True)
+        dem = masked_dem.filled(source.nodata if source.nodata is not None else np.nan).astype(np.float32)
+        dem_mask = np.asarray(masked_dem.mask, dtype=np.bool_)
+        if dem_mask.shape != masked_dem.shape:
+            dem_mask = np.broadcast_to(dem_mask, masked_dem.shape)
+        dem_validity = cast(BoolArray, ~dem_mask.any(axis=0))
+
+    grid = as_map(bundle["grid"], "grid")
+    transform = Affine(*cast(list[float], grid["transform"]))
+    crs = cast(str, grid["crs"])
+    validity, validity_policy = source_validity_mask(
+        bundle_root,
+        bundle,
+        artifacts,
+        s2,
+        s1,
+        dem_validity,
+        transform,
+        crs,
+    )
 
     tensors = {
-        "S2L2A": normalized_array(s2.transpose(1, 0, 2, 3), spec.means["S2L2A"], spec.stds["S2L2A"]),
-        "S1RTC": normalized_array(s1.transpose(1, 0, 2, 3), spec.means["S1RTC"], spec.stds["S1RTC"]),
+        "S2L2A": normalized_array(
+            s2.transpose(1, 0, 2, 3), spec.means["S2L2A"], spec.stds["S2L2A"], validity
+        ),
+        "S1RTC": normalized_array(
+            s1.transpose(1, 0, 2, 3), spec.means["S1RTC"], spec.stds["S1RTC"], validity
+        ),
         "DEM": normalized_array(
             np.repeat(dem[:, None, :, :], 4, axis=1),
             spec.means["DEM"],
             spec.stds["DEM"],
+            validity,
         ),
     }
     if requested_device not in {"auto", "metal"}:
@@ -154,21 +179,25 @@ def execute_hazard_candidate(
     exponent = np.exp(shifted)
     probability = (exponent / exponent.sum(axis=1, keepdims=True))[0, 1].astype(np.float32)
     elapsed = time.monotonic() - started
-    mask = cast(UInt8Array, (probability >= 0.5).astype(np.uint8))
+    mask, published_probability = apply_source_validity(probability, validity)
 
-    grid = as_map(bundle["grid"], "grid")
-    transform = Affine(*cast(list[float], grid["transform"]))
-    crs = cast(str, grid["crs"])
     write_cog(locations["mask"], mask[None, :, :], crs, transform, "uint8", 255, "nearest")
     write_cog(
-        locations["probability"], probability[None, :, :], crs, transform, "float32", -9999.0, "average"
+        locations["probability"],
+        published_probability[None, :, :],
+        crs,
+        transform,
+        "float32",
+        -9999.0,
+        "average",
     )
     write_preview(locations["preview"], s2[2], mask)
 
     ndvi = ndvi_comparison(s2, mask)
     pixel_area = numeric_value(grid["resolution_m"], "grid resolution_m") ** 2
-    candidate_pixels = int(mask.sum())
-    total_pixels = int(mask.size)
+    candidate_pixels = int((mask == 1).sum())
+    valid_pixels = int(validity.sum())
+    grid_pixels = int(mask.size)
     output_hashes = {
         "mask": sha256_file(locations["mask"]),
         "probability": sha256_file(locations["probability"]),
@@ -206,12 +235,15 @@ def execute_hazard_candidate(
             "crop": 256,
             "stride": 208,
             "delta": 8,
+            "validity_policy": validity_policy,
             "threshold": 0.5,
         },
         "summary": {
             f"{hazard}_pixels": candidate_pixels,
-            "total_pixels": total_pixels,
-            "candidate_fraction": round(candidate_pixels / total_pixels, 8),
+            "valid_pixels": valid_pixels,
+            "excluded_pixels": grid_pixels - valid_pixels,
+            "grid_pixels": grid_pixels,
+            "candidate_fraction": round(candidate_pixels / valid_pixels, 8),
             "candidate_area_square_metres": round(candidate_pixels * pixel_area, 3),
         },
         "outputs": {
@@ -245,7 +277,7 @@ def execute_hazard_candidate(
     locations["manifest"].write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     metrics: JsonMap = {
         "name": f"candidate_{hazard}_fraction",
-        "value": round(candidate_pixels / total_pixels, 8),
+        "value": round(candidate_pixels / valid_pixels, 8),
         "unit": "ratio",
         "evidence_class": "candidate-only",
     }
@@ -270,17 +302,97 @@ def load_zarr(path: pathlib.Path) -> FloatArray:
         store.close()
 
 
+def source_validity_mask(
+    bundle_root: pathlib.Path,
+    bundle: JsonMap,
+    artifacts: JsonMap,
+    s2: FloatArray,
+    s1: FloatArray,
+    dem_validity: BoolArray,
+    transform: object,
+    crs: str,
+) -> tuple[BoolArray, str]:
+    grid = as_map(bundle["grid"], "grid")
+    height = cast(int, grid["height"])
+    width = cast(int, grid["width"])
+    expected_shape = (height, width)
+    aoi = bundle.get("aoi")
+    if aoi is None:
+        target_validity = np.ones(expected_shape, dtype=np.bool_)
+    else:
+        bounds = as_map(aoi, "aoi").get("bounds_wgs84")
+        if (
+            not isinstance(bounds, list)
+            or len(bounds) != 4
+            or any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in bounds)
+        ):
+            raise GraphProviderError("input bundle AOI bounds are invalid")
+        target_validity = aoi_validity_mask(
+            [float(value) for value in bounds], crs, transform, height, width
+        )
+
+    explicit = artifacts.get("VALIDITY")
+    if explicit is not None:
+        import rasterio
+
+        validity_path = confined_bundle_path(bundle_root, artifact_path(artifacts, "VALIDITY"))
+        with rasterio.open(validity_path) as source:
+            source_values = source.read(1, masked=True)
+            source_mask = np.asarray(source_values.mask, dtype=np.bool_)
+            if source_mask.shape != source_values.shape:
+                source_mask = np.broadcast_to(source_mask, source_values.shape)
+            coverage_validity = cast(
+                BoolArray,
+                (source_values.filled(0) == 1) & (~source_mask),
+            )
+        policy = "declared-validity-and-exact-aoi"
+    else:
+        if s2.shape[-2:] != expected_shape or s1.shape[-2:] != expected_shape:
+            raise GraphProviderError("legacy TerraMind modalities do not match the declared grid")
+        s2_coverage = np.all(np.any(np.isfinite(s2) & (s2 != 0), axis=1), axis=0)
+        s1_coverage = np.all(np.isfinite(s1) & (s1 != 0), axis=(0, 1))
+        coverage_validity = cast(BoolArray, s2_coverage & s1_coverage & dem_validity)
+        policy = "legacy-derived-coverage-and-exact-aoi"
+
+    if coverage_validity.shape != expected_shape or dem_validity.shape != expected_shape:
+        raise GraphProviderError("TerraMind validity does not match the declared grid")
+    validity = target_validity & coverage_validity & dem_validity
+    if not validity.any():
+        raise GraphProviderError("TerraMind input bundle has no source-valid pixels inside the requested AOI")
+    return validity, policy
+
+
+def apply_source_validity(
+    probability: FloatArray, validity: BoolArray
+) -> tuple[UInt8Array, FloatArray]:
+    if probability.shape != validity.shape:
+        raise GraphProviderError("TerraMind probability and validity shapes do not match")
+    mask = np.full(probability.shape, 255, dtype=np.uint8)
+    mask[validity] = (probability[validity] >= 0.5).astype(np.uint8)
+    published_probability = np.full(probability.shape, -9999.0, dtype=np.float32)
+    published_probability[validity] = probability[validity]
+    return mask, published_probability
+
+
 def numeric_value(value: object, label: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise GraphProviderError(f"{label} must be numeric")
     return float(value)
 
 
-def normalized_array(value: object, means: list[float], stds: list[float]) -> FloatArray:
+def normalized_array(
+    value: object,
+    means: list[float],
+    stds: list[float],
+    validity: BoolArray | None = None,
+) -> FloatArray:
     tensor = np.asarray(value, dtype=np.float32)
     mean = np.asarray(means, dtype=np.float32)[:, None, None, None]
     std = np.asarray(stds, dtype=np.float32)[:, None, None, None]
-    return cast(FloatArray, ((tensor - mean) / std)[None, ...])
+    normalized = ((tensor - mean) / std)[None, ...]
+    if validity is not None:
+        normalized = np.where(validity[None, None, None, :, :], normalized, 0.0)
+    return cast(FloatArray, normalized.astype(np.float32, copy=False))
 
 
 def resolve_mere_run_executable() -> str | None:
@@ -428,11 +540,11 @@ def ndvi_comparison(s2: FloatArray, mask: UInt8Array) -> JsonMap:
     pre = ndvi(s2[1, 7], s2[1, 3])
     event = ndvi(s2[2, 7], s2[2, 3])
     change = event - pre
-    cue = change <= -0.2
+    cue = (change <= -0.2) & (mask != 255)
     intersection = int((cue & (mask == 1)).sum())
     union = int((cue | (mask == 1)).sum())
     cue_pixels = int(cue.sum())
-    flood_pixels = int(mask.sum())
+    flood_pixels = int((mask == 1).sum())
     return {
         "definition": "event minus pre-event NDVI <= -0.2",
         "cue_pixels": cue_pixels,

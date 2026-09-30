@@ -28,7 +28,8 @@ from .constants import (
     S2_BANDS,
     TEMPORAL_ROLES,
 )
-from .external_types import FloatArray, StacAsset, StacCatalog, StacItem
+from .external_types import BoolArray, FloatArray, NumericArray, StacAsset, StacCatalog, StacItem
+from .validity import aoi_validity_mask
 
 FLOOD_RECIPE_KIND = "mere.geo/terramind-flood-source-recipe"
 FIRE_RECIPE_KIND = "mere.geo/terramind-fire-source-recipe"
@@ -61,6 +62,7 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
     (output_root / "S2L2A").mkdir()
     (output_root / "S1RTC").mkdir()
     (output_root / "DEM").mkdir()
+    (output_root / "VALIDITY").mkdir()
 
     target = as_map(recipe["target"], "target")
     aoi = cast(list[float], target["aoi"])
@@ -74,15 +76,18 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
     projected_bounds = transform_bounds("EPSG:4326", crs, *aoi, densify_pts=21)
     left, bottom, right, top, width, height = aligned_grid(projected_bounds, resolution, block_multiple, min_size)
     transform = Affine(resolution, 0, left, 0, -resolution, top)
+    target_validity = aoi_validity_mask(aoi, crs, transform, height, width)
 
     endpoint = cast(str, recipe.get("stac_endpoint", "https://planetarycomputer.microsoft.com/api/stac/v1"))
     unsigned_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint))
     signed_catalog = cast(StacCatalog, pystac_client.Client.open(endpoint, modifier=pc.sign_inplace))
     s2_stack = np.zeros((4, len(S2_BANDS), height, width), dtype=np.float32)
     s1_stack = np.zeros((4, len(S1_BANDS), height, width), dtype=np.float32)
+    s2_validity = np.ones((4, height, width), dtype=np.bool_)
+    s1_validity = np.ones((4, height, width), dtype=np.bool_)
     timestep_provenance: list[JsonMap] = []
 
-    def read_asset(href: str, resampling: object, nodata: float) -> FloatArray:
+    def read_asset(href: str, resampling: object, nodata: float) -> tuple[FloatArray, BoolArray]:
         with (
             rasterio.open(href) as source,
             WarpedVRT(
@@ -96,7 +101,13 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
                 dtype="float32",
             ) as warped,
         ):
-            return cast(FloatArray, warped.read(1, masked=True).filled(nodata).astype(np.float32))
+            masked = warped.read(1, masked=True)
+            values = cast(FloatArray, masked.filled(nodata).astype(np.float32))
+            source_mask = np.asarray(masked.mask, dtype=np.bool_)
+            if source_mask.shape != masked.shape:
+                source_mask = np.broadcast_to(source_mask, masked.shape)
+            valid = ~source_mask
+            return values, valid
 
     for index, raw_step in enumerate(as_list(recipe["timesteps"], "timesteps")):
         step = as_map(raw_step, "timestep")
@@ -109,42 +120,55 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
         for band_index, band in enumerate(S2_BANDS):
             unsigned_asset = s2_unsigned.assets[band]
             signed_asset = s2_signed.assets[band]
-            s2_stack[index, band_index] = read_asset(signed_asset.href, Resampling.bilinear, 0.0)
+            values, valid = read_asset(signed_asset.href, Resampling.bilinear, 0.0)
+            s2_stack[index, band_index] = values
+            s2_validity[index] &= valid
             s2_assets.append(asset_provenance(band, unsigned_asset))
         for band_index, band in enumerate(S1_BANDS):
             unsigned_asset = s1_unsigned.assets[band]
             signed_asset = s1_signed.assets[band]
-            linear = read_asset(signed_asset.href, Resampling.bilinear, float("nan"))
-            valid = np.isfinite(linear) & (linear > 0)
+            linear, source_valid = read_asset(signed_asset.href, Resampling.bilinear, float("nan"))
+            valid = source_valid & np.isfinite(linear) & (linear > 0)
             db = np.zeros((height, width), dtype=np.float32)
             db[valid] = 10.0 * np.log10(linear[valid])
             s1_stack[index, band_index] = db
+            s1_validity[index] &= valid
             s1_assets.append(asset_provenance(band, unsigned_asset))
-        scl = read_asset(s2_signed.assets["SCL"].href, Resampling.nearest, 0.0)
+        scl, scl_valid = read_asset(s2_signed.assets["SCL"].href, Resampling.nearest, 0.0)
         invalid_classes = np.isin(scl.astype(np.uint8), [0, 1, 3, 8, 9, 10, 11])
+        quality_pixels = target_validity & scl_valid
+        invalid_fraction = (
+            float((invalid_classes & quality_pixels).sum()) / int(quality_pixels.sum())
+            if quality_pixels.any()
+            else 1.0
+        )
         timestep_provenance.append(
             {
                 "role": step["role"],
                 "S2L2A": item_provenance(s2_unsigned, s2_assets),
                 "S1RTC": item_provenance(s1_unsigned, s1_assets),
-                "quality": {"s2_invalid_pixel_fraction": round(float(invalid_classes.mean()), 6)},
+                "quality": {"s2_invalid_pixel_fraction": round(invalid_fraction, 6)},
             }
         )
 
     dem_spec = as_map(recipe["DEM"], "DEM source")
     dem_unsigned, dem_signed = paired_item(unsigned_catalog, signed_catalog, dem_spec)
-    dem = read_asset(dem_signed.assets["data"].href, Resampling.bilinear, -9999.0)
-    dem = np.where(np.isfinite(dem), dem, -9999.0).astype(np.float32)[None, :, :]
+    dem, dem_source_validity = read_asset(dem_signed.assets["data"].href, Resampling.bilinear, -9999.0)
+    dem_validity = dem_source_validity & np.isfinite(dem) & (dem != -9999.0)
+    dem = np.where(dem_validity, dem, -9999.0).astype(np.float32)[None, :, :]
+    validity = target_validity & s2_validity.all(axis=0) & s1_validity.all(axis=0) & dem_validity
 
     sample_id = cast(str, recipe["sample_id"])
     s2_path = output_root / "S2L2A" / f"{sample_id}_S2L2A.zarr.zip"
     s1_path = output_root / "S1RTC" / f"{sample_id}_S1RTC.zarr.zip"
     dem_path = output_root / "DEM" / f"{sample_id}_DEM.tif"
+    validity_path = output_root / "VALIDITY" / f"{sample_id}_VALIDITY.tif"
     write_zarr(s2_path, s2_stack)
     write_zarr(s1_path, s1_stack)
     write_cog(dem_path, dem, crs, transform, "float32", -9999.0)
+    write_cog(validity_path, validity.astype(np.uint8)[None, :, :], crs, transform, "uint8", 0)
 
-    artifact_paths = {"S2L2A": s2_path, "S1RTC": s1_path, "DEM": dem_path}
+    artifact_paths = {"S2L2A": s2_path, "S1RTC": s1_path, "DEM": dem_path, "VALIDITY": validity_path}
     artifacts: JsonMap = {}
     digest_entries: list[JsonMap] = []
     for name, path in artifact_paths.items():
@@ -174,6 +198,12 @@ def prepare_bundle(recipe_path: pathlib.Path, output_root: pathlib.Path) -> Json
             "S2L2A": {"bands": S2_BANDS, "shape": [4, 12, height, width], "units": "surface_reflectance_dn"},
             "S1RTC": {"bands": S1_BANDS, "shape": [4, 2, height, width], "units": "gamma0_db"},
             "DEM": {"bands": ["elevation"], "shape": [1, height, width], "units": "metres"},
+            "VALIDITY": {"bands": ["valid"], "shape": [1, height, width], "units": "binary"},
+        },
+        "validity": {
+            "policy": "exact-aoi-and-all-source-coverage",
+            "valid_pixels": int(validity.sum()),
+            "total_pixels": int(validity.size),
         },
         "artifacts": artifacts,
         "input_digest": canonical_digest(digest_entries),
@@ -300,7 +330,7 @@ def write_zarr(path: pathlib.Path, array: FloatArray) -> None:
 
 def write_cog(
     path: pathlib.Path,
-    array: FloatArray,
+    array: NumericArray,
     crs: str,
     transform: object,
     dtype: str,

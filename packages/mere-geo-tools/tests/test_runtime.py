@@ -88,6 +88,46 @@ class NativeTilingTests(unittest.TestCase):
         self.assertEqual(cue["cue_pixels"], 4)
         self.assertEqual(cue["intersection_pixels"], 1)
 
+    def test_validity_neutralizes_inputs_and_marks_outputs_nodata(self) -> None:
+        validity = np.array([[True, False], [True, False]], dtype=np.bool_)
+        normalized = runtime.normalized_array(
+            np.full((1, 1, 2, 2), -9999.0, dtype=np.float32),
+            [100.0],
+            [10.0],
+            validity,
+        )
+        self.assertTrue(np.all(normalized[..., ~validity] == 0))
+        self.assertTrue(np.all(normalized[..., validity] < -100))
+
+        probability = np.array([[0.9, 0.99], [0.1, 0.8]], dtype=np.float32)
+        mask, published_probability = runtime.apply_source_validity(probability, validity)
+        np.testing.assert_array_equal(mask, np.array([[1, 255], [0, 255]], dtype=np.uint8))
+        self.assertTrue(np.all(published_probability[~validity] == -9999.0))
+        np.testing.assert_allclose(published_probability[validity], [0.9, 0.1])
+
+    def test_legacy_validity_excludes_missing_modality_coverage(self) -> None:
+        s2 = np.ones((4, 12, 2, 3), dtype=np.float32)
+        s1 = -np.ones((4, 2, 2, 3), dtype=np.float32)
+        dem_validity = np.ones((2, 3), dtype=np.bool_)
+        s2[:, :, 1, 0] = 0
+        s1[:, :, 1, 1] = 0
+        dem_validity[1, 2] = False
+        validity, policy = runtime.source_validity_mask(
+            pathlib.Path("/tmp/unused"),
+            {"grid": {"height": 2, "width": 3}},
+            {},
+            s2,
+            s1,
+            dem_validity,
+            object(),
+            "EPSG:32617",
+        )
+        np.testing.assert_array_equal(
+            validity,
+            np.array([[True, True, True], [False, False, False]], dtype=np.bool_),
+        )
+        self.assertEqual(policy, "legacy-derived-coverage-and-exact-aoi")
+
     def test_runtime_executable_override_is_confined_to_real_executables(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             executable = pathlib.Path(raw_root) / "mere.run"
