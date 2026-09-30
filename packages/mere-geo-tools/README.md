@@ -75,3 +75,9 @@ Flood and fire outputs are always `candidate-only`, and embeddings are
 subject to its upstream artifact license, including its restrictions on
 military, defense, intelligence, human-surveillance, policing, and listed
 extractive uses.
+
+Hazard preparation records a content-addressed per-pixel validity raster from
+the exact requested footprint and the intersecting source coverage. The native
+runtime neutralizes excluded inputs before inference and writes nodata outside
+that validity footprint, so padded or missing source cells cannot become
+published candidates.
