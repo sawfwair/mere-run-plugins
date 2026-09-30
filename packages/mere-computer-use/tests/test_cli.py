@@ -35,6 +35,8 @@ class ComputerUseTests(unittest.TestCase):
     def fake_driver(tool: str, _arguments: cli.JsonMap) -> cli.JsonMap:
         if tool == "check_permissions":
             return {"accessibility": True, "screen_recording": True}
+        if tool == "bring_to_front":
+            return {"activated": True, "exact_window_effect": {"verified": True}}
         return {"elements": []}
 
     def test_manifest_and_packaged_extensions(self) -> None:
@@ -70,13 +72,14 @@ class ComputerUseTests(unittest.TestCase):
             cli.tool(path, self.tool_args("click", element_token="token"))
         with mock.patch.object(cli, "driver_call", side_effect=[
             {"elements": [], "screenshot_png_b64": "AA=="},
+            {"elements": [], "screenshot_png_b64": "BB=="},
+            {"activated": True, "exact_window_effect": {"verified": True}},
             {"effect": "unverifiable"},
             {"elements": []},
         ]) as driver:
             observed = cli.tool(path, self.tool_args("observe"))
             self.assertEqual(observed["screenshot_png_b64"], "AA==")
-            with self.assertRaisesRegex(cli.PluginError, "latest observation is current"):
-                cli.tool(path, self.tool_args("observe"))
+            self.assertEqual(cli.tool(path, self.tool_args("observe"))["screenshot_png_b64"], "BB==")
             clicked = cli.tool(path, self.tool_args("click", element_token="token"))
             self.assertEqual(clicked["effect"], "unverifiable")
             with self.assertRaises(cli.PluginError):
@@ -84,8 +87,8 @@ class ComputerUseTests(unittest.TestCase):
             cli.tool(path, self.tool_args("observe"))
             with self.assertRaises(cli.PluginError):
                 cli.tool(path, self.tool_args("click", element_token="token"))
-            self.assertEqual(driver.call_args_list[1].args[0], "click")
-            self.assertEqual(driver.call_args_list[1].args[1]["window_id"], 202)
+            self.assertEqual(driver.call_args_list[3].args[0], "click")
+            self.assertEqual(driver.call_args_list[3].args[1]["window_id"], 202)
         self.assertEqual(cli.load(path)["actionCount"], 1)
         self.assertFalse(cli.load(path)["needsObservation"])
         self.assertNotIn("screenshot", path.read_text())
@@ -118,8 +121,24 @@ class ComputerUseTests(unittest.TestCase):
         self.assertNotIn("tree_markdown", observed)
         self.assertNotIn("recent private file", json.dumps(observed))
         self.assertEqual(observed["snapshot_id"], "s00000002")
-        self.assertEqual(driver.call_args.args[1]["max_dimension"], 960)
+        self.assertEqual(driver.call_args.args[1]["max_dimension"], 768)
         self.assertNotIn("max_image_dimension", driver.call_args.args[1])
+
+    def test_observation_prefers_web_menu_item_over_native_duplicate(self) -> None:
+        raw = {"elements": [
+            {"element_index": 0, "role": "AXWindow"},
+            {"element_index": 1, "parent_index": 0, "role": "AXPopUpButton"},
+            {"element_index": 2, "parent_index": 1, "role": "AXMenuItem",
+             "label": "Billing", "value": "Billing", "in_web_content": True},
+            {"element_index": 3, "parent_index": 0, "role": "AXMenu"},
+            {"element_index": 4, "parent_index": 3, "role": "AXMenuItem",
+             "label": "Billing"},
+            {"element_index": 5, "parent_index": 3, "role": "AXMenuItem",
+             "label": "Other"},
+        ]}
+        observed = cli.compact_observation(raw)
+        self.assertEqual([item["element_index"] for item in observed["elements"]],
+                         [0, 1, 2, 3, 5])
 
     def test_pixel_click_requires_latest_screenshot_snapshot(self) -> None:
         path = self.planned()
@@ -128,14 +147,15 @@ class ComputerUseTests(unittest.TestCase):
         cli.save(path, run)
         with mock.patch.object(cli, "driver_call", side_effect=[
             {"snapshot_id": "s00000002", "screenshot_png_b64": "AA=="},
+            {"activated": True, "exact_window_effect": {"verified": True}},
             {"effect": "unverifiable"},
         ]) as driver:
             cli.tool(path, self.tool_args("observe"))
             with self.assertRaises(cli.PluginError):
                 cli.tool(path, self.tool_args("click", x="10", y="20", snapshot_id="old"))
             cli.tool(path, self.tool_args("click", x="10", y="20", snapshot_id="s00000002"))
-        self.assertNotIn("snapshot_id", driver.call_args_list[1].args[1])
-        self.assertEqual(driver.call_args_list[1].args[1]["x"], 10.0)
+        self.assertNotIn("snapshot_id", driver.call_args_list[2].args[1])
+        self.assertEqual(driver.call_args_list[2].args[1]["x"], 10.0)
 
     def test_key_passes_command_modifier_to_driver(self) -> None:
         path = self.planned()
@@ -146,10 +166,31 @@ class ComputerUseTests(unittest.TestCase):
         arguments = cli.parser().parse_args([
             "_tool", str(path), "key", "--key", "s", "--modifier", "cmd",
         ])
-        with mock.patch.object(cli, "driver_call", return_value={"effect": "unverifiable"}) as driver:
+        with mock.patch.object(cli, "driver_call", side_effect=[
+            {"activated": True, "exact_window_effect": {"verified": True}},
+            {"effect": "unverifiable"},
+        ]) as driver:
             cli.tool(path, arguments)
         self.assertEqual(driver.call_args.args[0], "press_key")
         self.assertEqual(driver.call_args.args[1]["modifiers"], ["cmd"])
+        self.assertEqual(driver.call_args.args[1]["delivery_mode"], "foreground")
+
+    def test_type_targets_focused_window_and_refusal_does_not_count(self) -> None:
+        path = self.planned()
+        run = cli.load(path)
+        run["status"] = "running"
+        run["needsObservation"] = False
+        cli.save(path, run)
+        with mock.patch.object(cli, "driver_call", side_effect=[
+            {"activated": True, "exact_window_effect": {"verified": True}},
+            {"effect": "refused", "reason": "same_pid_keyboard_ambiguity"},
+        ]) as driver:
+            with self.assertRaisesRegex(cli.PluginError, "same_pid_keyboard_ambiguity"):
+                cli.tool(path, self.tool_args("type", element_token="token", text="hello"))
+        self.assertEqual(driver.call_args.args[0], "type_text")
+        self.assertEqual(driver.call_args.args[1]["delivery_mode"], "foreground")
+        self.assertEqual(cli.load(path)["actionCount"], 0)
+        self.assertFalse(cli.load(path)["needsObservation"])
 
     def test_run_records_final_observation_without_claiming_independent_success(self) -> None:
         path = self.planned()
@@ -164,13 +205,19 @@ class ComputerUseTests(unittest.TestCase):
 
         with mock.patch.object(cli, "windows", return_value={"windows": [{"pid": 101, "window_id": 202}]}), \
              mock.patch.object(cli, "model_ready", return_value=True), \
-             mock.patch.object(cli, "driver_call", side_effect=self.fake_driver), \
+             mock.patch.object(cli, "driver_call", side_effect=self.fake_driver) as driver, \
              mock.patch.object(cli.subprocess, "run", side_effect=fake_pi):
             result = cli.run_plan(path, 10)
+        self.assertTrue(any(call.args[0] == "bring_to_front"
+                            and call.args[1] == {"pid": 101, "window_id": 202}
+                            for call in driver.call_args_list))
         self.assertEqual(result["status"], "finished")
         self.assertEqual(result["verification"], "model-report-with-final-observation")
         self.assertEqual(result["actionCount"], 1)
         self.assertEqual(result["result"], "Total is 42")
+        self.assertIsInstance(result["startedAt"], str)
+        self.assertIsInstance(result["finishedAt"], str)
+        self.assertGreaterEqual(result["wallMs"], 0)
 
     def test_no_final_observation_is_reported(self) -> None:
         path = self.planned()
