@@ -63,6 +63,8 @@ mypy_path = [
 files = [
   "benchmarks/ate-v0/score.py",
   "benchmarks/ate-v0/test_cases.py",
+  "benchmarks/website-after-hours-v0/benchmark.py",
+  "benchmarks/website-after-hours-v0/test_benchmark.py",
   "packages/mere-archive-tools/src",
   "packages/mere-animatic-tools/src",
   "packages/mere-image-tools/src",

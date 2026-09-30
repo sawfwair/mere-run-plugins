@@ -1,0 +1,105 @@
+{
+  "name": "After Hours",
+  "currency": "CAD",
+  "bookingWindow": {
+    "firstDate": "2026-10-12",
+    "lastDate": "2026-10-13"
+  },
+  "openingHours": {
+    "open": "09:00",
+    "close": "21:00"
+  },
+  "startStepMinutes": 30,
+  "durationOptionsMinutes": [
+    30,
+    60,
+    90,
+    120
+  ],
+  "rooms": [
+    {
+      "id": "daylight",
+      "name": "Daylight studio",
+      "capacity": 10,
+      "hourlyRateCents": 8500,
+      "equipment": [
+        "backdrop",
+        "lighting",
+        "tripod"
+      ],
+      "description": "A bright photography space with a tall north-facing window and a seamless backdrop.",
+      "image": "assets/daylight.svg",
+      "imageAlt": "Illustration of daylight studio"
+    },
+    {
+      "id": "booth",
+      "name": "Sound booth",
+      "capacity": 4,
+      "hourlyRateCents": 6000,
+      "equipment": [
+        "microphones",
+        "headphones",
+        "mixer"
+      ],
+      "description": "A quiet recording room for podcasts and voice sessions, with acoustic wall panels.",
+      "image": "assets/booth.svg",
+      "imageAlt": "Illustration of sound booth"
+    },
+    {
+      "id": "loft",
+      "name": "Live loft",
+      "capacity": 16,
+      "hourlyRateCents": 12000,
+      "equipment": [
+        "microphones",
+        "piano",
+        "speakers"
+      ],
+      "description": "An open rehearsal loft with an upright piano and room for a small ensemble.",
+      "image": "assets/loft.svg",
+      "imageAlt": "Illustration of live loft"
+    },
+    {
+      "id": "suite",
+      "name": "Edit suite",
+      "capacity": 2,
+      "hourlyRateCents": 4500,
+      "equipment": [
+        "monitor",
+        "headphones",
+        "desk"
+      ],
+      "description": "A focused postproduction suite with a large display and two comfortable workstations.",
+      "image": "assets/suite.svg",
+      "imageAlt": "Illustration of edit suite"
+    },
+    {
+      "id": "workshop",
+      "name": "Maker workshop",
+      "capacity": 8,
+      "hourlyRateCents": 6500,
+      "equipment": [
+        "workbench",
+        "sink",
+        "lighting"
+      ],
+      "description": "A practical space for hands-on projects, tabletop shoots, and group workshops.",
+      "image": "assets/workshop.svg",
+      "imageAlt": "Illustration of maker workshop"
+    },
+    {
+      "id": "gallery",
+      "name": "White room",
+      "capacity": 24,
+      "hourlyRateCents": 15000,
+      "equipment": [
+        "projector",
+        "speakers",
+        "display-walls"
+      ],
+      "description": "A flexible gallery for screenings, installations, and small creative gatherings.",
+      "image": "assets/gallery.svg",
+      "imageAlt": "Illustration of white room"
+    }
+  ]
+}

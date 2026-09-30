@@ -1,0 +1,194 @@
+[
+  {
+    "id": "F01",
+    "kind": "stable",
+    "action": "Browse the initial catalog.",
+    "expected": "All six room names, capacities, supplied images, and hourly prices match studio.json."
+  },
+  {
+    "id": "F02",
+    "kind": "stable",
+    "action": "Set minimum capacity to 6.",
+    "expected": "Daylight studio, Live loft, Maker workshop, and White room remain."
+  },
+  {
+    "id": "F03",
+    "kind": "stable",
+    "action": "Select microphones and piano with other filters clear.",
+    "expected": "Only Live loft remains; equipment uses AND matching."
+  },
+  {
+    "id": "F04",
+    "kind": "stable",
+    "action": "Set maximum hourly price to CAD 65 with other filters clear.",
+    "expected": "Sound booth, Edit suite, and Maker workshop remain, including the exact price boundary."
+  },
+  {
+    "id": "F05",
+    "kind": "stable",
+    "action": "Combine minimum capacity 4, microphones, and maximum hourly price CAD 70.",
+    "expected": "Only Sound booth remains."
+  },
+  {
+    "id": "F06",
+    "kind": "stable",
+    "action": "Choose filters with no matches (capacity 30 if supported, otherwise piano plus maximum price CAD 65), then clear them.",
+    "expected": "An understandable empty state appears; clearing filters restores all six rooms."
+  },
+  {
+    "id": "F07",
+    "kind": "stable",
+    "action": "Open each room's details.",
+    "expected": "Description, equipment, image, capacity, and price match the supplied data."
+  },
+  {
+    "id": "F08",
+    "kind": "stable",
+    "action": "Inspect Daylight studio on October 12.",
+    "expected": "Availability distinguishes the 10:00–11:00 and 13:00–14:00 seed reservations from free time."
+  },
+  {
+    "id": "F09",
+    "kind": "stable",
+    "action": "Choose Daylight studio, October 12, 15:00, duration 90 minutes.",
+    "expected": "Before confirmation, the end time is 16:30 and total is CAD 127.50."
+  },
+  {
+    "id": "F10",
+    "kind": "stable",
+    "action": "Book Daylight studio on October 12 from 15:00 for 60 minutes.",
+    "expected": "One confirmation and one visitor booking show the correct room, date, 15:00–16:00, and CAD 85.00."
+  },
+  {
+    "id": "F11",
+    "kind": "stable",
+    "action": "Create the F10 booking, refresh twice, and inspect My bookings and availability.",
+    "expected": "Exactly one visitor booking survives; its occupied time still blocks another reservation."
+  },
+  {
+    "id": "F12",
+    "kind": "stable",
+    "action": "Create F10, cancel it, then refresh.",
+    "expected": "The visitor booking stays canceled and 15:00–16:00 becomes bookable."
+  },
+  {
+    "id": "F13",
+    "kind": "stable",
+    "action": "Inspect seed reservations and visitor cancellation controls.",
+    "expected": "Seed reservations keep blocking their times and cannot be canceled by the visitor."
+  },
+  {
+    "id": "F14",
+    "kind": "stable",
+    "action": "Attempt Daylight studio, October 12, 10:30 for 60 minutes.",
+    "expected": "Overlap with the 10:00–11:00 seed is prevented or rejected; no visitor booking is created."
+  },
+  {
+    "id": "F15",
+    "kind": "stable",
+    "action": "Attempt Daylight studio, October 12, 09:30 for 120 minutes.",
+    "expected": "A booking containing the seed interval is prevented or rejected."
+  },
+  {
+    "id": "F16",
+    "kind": "stable",
+    "action": "Book Maker workshop, October 12, 10:00 for 60 minutes.",
+    "expected": "The booking succeeds even though Daylight studio is occupied at that time."
+  },
+  {
+    "id": "F17",
+    "kind": "stable",
+    "action": "Book Daylight studio, October 13, 10:00 for 60 minutes.",
+    "expected": "The booking succeeds; seed reservations on October 12 do not block it."
+  },
+  {
+    "id": "F18",
+    "kind": "stable",
+    "action": "Independently try Maker workshop: 09:00 for 30 minutes, 20:30 for 30 minutes, 08:30 for 30 minutes, and 20:30 for 60 minutes.",
+    "expected": "The two inside-hours bookings succeed. The two outside-hours bookings are prevented or rejected."
+  },
+  {
+    "id": "F19",
+    "kind": "stable",
+    "action": "Try a 09:15 start and durations 0, 45, and 150 minutes on a free room.",
+    "expected": "Invalid inputs are unavailable or rejected with understandable constraints; only half-hour starts and listed durations can be confirmed."
+  },
+  {
+    "id": "F20",
+    "kind": "stable",
+    "action": "Attempt confirmation with missing required inputs and with October 11 or October 14.",
+    "expected": "Missing and out-of-window values are prevented or rejected. Dates inside the window work regardless of today's date."
+  },
+  {
+    "id": "F21",
+    "kind": "stable",
+    "action": "Create F10, return to the same room and date, then try 15:30 for 60 minutes.",
+    "expected": "Availability updates and confirmation prevents the overlapping visitor booking."
+  },
+  {
+    "id": "F22",
+    "kind": "stable",
+    "action": "Open My bookings in fresh storage, then complete one booking.",
+    "expected": "The empty state gives a useful next step; the site explains that this is a demo saved in this browser."
+  },
+  {
+    "id": "F23",
+    "kind": "stable",
+    "action": "Use Pacific/Honolulu with empty visitor storage. Book Sound booth on October 13 from 14:30 for 90 minutes, then refresh. Export storage. On the same origin and profile, change only the browser time zone to Pacific/Kiritimati and refresh again. Inspect the booking, price, selected date, and occupied interval; attempt an overlapping booking at 15:00 for 30 minutes. Record the effective time zone in each capture.",
+    "expected": "The reservation remains October 13, 14:30–16:00, CAD 90.00 in both zones. Its occupied interval still blocks the overlapping booking. No date or time shifts occur. Restore the common browser time zone afterward."
+  },
+  {
+    "id": "F24",
+    "kind": "stable",
+    "action": "With empty visitor storage, set the browser wall clock to October 14, 2026, at 12:00 UTC before loading the site. Record the effective clock. Book Maker workshop on October 12 at 09:00 for 30 minutes, then refresh.",
+    "expected": "The booking succeeds and remains October 12, 09:00–09:30, CAD 32.50 even though the browser clock is past the booking window. Restore the common browser clock afterward."
+  },
+  {
+    "id": "A01",
+    "kind": "adjacency",
+    "action": "Book Daylight studio, October 12, 09:30 for 30 minutes.",
+    "expected": "Stage 1 allows a booking ending exactly when the 10:00 seed begins."
+  },
+  {
+    "id": "A02",
+    "kind": "adjacency",
+    "action": "Book Daylight studio, October 12, 11:00 for 30 minutes.",
+    "expected": "Stage 1 allows a booking starting exactly when the 11:00 seed ends."
+  },
+  {
+    "id": "C01",
+    "kind": "change",
+    "action": "After the follow-up, independently try Daylight studio, October 12, 09:30 for 30 minutes and 11:00 for 30 minutes.",
+    "expected": "Both zero-gap bookings are blocked. Availability and confirmation agree."
+  },
+  {
+    "id": "C02",
+    "kind": "change",
+    "action": "Book Sound booth, October 12, 09:30 for 30 minutes.",
+    "expected": "An exact 15-minute gap before the 10:15 seed is allowed; the total is CAD 30.00."
+  },
+  {
+    "id": "C03",
+    "kind": "change",
+    "action": "Book Sound booth, October 12, 11:30 for 30 minutes.",
+    "expected": "An exact 15-minute gap after the 11:15 seed is allowed; the total is CAD 30.00."
+  },
+  {
+    "id": "C04",
+    "kind": "change",
+    "action": "Create Maker workshop, October 12, 15:00 for 30 minutes. Independently attempt 14:30 and 15:30 for 30 minutes; then try 16:00 for 30 minutes.",
+    "expected": "Both zero-gap attempts are blocked against the visitor booking, before and after it. The 16:00 booking succeeds."
+  },
+  {
+    "id": "C05",
+    "kind": "change",
+    "action": "Before the follow-up, start with empty visitor storage. Create Daylight studio on October 12 at 11:00–11:30 and 11:30–12:00. Also create a 15:00–15:30 booking, cancel it, and refresh. Export this storage and capture the two active bookings and the canceled booking’s absence. Preserve this dedicated migration profile and the stage 1 source. After the follow-up, restore that exact export on the same origin, refresh, and inspect all three booking outcomes. Cancel one surviving booking and refresh again.",
+    "expected": "The two active bookings retain their room, date, times, and prices; preserve their existing identifiers if the implementation stores any. No identifier field or storage schema is required. The previously canceled 15:00 booking stays absent and its time stays bookable. Seed records remain unchanged. Canceling a surviving booking persists after refresh. If stage 1 cannot create this fixture, record a stage 1 prerequisite failure with evidence; do not inject fabricated records or claim an observed migration failure."
+  },
+  {
+    "id": "C06",
+    "kind": "change",
+    "action": "Inspect the time picker explanation, then book Maker workshop, October 12, 20:30 for 30 minutes.",
+    "expected": "The 15-minute gap is explained. The final booking succeeds, ends at 21:00, and costs CAD 32.50. Cleaning does not extend the priced duration or require time before closing."
+  }
+]

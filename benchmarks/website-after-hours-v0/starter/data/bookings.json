@@ -1,0 +1,30 @@
+[
+  {
+    "id": "seed-daylight-am",
+    "roomId": "daylight",
+    "date": "2026-10-12",
+    "start": "10:00",
+    "end": "11:00"
+  },
+  {
+    "id": "seed-daylight-pm",
+    "roomId": "daylight",
+    "date": "2026-10-12",
+    "start": "13:00",
+    "end": "14:00"
+  },
+  {
+    "id": "seed-booth",
+    "roomId": "booth",
+    "date": "2026-10-12",
+    "start": "10:15",
+    "end": "11:15"
+  },
+  {
+    "id": "seed-loft",
+    "roomId": "loft",
+    "date": "2026-10-13",
+    "start": "18:00",
+    "end": "20:00"
+  }
+]

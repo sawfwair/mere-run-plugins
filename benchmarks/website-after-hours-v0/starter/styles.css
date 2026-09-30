@@ -1,0 +1,4 @@
+/* Choose the visual design for your implementation. */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; }
+main { padding: 2rem; }

@@ -77,6 +77,11 @@ For authored local model evaluations, see the
 includes 240 cases and 60 executable fixture cases; it is not an installable
 plugin or an official Cohere benchmark.
 
+For a website-building comparison, use the
+[After Hours evaluation kit](benchmarks/website-after-hours-v0/README.md).
+It supplies identical starters, a booking-rule follow-up, browser review cases,
+and separate functionality, regression, and design scores for five entries.
+
 ## Understand the safety boundary
 
 Plugins are separate executables. `mere.run` doesn't load plugin code into the
