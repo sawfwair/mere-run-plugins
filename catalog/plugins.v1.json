@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-09-25T14:00:00Z",
+  "updatedAt": "2026-11-19T00:00:00Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -17,6 +17,23 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-frontier-handoff"
+        }
+      }
+    },
+    {
+      "id": "mere-firecrawl-local",
+      "name": "Firecrawl Local",
+      "description": "Read public web pages as Markdown through a separately installed Firecrawl Local instance.",
+      "repo": "https://github.com/sawfwair/mere-run-plugins",
+      "package": "mere-firecrawl-local",
+      "subdirectory": "packages/mere-firecrawl-local",
+      "entrypoint": "mere-firecrawl-local",
+      "capabilities": ["web-scrape", "markdown", "pi-tool"],
+      "channels": {
+        "main": {
+          "manager": "pipx",
+          "ref": "main",
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-firecrawl-local"
         }
       }
     },
