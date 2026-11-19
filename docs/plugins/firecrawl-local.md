@@ -4,30 +4,10 @@ Use `mere-firecrawl-local` to read a public page as Markdown from the command
 line or a `mere.run` agent. Firecrawl Local runs as a separate application.
 The plugin sends one URL at a time to its HTTP API.
 
-## Connect to Firecrawl Local
+## Install the adapter and start Firecrawl
 
-On Apple Silicon with macOS 15 or later, download the signed disk image, drag
-**Firecrawl Local** to **Applications**, and open it. You can also download the
-matching AGPL source and the SHA-256 checksums.
-
-- [Firecrawl Local 0.1.1 for macOS](https://mere.run/releases/firecrawl-local/0.1.1/firecrawl-local-0.1.1-macos-arm64.dmg)
-- [Firecrawl Local 0.1.1 source](https://mere.run/releases/firecrawl-local/0.1.1/firecrawl-local-0.1.1-source.tar.gz)
-- [SHA-256 checksums](https://mere.run/releases/firecrawl-local/0.1.1/SHA256SUMS)
-
-If you already have Firecrawl Local installed, start it with cloud fallback
-disabled.
-
-```sh
-FIRECRAWL_CLOUD=off firecrawl-local --browser never serve
-```
-
-The standalone macOS application listens on `127.0.0.1:3002` and uses HTTP
-fetching. Keep its window open during the agent session. Quit the app to stop
-the service. JavaScript-only pages can return incomplete content in this mode.
-
-Install the adapter and check the connection. On Apple Silicon with macOS 15
-or later, Mere installs the signed adapter bundle with its own Python runtime.
-The adapter connects to the Firecrawl Local app over HTTP.
+On Apple Silicon with macOS 15 or later, run these commands to install the
+signed adapter, start Firecrawl Local, and read a page.
 
 ```sh
 mere.run plugin install mere-firecrawl-local --yes
@@ -35,11 +15,26 @@ mere.run plugin doctor mere-firecrawl-local
 mere.run plugin run mere-firecrawl-local -- scrape https://example.com
 ```
 
+Setup reuses a healthy Firecrawl Local instance. Otherwise, it opens an
+existing Mere-signed Firecrawl Local app or downloads and verifies the
+separate app before installing it in `~/Applications`. Open Firecrawl Local
+again from Finder whenever you need to restart the service. Quit the app to
+stop it. It listens on `127.0.0.1:3002` with Firecrawl Cloud fallback and
+browser rendering disabled. JavaScript-only pages can return incomplete content.
+
+To rerun setup, use `mere.run plugin run mere-firecrawl-local -- setup --yes`.
+To install or start Firecrawl yourself, use the standalone application or
+configure a compatible endpoint before installing the adapter.
+
+- [Firecrawl Local 0.1.1 for macOS](https://mere.run/releases/firecrawl-local/0.1.1/firecrawl-local-0.1.1-macos-arm64.dmg)
+- [Firecrawl Local 0.1.1 source](https://mere.run/releases/firecrawl-local/0.1.1/firecrawl-local-0.1.1-source.tar.gz)
+- [SHA-256 checksums](https://mere.run/releases/firecrawl-local/0.1.1/SHA256SUMS)
+
 The scrape command returns JSON with the requested URL, final URL, page title,
 Markdown, and a flag that reports truncation at 16,000 characters.
 
-To use another compatible instance, set `MERE_FIRECRAWL_URL` before starting the
-agent or pass `--endpoint` to individual adapter commands. Endpoints outside loopback
+To use another compatible instance, set `MERE_FIRECRAWL_URL` before installing
+the adapter or starting the agent. You can also pass `--endpoint` to individual adapter commands. Endpoints outside loopback
 require HTTPS. If the instance requires a bearer token, set
 `MERE_FIRECRAWL_TOKEN` in the environment.
 

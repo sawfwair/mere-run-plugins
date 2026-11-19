@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mere-firecrawl-local"
-version = "0.1.1"
+version = "0.1.2"
 description = "Read public web pages through a separately installed Firecrawl Local instance"
 readme = "README.md"
 requires-python = ">=3.9"
