@@ -11,7 +11,8 @@ jobs:
   check:
     name: Python ${{ matrix.python-version }}
     needs: docs
-    runs-on: ubuntu-latest
+    # setup-python does not provide Python 3.9 on Ubuntu 26.04.
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
