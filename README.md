@@ -56,6 +56,7 @@ The catalog contains 21 companion executables:
 | Create visual-effects shot artifacts | [VFX Tools](https://plugins-docs.mere.run/plugins/vfx-tools) |
 | Operate a selected macOS window locally | [Computer Use](https://plugins-docs.mere.run/plugins/computer-use) |
 | Hand off bounded chat or agent work | [Frontier Handoff](https://plugins-docs.mere.run/plugins/frontier-handoff) |
+| Read a public page as Markdown | [Firecrawl Local](https://plugins-docs.mere.run/plugins/firecrawl-local) |
 | Install local SearXNG and search the web | [SearXNG Search](https://plugins-docs.mere.run/plugins/searxng-search) |
 | Remove a still-image background | [Image Tools](https://plugins-docs.mere.run/plugins/image-tools) |
 | Produce animatic assets | [Animatic Tools](https://plugins-docs.mere.run/plugins/animatic-tools) |

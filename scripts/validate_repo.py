@@ -220,6 +220,7 @@ def validate_catalog() -> None:
 def plugin_env() -> dict[str, str]:
     env = dict(**os.environ)
     package_paths = [
+        ROOT / "packages" / "mere-firecrawl-local" / "src",
         ROOT / "packages" / "mere-searxng-search" / "src",
         ROOT / "packages" / "mere-frontier-handoff" / "src",
         ROOT / "packages" / "mere-computer-use" / "src",
@@ -274,6 +275,10 @@ def validate_plugin_manifest(module: str, executable: str, required_commands: se
 
 
 def validate_plugin_manifests() -> None:
+    validate_plugin_manifest(
+        "mere_firecrawl_local", "mere-firecrawl-local",
+        {"manifest", "doctor", "scrape", "pi-extension", "pi"},
+    )
     validate_plugin_manifest(
         "mere_searxng_search", "mere-web-search",
         {"manifest", "doctor", "search", "plan", "run", "resume", "cleanup", "instance"},

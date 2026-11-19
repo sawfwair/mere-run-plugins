@@ -13,7 +13,7 @@ PYTHON="$CHECK_TMP/venv/bin/python"
 "$PYTHON" -m pip install -q --disable-pip-version-check --upgrade pip
 "$PYTHON" -m pip install -q --disable-pip-version-check -r requirements-dev.txt
 
-export PYTHONPATH="$ROOT/packages/mere-searxng-search/src:$ROOT/packages/mere-frontier-handoff/src:$ROOT/packages/mere-computer-use/src:$ROOT/packages/mere-archive-tools/src:$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
+export PYTHONPATH="$ROOT/packages/mere-firecrawl-local/src:$ROOT/packages/mere-searxng-search/src:$ROOT/packages/mere-frontier-handoff/src:$ROOT/packages/mere-computer-use/src:$ROOT/packages/mere-archive-tools/src:$ROOT/packages/mere-runpod/src:$ROOT/packages/mere-terminal-bench/src:$ROOT/packages/mere-image-tools/src:$ROOT/packages/mere-face-tools/src:$ROOT/packages/mere-film-tools/src:$ROOT/packages/mere-workflow-tools/src:$ROOT/packages/mere-geo-tools/src:$ROOT/packages/mere-animatic-tools/src:$ROOT/packages/mere-shotgrid-tools/src:$ROOT/packages/mere-perform/src:$ROOT/packages/mere-vfx-tools/src"
 
 "$PYTHON" -m ruff check .
 "$PYTHON" -m mypy
@@ -29,9 +29,10 @@ if rg -n 'ignore_errors\s*=\s*true' pyproject.toml; then
   echo "Whole-module mypy exemptions are forbidden." >&2
   exit 1
 fi
-"$PYTHON" -m compileall -q packages/mere-searxng-search/src packages/mere-frontier-handoff/src packages/mere-computer-use/src packages/mere-archive-tools/src packages/mere-runpod/src packages/mere-terminal-bench/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
+"$PYTHON" -m compileall -q packages/mere-firecrawl-local/src packages/mere-searxng-search/src packages/mere-frontier-handoff/src packages/mere-computer-use/src packages/mere-archive-tools/src packages/mere-runpod/src packages/mere-terminal-bench/src packages/mere-image-tools/src packages/mere-face-tools/src packages/mere-film-tools/src packages/mere-workflow-tools/src packages/mere-geo-tools/src packages/mere-animatic-tools/src packages/mere-shotgrid-tools/src packages/mere-perform/src packages/mere-vfx-tools/src scripts
 "$PYTHON" -m coverage erase
-"$PYTHON" -m coverage run -m unittest discover -s packages/mere-searxng-search/tests
+"$PYTHON" -m coverage run -m unittest discover -s packages/mere-firecrawl-local/tests
+"$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-searxng-search/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-frontier-handoff/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-computer-use/tests
 "$PYTHON" -m coverage run --append -m unittest discover -s packages/mere-archive-tools/tests
@@ -54,6 +55,9 @@ fi
 "$PYTHON" scripts/check_plugin_bundles.py
 
 unset PYTHONPATH
+"$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-firecrawl-local
+"$CHECK_TMP/venv/bin/mere-firecrawl-local" manifest --json >/dev/null
+test -f "$("$CHECK_TMP/venv/bin/mere-firecrawl-local" pi-extension)"
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-searxng-search
 "$CHECK_TMP/venv/bin/mere-web-search" manifest --json >/dev/null
 test -f "$("$CHECK_TMP/venv/bin/mere-web-search" pi-extension)"

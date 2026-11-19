@@ -2,6 +2,7 @@
 target-version = "py39"
 line-length = 120
 src = [
+  "packages/mere-firecrawl-local/src",
   "packages/mere-searxng-search/src",
   "packages/mere-computer-use/src",
   "packages/mere-frontier-handoff/src",
@@ -50,6 +51,7 @@ pretty = true
 warn_unreachable = true
 explicit_package_bases = true
 mypy_path = [
+  "packages/mere-firecrawl-local/src",
   "packages/mere-searxng-search/src",
   "packages/mere-computer-use/src",
   "packages/mere-frontier-handoff/src",
@@ -67,6 +69,7 @@ mypy_path = [
   "packages/mere-geo-tools/src",
 ]
 files = [
+  "packages/mere-firecrawl-local/src",
   "packages/mere-searxng-search/src",
   "packages/mere-computer-use/src",
   "packages/mere-frontier-handoff/src",
@@ -110,6 +113,7 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 source = [
+  "packages/mere-firecrawl-local/src/mere_firecrawl_local",
   "packages/mere-searxng-search/src/mere_searxng_search",
   "packages/mere-computer-use/src/mere_computer_use",
   "packages/mere-frontier-handoff/src/mere_frontier_handoff",
