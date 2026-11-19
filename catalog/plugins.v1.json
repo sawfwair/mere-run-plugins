@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-19T21:46:34Z",
+  "updatedAt": "2026-11-19T23:34:21Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -34,8 +34,9 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-firecrawl-local",
+          "setup": true,
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-firecrawl-local/0.1.1-1/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-firecrawl-local/0.1.2-2/release.json"
           }
         }
       }
