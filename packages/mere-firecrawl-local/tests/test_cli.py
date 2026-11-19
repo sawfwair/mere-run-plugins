@@ -25,6 +25,24 @@ class FirecrawlTests(unittest.TestCase):
         self.assertEqual((status, stderr), (0, ""))
         self.assertEqual(json.loads(stdout)["version"], "0.1.0")
 
+    def test_setup_previews_without_installing(self) -> None:
+        with mock.patch.dict(cli.os.environ, {}, clear=True), mock.patch.object(cli.standalone, "setup") as install:
+            status, stdout, stderr = self.invoke("setup")
+        self.assertEqual((status, stderr), (0, ""))
+        self.assertEqual(json.loads(stdout)["download"], cli.standalone.IMAGE)
+        install.assert_not_called()
+
+    def test_setup_respects_a_configured_instance(self) -> None:
+        endpoint = "https://firecrawl.example.org"
+        with mock.patch.dict(cli.os.environ, {"MERE_FIRECRAWL_URL": endpoint}), mock.patch.object(
+            cli, "request_json", return_value={"status": "ok", "version": "fixture"},
+        ) as health, mock.patch.object(cli.standalone, "setup") as install:
+            status, stdout, stderr = self.invoke("setup", "--yes")
+        self.assertEqual((status, stderr), (0, ""))
+        self.assertEqual(json.loads(stdout)["status"], "configured")
+        health.assert_called_once_with(endpoint, "/health")
+        install.assert_not_called()
+
     def test_scrape_limits_output_and_uses_caller_endpoint(self) -> None:
         url = "https://example.com/?q=sea"
         markdown = "A" * (cli.MAX_MARKDOWN_CHARS + 1)

@@ -11,16 +11,16 @@ import urllib.parse
 import urllib.request
 from typing import cast
 
-from . import __version__, pi
+from . import __version__, pi, standalone
 
 PLUGIN = "mere-firecrawl-local"
-DEFAULT_ENDPOINT = "http://127.0.0.1:3002"
 MAX_RESPONSE_BYTES = 4_000_000
 MAX_MARKDOWN_CHARS = 16_000
 DESCRIPTION = "Read public web pages through a separately installed Firecrawl Local instance"
 COMMANDS = (
     ("manifest", "Describe this plugin", "json"),
     ("doctor", "Check Firecrawl Local readiness", "json"),
+    ("setup", "Install and start the separate Firecrawl Local app", "json"),
     ("scrape", "Read one page as Markdown", "json"),
     ("pi-extension", "Locate the Pi extension", "paths"),
     ("pi", "Manage the tool in mere.run's Pi agent", "json"),
@@ -163,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     pi_command = commands.add_parser("pi")
     pi_command.add_argument("action", choices=("enable", "status", "disable"))
     commands.add_parser("doctor").add_argument("--endpoint")
+    commands.add_parser("setup").add_argument("--yes", action="store_true")
     scrape_command = commands.add_parser("scrape")
     scrape_command.add_argument("--endpoint")
     scrape_command.add_argument("url")
@@ -179,8 +180,21 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         elif args.command == "pi":
             result = pi.manage(args.action, extension)
+        elif args.command == "setup":
+            configured = os.environ.get("MERE_FIRECRAWL_URL")
+            if not args.yes:
+                result = {"status": "planned", "endpoint": configured or standalone.ENDPOINT,
+                          "download": None if configured else standalone.IMAGE}
+            elif configured:
+                endpoint = endpoint_url(configured)
+                health = request_json(endpoint, "/health")
+                if health.get("status") != "ok":
+                    raise FirecrawlError("The configured Firecrawl endpoint did not report a healthy service")
+                result = {"ready": True, "status": "configured", "endpoint": endpoint, "version": health.get("version")}
+            else:
+                result = standalone.setup()
         else:
-            endpoint = endpoint_url(args.endpoint or os.environ.get("MERE_FIRECRAWL_URL") or DEFAULT_ENDPOINT)
+            endpoint = endpoint_url(args.endpoint or os.environ.get("MERE_FIRECRAWL_URL") or standalone.ENDPOINT)
             if args.command == "doctor":
                 health = request_json(endpoint, "/health")
                 if health.get("status") != "ok":
@@ -188,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
                 result = {"ready": True, "endpoint": endpoint, "version": health.get("version")}
             else:
                 result = scrape(endpoint, args.url)
-    except (InputError, FirecrawlError, pi.PiError, OSError) as error:
+    except (InputError, FirecrawlError, pi.PiError, standalone.SetupError, OSError) as error:
         sys.stderr.write(f"{PLUGIN}: {error}\n")
         if isinstance(error, InputError):
             return 2
