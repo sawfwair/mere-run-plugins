@@ -92,7 +92,7 @@ visible in `doctor`; they are not silently installed or treated as mandatory
 for unrelated local workflows. A valid signature alone is not a workflow test.
 
 Reviewed recipes cover Workflow, Archive, Image, Face, Animatic, VFX, Perform,
-Film Studio, Geospatial, and Terminal-Bench tools. The Archive Tools bundle
+Film Studio, Firecrawl Local, Geospatial, and Terminal-Bench tools. The Archive Tools bundle
 includes AnyDoc and its native license inventory; it does not depend on a user
 Python installation or package manager. The Terminal-Bench recipe includes
 the pinned Harbor runtime and invokes it through the plugin's restricted frozen
@@ -102,4 +102,5 @@ tagged Supabase MIT and Tokenizers Apache-2.0 terms omitted from six upstream
 wheels. Film Studio bundles its first-party Pi
 prompts, skills, agents, and extension sources, but not Pi, provider
 credentials, or ffmpeg. Those runtime integrations remain visible in `doctor`
-and under user control.
+and under user control. The Firecrawl Local adapter bundles its Pi extension
+and uses the separately distributed Firecrawl Local app through HTTP.

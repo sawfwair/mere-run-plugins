@@ -20,6 +20,7 @@ class BundleContractTests(unittest.TestCase):
             "archive-tools",
             "face-tools",
             "film-tools",
+            "firecrawl-local",
             "geo-tools",
             "image-tools",
             "perform",
