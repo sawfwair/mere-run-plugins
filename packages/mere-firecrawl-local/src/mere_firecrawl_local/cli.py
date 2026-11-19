@@ -182,11 +182,10 @@ def main(argv: list[str] | None = None) -> int:
             result = pi.manage(args.action, extension)
         elif args.command == "setup":
             configured = os.environ.get("MERE_FIRECRAWL_URL")
+            endpoint = endpoint_url(configured) if configured else standalone.ENDPOINT
             if not args.yes:
-                result = {"status": "planned", "endpoint": configured or standalone.ENDPOINT,
-                          "download": None if configured else standalone.IMAGE}
+                result = {"status": "planned", "endpoint": endpoint, "download": None if configured else standalone.IMAGE}
             elif configured:
-                endpoint = endpoint_url(configured)
                 health = request_json(endpoint, "/health")
                 if health.get("status") != "ok":
                     raise FirecrawlError("The configured Firecrawl endpoint did not report a healthy service")

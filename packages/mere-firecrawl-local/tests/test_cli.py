@@ -32,6 +32,12 @@ class FirecrawlTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout)["download"], cli.standalone.IMAGE)
         install.assert_not_called()
 
+    def test_setup_preview_does_not_print_credentials_in_an_invalid_endpoint(self) -> None:
+        with mock.patch.dict(cli.os.environ, {"MERE_FIRECRAWL_URL": "https://user:invalid-token@example.com"}):
+            status, stdout, stderr = self.invoke("setup")
+        self.assertEqual((status, stdout), (2, ""))
+        self.assertNotIn("invalid-token", stderr)
+
     def test_setup_respects_a_configured_instance(self) -> None:
         endpoint = "https://firecrawl.example.org"
         with mock.patch.dict(cli.os.environ, {"MERE_FIRECRAWL_URL": endpoint}), mock.patch.object(
