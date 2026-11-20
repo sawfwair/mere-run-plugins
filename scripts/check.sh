@@ -59,9 +59,11 @@ unset PYTHONPATH
 "$CHECK_TMP/venv/bin/mere-firecrawl-local" manifest --json >/dev/null
 test -f "$("$CHECK_TMP/venv/bin/mere-firecrawl-local" pi-extension)"
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-searxng-search
-"$CHECK_TMP/venv/bin/mere-web-search" manifest --json >/dev/null
 test -f "$("$CHECK_TMP/venv/bin/mere-web-search" pi-extension)"
-"$CHECK_TMP/venv/bin/mere-searxng-search" --help >/dev/null
+for search_command in mere-web-search mere-searxng-search; do
+  "$CHECK_TMP/venv/bin/$search_command" manifest --json | "$PYTHON" -c \
+    'import json, sys; assert json.load(sys.stdin)["executable"] == sys.argv[1]' "$search_command"
+done
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-frontier-handoff
 "$CHECK_TMP/venv/bin/mere-frontier-handoff" manifest --json >/dev/null
 "$PYTHON" -m pip install -q --disable-pip-version-check ./packages/mere-computer-use

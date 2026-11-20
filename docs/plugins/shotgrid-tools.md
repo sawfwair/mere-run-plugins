@@ -11,9 +11,10 @@ this plugin records what was produced.
 ## Commands
 
 ```bash
-mere-shotgrid-tools manifest --json
-mere-shotgrid-tools doctor
-mere-shotgrid-tools plan \
+mere.run plugin install mere-shotgrid-tools --yes
+mere.run plugin run mere-shotgrid-tools -- manifest --json
+mere.run plugin run mere-shotgrid-tools -- doctor
+mere.run plugin run mere-shotgrid-tools -- plan \
   --project-id 123 \
   --entity-type Shot \
   --entity-id 456 \
@@ -23,21 +24,21 @@ mere-shotgrid-tools plan \
   --note "Ready for review." \
   --output-dir ./publish \
   --run-id shot010-v003
-mere-shotgrid-tools run ./publish/run.json
-mere-shotgrid-tools publish \
+mere.run plugin run mere-shotgrid-tools -- run ./publish/run.json
+mere.run plugin run mere-shotgrid-tools -- publish \
   --project-id 123 \
   --entity-type Shot \
   --entity-id 456 \
   --artifact ./review.mov \
   --output-dir ./publish \
   --run-id shot010-v003
-mere-shotgrid-tools pull-tasks \
+mere.run plugin run mere-shotgrid-tools -- pull-tasks \
   --project-id 123 \
   --assignee-id 42 \
   --status rdy \
   --tool shot-kit \
   --output ./jobs.jsonl
-mere-shotgrid-tools cleanup ./publish/run.json
+mere.run plugin run mere-shotgrid-tools -- cleanup ./publish/run.json
 ```
 
 ## Credentials

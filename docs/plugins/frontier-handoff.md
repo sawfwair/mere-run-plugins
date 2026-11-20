@@ -8,7 +8,7 @@ Install Claude Code or Codex separately, and sign in with the account you intend
 
 ```sh
 mere.run plugin install mere-frontier-handoff --yes
-mere-frontier-handoff doctor
+mere.run plugin run mere-frontier-handoff -- doctor
 ```
 
 `doctor` checks CLI installation and local sign-in status. It does not invoke a model. A handoff can use the signed-in CLI account and might incur charges under that account's terms.
@@ -30,9 +30,9 @@ Save a request as `request.json`:
 To use Claude Code, set `backend` to `claude`. Plan the request before running it:
 
 ```sh
-mere-frontier-handoff plan --request ./request.json --output ./frontier-run
-mere-frontier-handoff run ./frontier-run/run.json
-mere-frontier-handoff resume ./frontier-run/run.json
+mere.run plugin run mere-frontier-handoff -- plan --request ./request.json --output ./frontier-run
+mere.run plugin run mere-frontier-handoff -- run ./frontier-run/run.json
+mere.run plugin run mere-frontier-handoff -- resume ./frontier-run/run.json
 ```
 
 `plan` creates `run.json` without invoking a model. `run` verifies that the request file has not changed, invokes the selected CLI, and writes `result.json`. The response can be text or a JSON object. A downstream application must validate the response against its own schema and policy before acting on it.

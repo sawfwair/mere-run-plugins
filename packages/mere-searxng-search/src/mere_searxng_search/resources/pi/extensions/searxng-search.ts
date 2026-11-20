@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -11,9 +11,8 @@ function searchExecutable(): string {
   if (process.env.MERE_SEARXNG_SEARCH_COMMAND) return process.env.MERE_SEARXNG_SEARCH_COMMAND;
   const extension = realpathSync(fileURLToPath(import.meta.url));
   const contents = resolve(dirname(extension), "../../../../..");
-  if (basename(contents) === "Contents" && basename(dirname(contents)) === "MereSearxngSearch.app") {
-    return join(contents, "MacOS", "mere-searxng-search");
-  }
+  const launcher = join(contents, "MacOS", "mere-searxng-search");
+  if (basename(contents) === "Contents" && existsSync(launcher)) return launcher;
   return "mere-web-search";
 }
 

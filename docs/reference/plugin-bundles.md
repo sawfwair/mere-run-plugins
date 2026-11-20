@@ -46,9 +46,12 @@ A source channel can add an optional `bundles` map:
 ```
 
 Compatible CLIs prefer the advertised bundle. Older CLIs retain the source
-install behavior. An explicit `--source` selects pipx. A failed bundle
-verification never falls back to installing source. An unsupported bundle
-platform requires an explicit source installation choice.
+install behavior. To choose pipx on Linux or on a Mac, run
+`mere.run plugin install PLUGIN_ID --source --yes`. Replace `PLUGIN_ID` with the
+catalog ID. You can also run `pipx install` directly with the catalog channel's
+`spec` URL. Each plugin's own platform and runtime requirements still apply.
+Computer Use requires macOS for desktop workflows. A failed bundle verification
+never falls back to installing source.
 
 ## Verification and activation
 
@@ -92,7 +95,8 @@ visible in `doctor`; they are not silently installed or treated as mandatory
 for unrelated local workflows. A valid signature alone is not a workflow test.
 
 Reviewed recipes cover Workflow, Archive, Image, Face, Animatic, VFX, Perform,
-Film Studio, Firecrawl Local, Geospatial, and Terminal-Bench tools. The Archive Tools bundle
+Film Studio, Firecrawl Local, Geospatial, Terminal-Bench, Frontier Handoff,
+SearXNG Search, Computer Use, RunPod, and ShotGrid Tools. The Archive Tools bundle
 includes AnyDoc and its native license inventory; it does not depend on a user
 Python installation or package manager. The Terminal-Bench recipe includes
 the pinned Harbor runtime and invokes it through the plugin's restricted frozen
@@ -104,3 +108,9 @@ prompts, skills, agents, and extension sources, but not Pi, provider
 credentials, or ffmpeg. Those runtime integrations remain visible in `doctor`
 and under user control. The Firecrawl Local adapter bundles its Pi extension
 and uses the separately distributed Firecrawl Local app through HTTP.
+
+Frontier Handoff uses the signed-in Claude Code or Codex CLI. SearXNG Search
+includes its Pi extension and uses a separate SearXNG server. Computer Use
+includes its Pi extensions and uses the separately installed Cua Driver.
+RunPod includes its training recipes. ShotGrid Tools includes the pinned
+Autodesk SDK. RunPod and ShotGrid use the account you configure.
