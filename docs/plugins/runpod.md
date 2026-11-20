@@ -27,21 +27,22 @@ is missing.
 ## Commands
 
 ```bash
-mere-runpod doctor
-mere-runpod volume ensure \
+mere.run plugin install mere-runpod --yes
+mere.run plugin run mere-runpod -- doctor
+mere.run plugin run mere-runpod -- volume ensure \
   --name mere-klein-cache \
   --data-center-id US-KS-2 \
   --size-gb 512 \
   --dry-run
-mere-runpod plan --recipe klein-style-lora --data ./dataset --output ./runs/foo
-mere-runpod run \
+mere.run plugin run mere-runpod -- plan --recipe klein-style-lora --data ./dataset --output ./runs/foo
+mere.run plugin run mere-runpod -- run \
   --recipe klein-style-lora \
   --data ./dataset \
   --output ./runs/foo \
   --build-pack ./build-packs/mere-run-linux-cuda.tar.gz \
   --network-volume-id <volume-id> \
   --data-center-id US-KS-2
-mere-runpod cleanup ./runs/foo/run.json
+mere.run plugin run mere-runpod -- cleanup ./runs/foo/run.json
 ```
 
 ## Cleanup
@@ -68,9 +69,9 @@ For fast repeated training, use a RunPod network volume as the persistent model
 cache:
 
 ```bash
-mere-runpod volume list
-mere-runpod volume ensure --name mere-klein-cache --data-center-id US-KS-2 --size-gb 512 --dry-run
-mere-runpod volume ensure --name mere-klein-cache --data-center-id US-KS-2 --size-gb 512
+mere.run plugin run mere-runpod -- volume list
+mere.run plugin run mere-runpod -- volume ensure --name mere-klein-cache --data-center-id US-KS-2 --size-gb 512 --dry-run
+mere.run plugin run mere-runpod -- volume ensure --name mere-klein-cache --data-center-id US-KS-2 --size-gb 512
 ```
 
 `volume ensure --dry-run` prints the billable storage request without calling
@@ -85,7 +86,7 @@ the same package.
 
 Remote CUDA training defaults to `MLX_CUDA_USE_CUDNN_SDPA=0` and
 `MLX_CUDA_GRAPH_CACHE_SIZE=4096`. Override either environment variable before
-`mere-runpod run` only when deliberately testing alternate MLX CUDA graph
+`mere.run plugin run mere-runpod -- run` only when deliberately testing alternate MLX CUDA graph
 behavior.
 
 RunPod network volumes for pods are Secure Cloud resources and must be attached

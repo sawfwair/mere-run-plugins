@@ -1,0 +1,25 @@
+{
+  "package": "mere-frontier-handoff",
+  "packagePath": "packages/mere-frontier-handoff",
+  "appBundle": "MereFrontierHandoff.app",
+  "appExecutable": "MereFrontierHandoff",
+  "bundleIdentifier": "run.mere.plugins.mere-frontier-handoff",
+  "volumeName": "MereFrontierHandoff",
+  "minimumOSVersion": "15.0",
+  "python": {
+    "version": "3.12.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.12.13%2B20260414-aarch64-apple-darwin-pgo%2Blto-full.tar.zst",
+    "sha256": "612b1af85f33fe57351c0e8e40677c95d9ef63774c1f13ae8054c59c785a84ca"
+  },
+  "entrypoints": {
+    "mere-frontier-handoff": "mere_frontier_handoff.cli"
+  },
+  "collectAll": [
+    "mere_frontier_handoff"
+  ],
+  "copyMetadata": [
+    "mere-frontier-handoff",
+    "pyinstaller"
+  ],
+  "smokeProfile": "frontier-handoff"
+}

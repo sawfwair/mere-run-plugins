@@ -172,6 +172,19 @@ class ComputerUseTests(unittest.TestCase):
         self.assertEqual(result["actionCount"], 1)
         self.assertEqual(result["result"], "Total is 42")
 
+    def test_frozen_run_passes_native_launcher_to_pi(self) -> None:
+        path = self.planned()
+        launcher = self.root / "Mere Computer Use.app" / "Contents" / "MacOS"
+        with mock.patch.object(cli, "verify_target"), \
+             mock.patch.object(cli, "permissions", return_value={"accessibility": True, "screen_recording": True}), \
+             mock.patch.object(cli.api_lifecycle, "ensure_model", return_value=None), \
+             mock.patch.object(cli.sys, "frozen", True, create=True), \
+             mock.patch.object(cli.sys, "executable", str(launcher / "MereComputerUse")), \
+             mock.patch.dict(cli.os.environ, {}, clear=True), \
+             mock.patch.object(cli.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")) as pi:
+            cli.run_plan(path, 10)
+        self.assertEqual(pi.call_args.kwargs["env"]["MERE_COMPUTER_USE_COMMAND"], str(launcher / "mere-computer-use"))
+
     def test_no_final_observation_is_reported(self) -> None:
         path = self.planned()
 
