@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-19T23:34:21Z",
+  "updatedAt": "2026-11-20T14:16:46Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -16,7 +16,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-frontier-handoff"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-frontier-handoff",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-frontier-handoff/0.1.0-1/release.json"
+          }
         }
       }
     },
@@ -48,13 +51,16 @@
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-searxng-search",
       "subdirectory": "packages/mere-searxng-search",
-      "entrypoint": "mere-web-search",
+      "entrypoint": "mere-searxng-search",
       "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management"],
       "channels": {
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-searxng-search"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-searxng-search",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-searxng-search/0.1.1-1/release.json"
+          }
         }
       }
     },
@@ -78,7 +84,10 @@
           "manager": "pipx",
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-computer-use",
-          "setup": true
+          "setup": true,
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-computer-use/0.1.1-1/release.json"
+          }
         }
       }
     },
@@ -155,7 +164,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-runpod",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-runpod/0.1.0-1/release.json"
+          }
         }
       }
     },
@@ -450,7 +462,10 @@
         "main": {
           "manager": "pipx",
           "ref": "main",
-          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools"
+          "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-shotgrid-tools",
+          "bundles": {
+            "macos-arm64": "https://mere.run/releases/plugins/mere-shotgrid-tools/0.1.0-1/release.json"
+          }
         }
       }
     },
