@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import pathlib
 import sys
@@ -9,7 +10,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest import mock
 
-from mere_geo_tools import cli, prepare, prepare_embeddings, provider
+from mere_geo_tools import cli, prepare, prepare_embeddings, provider, validity
 from mere_geo_tools.bundle import (
     BUNDLE_KIND,
     BUNDLE_VERSION,
@@ -201,6 +202,22 @@ class GeoProviderTests(unittest.TestCase):
         self.assertIn("flood-segmentation", manifest["capabilities"])
         self.assertIn("fire-segmentation", manifest["capabilities"])
         self.assertIn("earth-observation-embeddings", manifest["capabilities"])
+
+    @unittest.skipUnless(importlib.util.find_spec("rasterio"), "rasterio is an optional runtime dependency")
+    def test_exact_aoi_mask_excludes_projected_grid_padding(self) -> None:
+        from rasterio.transform import Affine
+
+        mask = validity.aoi_validity_mask(
+            [-85.69, 30.001, -85.47, 30.14],
+            "EPSG:32616",
+            Affine(10, 0, 625990, 0, -10, 3335460),
+            1600,
+            2176,
+        )
+        self.assertTrue(mask[800, 1088])
+        self.assertFalse(mask[-1].any())
+        self.assertGreater(int(mask.sum()), 3_000_000)
+        self.assertLess(int(mask.sum()), mask.size)
 
     def test_doctor_requires_only_native_provider_dependencies(self) -> None:
         with mock.patch(
@@ -469,6 +486,37 @@ class GeoProviderTests(unittest.TestCase):
             (bundle / "DEM/fixture_DEM.tif").write_bytes(b"drift")
             with self.assertRaisesRegex(GraphProviderError, "hash mismatch"):
                 load_bundle(bundle)
+
+    def test_hazard_bundle_accepts_content_addressed_validity_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            bundle = self.make_bundle(pathlib.Path(raw_root))
+            validity_path = bundle / "VALIDITY/fixture_VALIDITY.tif"
+            validity_path.parent.mkdir()
+            validity_path.write_bytes(b"fixture-VALIDITY")
+            manifest_path = bundle / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            digest = sha256_file(validity_path)
+            manifest["modalities"]["VALIDITY"] = {
+                "bands": ["valid"],
+                "shape": [1, 256, 256],
+            }
+            manifest["artifacts"]["VALIDITY"] = {
+                "path": "VALIDITY/fixture_VALIDITY.tif",
+                "bytes": validity_path.stat().st_size,
+                "sha256": digest,
+            }
+            manifest["input_digest"] = canonical_digest(
+                [
+                    {
+                        "name": name,
+                        "path": manifest["artifacts"][name]["path"],
+                        "sha256": manifest["artifacts"][name]["sha256"],
+                    }
+                    for name in ["S2L2A", "S1RTC", "DEM", "VALIDITY"]
+                ]
+            )
+            manifest_path.write_text(json.dumps(manifest))
+            self.assertEqual(load_bundle(bundle)["modalities"]["VALIDITY"]["bands"], ["valid"])
 
     def test_preflight_blocks_non_native_device(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:

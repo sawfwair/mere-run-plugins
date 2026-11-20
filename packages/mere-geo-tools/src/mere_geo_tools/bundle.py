@@ -135,6 +135,13 @@ def validate_hazard_bundle(manifest: JsonMap, grid: JsonMap, kind: str) -> None:
         raise GraphProviderError("S1RTC must be [4,2,H,W] ordered as VV,VH")
     if dem.get("shape") != [1, grid["height"], grid["width"]]:
         raise GraphProviderError("DEM must be [1,H,W] and is repeated by the runtime")
+    validity = modalities.get("VALIDITY")
+    if validity is not None:
+        validity_map = as_map(validity, "VALIDITY modality")
+        if validity_map.get("shape") != [1, grid["height"], grid["width"]] or validity_map.get(
+            "bands"
+        ) != ["valid"]:
+            raise GraphProviderError("VALIDITY must be [1,H,W] with a single valid band")
 
 
 def validate_tessera_bundle(manifest: JsonMap, grid: JsonMap) -> None:
@@ -214,7 +221,12 @@ def validate_artifacts(manifest: JsonMap, root: pathlib.Path, verify_hashes: boo
     modalities = as_map(manifest.get("modalities"), "input bundle modalities")
     kind = manifest.get("kind")
     if kind in {FLOOD_BUNDLE_KIND, FIRE_BUNDLE_KIND}:
-        required = ["S2L2A", "S1RTC", "DEM"]
+        required = [
+            "S2L2A",
+            "S1RTC",
+            "DEM",
+            *(["VALIDITY"] if "VALIDITY" in modalities else []),
+        ]
     elif kind == TESSERA_BUNDLE_KIND:
         required = ["S2", "S2_VALID", *[name for name in ["S1_ASC", "S1_DESC"] if name in modalities]]
     else:

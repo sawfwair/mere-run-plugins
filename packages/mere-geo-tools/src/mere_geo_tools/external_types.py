@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 FloatArray = NDArray[np.float32]
+BoolArray = NDArray[np.bool_]
 UInt8Array = NDArray[np.uint8]
 Int32Array = NDArray[np.int32]
 Int64Array = NDArray[np.int64]
