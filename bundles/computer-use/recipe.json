@@ -1,0 +1,25 @@
+{
+  "package": "mere-computer-use",
+  "packagePath": "packages/mere-computer-use",
+  "appBundle": "MereComputerUse.app",
+  "appExecutable": "MereComputerUse",
+  "bundleIdentifier": "run.mere.plugins.mere-computer-use",
+  "volumeName": "MereComputerUse",
+  "minimumOSVersion": "15.0",
+  "python": {
+    "version": "3.12.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.12.13%2B20260414-aarch64-apple-darwin-pgo%2Blto-full.tar.zst",
+    "sha256": "612b1af85f33fe57351c0e8e40677c95d9ef63774c1f13ae8054c59c785a84ca"
+  },
+  "entrypoints": {
+    "mere-computer-use": "mere_computer_use.cli"
+  },
+  "collectAll": [
+    "mere_computer_use"
+  ],
+  "copyMetadata": [
+    "mere-computer-use",
+    "pyinstaller"
+  ],
+  "smokeProfile": "computer-use"
+}

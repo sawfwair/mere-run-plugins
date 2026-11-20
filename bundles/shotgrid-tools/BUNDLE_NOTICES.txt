@@ -1,0 +1,132 @@
+Mere ShotGrid Tools bundle acknowledgments
+
+CPython and its native dependency notices are preserved in python-licenses.
+The plugin's MIT terms are preserved in LICENSE.txt. mere.run is a runtime
+integration and is not redistributed in this bundle.
+
+The PyInstaller bootloader is used without modification under its distribution
+exception. Its licensing terms, including the Apache-licensed runtime hooks,
+are preserved in dependency-licenses.
+
+License expressions in the build inventory do not replace the upstream terms.
+
+The Autodesk ShotGrid Python SDK license is preserved in dependency-licenses.
+
+The SDK ships Certifi 2026.10.23 under the Mozilla Public License 2.0.
+Source for the bundled SDK, including its vendored Python modules, is available
+from Autodesk without charge at
+https://files.pythonhosted.org/packages/b8/af/c1a9f7e9a5fd2e5e0bf8f50bfbc15d4bb0481412f68a349a9dd9a5f6f85b/shotgun_api3-3.10.5.tar.gz
+SHA-256: 0a1110a794ee3eb6902e8946fc6addb7efa5ccdbc5d6b4575f7897fff44fdb45
+
+Upstream Certifi source is available at
+https://github.com/certifi/python-certifi/tree/b60466c9f2882d9cf088943c650b0faac06c080c
+
+Certifi license
+---------------
+
+This package contains a modified version of ca-bundle.crt:
+
+ca-bundle.crt -- Bundle of CA Root Certificates
+
+This is a bundle of X.509 certificates of public Certificate Authorities
+(CA). These were automatically extracted from Mozilla's root certificates
+file (certdata.txt).  This file can be found in the mozilla source tree:
+https://hg.mozilla.org/mozilla-central/file/tip/security/nss/lib/ckfw/builtins/certdata.txt
+It contains the certificates in PEM format and therefore
+can be directly used with curl / libcurl / php_curl, or with
+an Apache+mod_ssl webserver for SSL client authentication.
+Just configure this file as the SSLCACertificateFile.#
+
+***** BEGIN LICENSE BLOCK *****
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
+one at http://mozilla.org/MPL/2.0/.
+
+***** END LICENSE BLOCK *****
+@(#) $RCSfile: certdata.txt,v $ $Revision: 1.80 $ $Date: 2011/11/03 15:11:58 $
+
+httplib2 license
+----------------
+
+Httplib2 Software License
+
+Copyright (c) 2006 by Joe Gregorio
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of the Software,
+and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+SocksiPy - Python SOCKS module.
+
+Version 1.00
+
+Copyright 2006 Dan-Haim. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of Dan Haim nor the names of his contributors may be used
+   to endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY DAN HAIM "AS IS" AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+EVENT SHALL DAN HAIM OR HIS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMANGE.
+
+This module provides a standard socket-like interface for Python
+for tunneling connections through SOCKS proxies.
+
+Minor modifications made by Christopher Gilbert (http://motomastyle.com/) for
+use in PyLoris (http://pyloris.sourceforge.net/).
+
+Minor modifications made by Mario Vilas (http://breakingcode.wordpress.com/)
+mainly to merge bug fixes found in Sourceforge.
+
+pyparsing license
+-----------------
+
+Copyright (c) 2003-2019  Paul T. McGuire
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE

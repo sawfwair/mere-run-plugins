@@ -1,10 +1,21 @@
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const execFileAsync = promisify(execFile);
-const command = process.env.MERE_SEARXNG_SEARCH_COMMAND || "mere-web-search";
+function searchExecutable(): string {
+  if (process.env.MERE_SEARXNG_SEARCH_COMMAND) return process.env.MERE_SEARXNG_SEARCH_COMMAND;
+  const extension = realpathSync(fileURLToPath(import.meta.url));
+  const contents = resolve(dirname(extension), "../../../../..");
+  if (basename(contents) === "Contents" && basename(dirname(contents)) === "MereSearxngSearch.app") {
+    return join(contents, "MacOS", "mere-searxng-search");
+  }
+  return "mere-web-search";
+}
 
 interface SearchResult {
   title: string;
@@ -34,7 +45,7 @@ export default function searxngSearch(pi: ExtensionAPI) {
       const args = ["search", params.query, "--limit", String(params.limit ?? 5), "--timeout", "15"];
       if (params.language) args.push("--language", params.language);
       if (params.timeRange) args.push("--time-range", params.timeRange);
-      const { stdout } = await execFileAsync(command, args, { maxBuffer: 4 * 1024 * 1024, timeout: 20_000 });
+      const { stdout } = await execFileAsync(searchExecutable(), args, { maxBuffer: 4 * 1024 * 1024, timeout: 20_000 });
       const parsed = JSON.parse(stdout) as SearchResponse;
       if (!Array.isArray(parsed.results)) throw new Error("SearXNG plugin returned an invalid search response");
       const payload = {

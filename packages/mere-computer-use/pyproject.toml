@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mere-computer-use"
-version = "0.1.0"
+version = "0.1.1"
 description = "Window-scoped local computer use with mere.run and Cua Driver"
 readme = "README.md"
 requires-python = ">=3.9"

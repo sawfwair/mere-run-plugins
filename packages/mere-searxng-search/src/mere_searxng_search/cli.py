@@ -170,6 +170,12 @@ def search(request: JsonMap) -> JsonMap:
             "suggestions": payload.get("suggestions", []), "answers": payload.get("answers", [])}
 
 
+def executable_name() -> str:
+    if getattr(sys, "frozen", False) or pathlib.Path(sys.argv[0]).name == "mere-searxng-search":
+        return "mere-searxng-search"
+    return "mere-web-search"
+
+
 def manifest() -> JsonMap:
     commands = [("manifest", "Describe this plugin"), ("doctor", "Check instance JSON search"),
                 ("search", "Search directly"), ("plan", "Save a search plan"), ("run", "Execute a saved search"),
@@ -179,7 +185,7 @@ def manifest() -> JsonMap:
                 ("pi", "Enable or disable the tool in mere.run's Pi agent")]
     return {
         "contractVersion": "mere.run/plugin.v1", "name": "mere-searxng-search", "version": __version__,
-        "executable": "mere-web-search", "description": "Search a user-configured SearXNG instance",
+        "executable": executable_name(), "description": "Search a user-configured SearXNG instance",
         "homepage": "https://github.com/searxng/searxng",
         "capabilities": ["web-search", "searxng", "json-results", "local-instance", "container-management", "pi-tool"],
         "commands": [{"name": name, "description": description,
@@ -247,7 +253,7 @@ def pi_extension_path() -> pathlib.Path:
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(prog="mere-web-search")
+    root = argparse.ArgumentParser(prog=executable_name())
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("manifest").add_argument("--json", action="store_true")
     commands.add_parser("pi-extension")

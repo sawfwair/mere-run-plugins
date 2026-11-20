@@ -399,6 +399,9 @@ def run_plan(path: pathlib.Path, timeout: int, api_start_timeout: int = 300) -> 
     ]
     environment = os.environ.copy()
     environment["MERE_COMPUTER_USE_MANIFEST"] = str(path)
+    if getattr(sys, "frozen", False):
+        launcher = pathlib.Path(sys.executable).with_name("mere-computer-use")
+        environment.setdefault("MERE_COMPUTER_USE_COMMAND", str(launcher))
     environment["MERERUN_BASE_URL"] = base_url
     environment["MERERUN_API_KEY"] = os.environ.get("MERE_COMPUTER_USE_API_KEY", "mere-run")
     run["apiServer"] = {
