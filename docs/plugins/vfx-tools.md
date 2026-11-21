@@ -267,3 +267,44 @@ retains the original z-up convention, with yaw and pitch in radians and field
 of view in degrees. The `image-to-3d.json` handoff records both conventions,
 checkpoint identities, sampling settings, and SHA-256 hashes for the outputs.
 Use a new output directory for each run.
+
+## Capture a World session for editing
+
+Use `world-handoff` to start a fresh local DreamX or Cosmos3 session from a
+still image and capture an ordered camera path. Share the resulting `world/`
+folder with an editor or use its last PNG as the starting still for another
+session. See [World runtime setup](https://github.com/sawfwair/mere-run/blob/v0.73.1/docs/runtime/world.md)
+for supported models and camera controls.
+
+1. In Studio, open **Server → World**, choose a backend, and start a dedicated
+   session with an empty state folder. For the CLI, start the server in a
+   separate terminal from the same working directory as the capture.
+
+   ```bash
+   mere.run world serve --backend cosmos3 --state-directory "$PWD/world-state"
+   ```
+
+2. Save the [lighthouse request example](https://github.com/sawfwair/mere-run-plugins/blob/main/examples/world/lighthouse-request.json).
+   Point `inputs.image` at your still and set `options.stateDirectory` to the
+   folder used by the server. If your local server uses a key, set
+   `MERE_WORLD_API_KEY` in the capture shell.
+
+3. Run the capture in a fresh output directory.
+
+   ```bash
+   mere-vfx-tools world-handoff \
+     --request-json ./lighthouse-request.json \
+     --output-dir ./lighthouse-edit
+   ```
+
+`world/handoff.json` contains the camera instructions, effective sampling
+settings, effective seed per move, state sequence, and checksums for the PNGs
+and MP4s. The numbered
+MP4s import as separate clips. `continuationFrame` identifies the last PNG
+for a new World session. DreamX’s exact inference checkpoints belong to
+the live server session.
+
+If a job fails or times out, inspect `world/capture.json` for completed
+clips and the job ID. Start a new dedicated session and use a fresh output
+directory for another capture. A preview plan with `--dry-run` writes a
+VFX run manifest without contacting the server.

@@ -119,3 +119,43 @@ and reviewed. TESSERA and OlmoEarth outputs are `derived-feature` artifacts, not
 findings. OlmoEarth use remains subject to its upstream artifact license and its
 restrictions on military, defense, intelligence, human-surveillance, policing,
 and listed extractive uses.
+
+## Run a pinned Valencia example
+
+The examples cover the same small area south of Valencia, Spain, around the
+October 2024 flood. Both pin their imagery by collection and item ID in the
+[Microsoft Planetary Computer STAC catalog](https://planetarycomputer.microsoft.com/docs/concepts/data-catalog/).
+
+| Example | Prepared data | Graph output |
+| --- | --- | --- |
+| [TerraMind flood](https://github.com/sawfwair/mere-run-plugins/blob/main/examples/geo/valencia-flood-sources.json) | Four sets of Sentinel-2 and descending Sentinel-1 observations, plus Copernicus elevation | Candidate mask and probability GeoTIFFs, preview, and provenance |
+| [OlmoEarth observations](https://github.com/sawfwair/mere-run-plugins/blob/main/examples/geo/valencia-olmoearth-sources.json) | Two paired Sentinel-2 and Sentinel-1 timesteps | Georeferenced spatial embeddings and provenance |
+
+For either workflow, save the source recipe and its matching
+[example graph](https://github.com/sawfwair/mere-run-plugins/tree/main/examples/geo).
+For example, prepare the flood inputs and inspect the grid and source lineage.
+
+```bash
+mere-geo-tools prepare \
+  --recipe ./valencia-flood-sources.json --output ./valencia-flood-data --json
+mere-geo-tools inspect ./valencia-flood-data --json
+```
+
+The examples share a WGS84 area of interest and use a 10-meter UTM zone 30N
+grid. The flood model uses four acquisition windows, which span different
+dates for the optical and radar observations. Review cloud cover and dates
+when you interpret a candidate mask.
+
+With the relevant native models installed on Apple Silicon, use the prepared
+directory as the graph’s `bundle` input.
+
+```bash
+jq -n --arg bundle "$PWD/valencia-flood-data" '{bundle: $bundle}' > inputs.json
+mere.run graph run ./valencia-flood-graph.json \
+  --inputs-json ./inputs.json --run-dir ./valencia-flood-run --json
+```
+
+For the embedding workflow, use `valencia-olmoearth-sources.json` and
+`valencia-olmoearth-graph.json`, plus a separate prepared directory and run
+directory. Examine the manifest alongside either output to trace it back to
+its source observations.

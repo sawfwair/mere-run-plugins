@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/world-handoff.v1.schema.json",
+  "title": "Mere Run World Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "backend", "sessionId", "origin", "sampling", "transitions", "continuationFrame"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/world-handoff.v1"},
+    "backend": {"enum": ["dreamx", "cosmos3"]},
+    "sessionId": {"type": "string", "format": "uuid"},
+    "origin": {"$ref": "#/$defs/file"},
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "num_frames", "steps", "guidance_scale", "shift", "seed", "fps"],
+      "properties": {
+        "width": {"$ref": "#/$defs/positive"},
+        "height": {"$ref": "#/$defs/positive"},
+        "num_frames": {"$ref": "#/$defs/positive"},
+        "steps": {"$ref": "#/$defs/positive"},
+        "guidance_scale": {"type": "number", "exclusiveMinimum": 0},
+        "shift": {"type": "number", "exclusiveMinimum": 0},
+        "seed": {"type": "integer", "minimum": 0},
+        "fps": {"$ref": "#/$defs/positive"}
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "jobId", "previousStateId", "stateId", "transitionIndex", "effectiveSeed", "request", "video", "terminalFrame"],
+        "properties": {
+          "sequence": {"$ref": "#/$defs/positive"},
+          "jobId": {"type": "string", "format": "uuid"},
+          "previousStateId": {"type": ["string", "null"], "format": "uuid"},
+          "stateId": {"type": "string", "format": "uuid"},
+          "transitionIndex": {"$ref": "#/$defs/positive"},
+          "effectiveSeed": {"type": "integer", "minimum": 0},
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["prompt", "camera"],
+            "properties": {
+              "prompt": {"type": "string", "minLength": 1},
+              "camera": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["motion", "translationMeters", "rotationDegrees"],
+                "properties": {
+                  "motion": {"enum": ["hold", "forward", "backward", "strafeLeft", "strafeRight", "yawLeft", "yawRight", "custom"]},
+                  "translationMeters": {"$ref": "#/$defs/xyz"},
+                  "rotationDegrees": {"$ref": "#/$defs/xyz"}
+                }
+              }
+            }
+          },
+          "video": {"$ref": "#/$defs/file"},
+          "terminalFrame": {"$ref": "#/$defs/file"}
+        }
+      }
+    },
+    "continuationFrame": {"$ref": "#/$defs/file"}
+  },
+  "$defs": {
+    "positive": {"type": "integer", "minimum": 1},
+    "xyz": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "file": {
+      "type": "object",
+      "required": ["path", "bytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "pattern": "^(origin[.]png|media/[0-9]{4,}[.](mp4|png))$"},
+        "bytes": {"$ref": "#/$defs/positive"},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
