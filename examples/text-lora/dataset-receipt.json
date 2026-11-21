@@ -1,0 +1,27 @@
+{
+  "contractVersion": "mere.run/text-lora-dataset.v1",
+  "counts": {
+    "behavior": 2,
+    "heldOut": 1,
+    "train": 2
+  },
+  "datasetSha256": "29efd9ff78d0e3024dae1a0fc50532834b1220bf6ae17774c23f738509611638",
+  "files": {
+    "evaluation/cases.jsonl": {
+      "bytes": 665,
+      "sha256": "4eb4fe03fbafcc86468a20e3cb753332b51b84db7cb6758f9ed71767289006cf"
+    },
+    "evaluation/eval-pack.json": {
+      "bytes": 1004,
+      "sha256": "457f4e92272b0ab9e082f5aa6e6fc36c293172be4db9f4b63bcc7654eafb006c"
+    },
+    "held-out.jsonl": {
+      "bytes": 294,
+      "sha256": "7d3202bde68a28a9df1513e6fca8d1136bc496c533412eea100d0a480fc17586"
+    },
+    "train.jsonl": {
+      "bytes": 554,
+      "sha256": "4ad960b2943d8cc405a4fbbd47d143bea6228454f9617e3cb6c073aaf818b148"
+    }
+  }
+}

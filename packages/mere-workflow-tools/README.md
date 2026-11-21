@@ -145,3 +145,7 @@ If you bundle or redistribute dependencies, preserve their applicable license
 and copyright notices. The packaged notices cover these reviewed components;
 they aren't a complete inventory of transitive dependency licenses. Review the
 resolved dependency versions before redistribution.
+
+Use `mere-dataset-tools text-lora` to prepare three text splits, train a native
+adapter, and compare it with the base model on held-out behavior. See the
+[Dataset Tools guide](https://plugins-docs.mere.run/plugins/dataset-tools#train-a-text-lora).

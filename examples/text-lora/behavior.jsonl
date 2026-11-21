@@ -1,0 +1,2 @@
+{"id": "color-mix", "prompt": "What color do blue and yellow make? Reply with one lowercase word.", "expected": "green"}
+{"id": "route-check", "prompt": "Which color marks the Coral route? Reply with one lowercase word.", "expected": "red"}

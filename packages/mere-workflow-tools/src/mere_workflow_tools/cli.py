@@ -28,6 +28,7 @@ from . import (
     image_graph_provider,
     media_redaction,
     structured_documents,
+    text_lora,
     transcript_formats,
 )
 from .graph_sdk import GraphProviderError
@@ -83,8 +84,8 @@ TOOLS: dict[str, ToolSpec] = {
         kind="dataset",
         plugin_name="mere-dataset-tools",
         executable="mere-dataset-tools",
-        description="Prepare LoRA datasets with local captions, OCR sidecars, and contact sheets.",
-        capabilities=["dataset", "captioning", "ocr", "lora"],
+        description="Prepare image datasets and train and evaluate local text LoRA adapters.",
+        capabilities=["dataset", "captioning", "ocr", "lora", "text-lora-training", "text-lora-evaluation"],
         one_shot="caption",
         recipe_id="dataset-caption",
         recipe_title="Dataset caption preparation",
@@ -293,6 +294,9 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             {"name": "redaction-review", "description": "Create an offline image redaction review.", "stdout": "json"},
             {"name": "redact-export", "description": "Export images from an approved redaction review.", "stdout": "json"},
         ])
+    if spec.kind == "dataset":
+        commands.append({"name": "text-lora", "description": "Prepare data, train a text LoRA, and evaluate behavior.",
+                         "stdout": "json"})
     capabilities = list(spec.capabilities)
     manifest: JsonMap = {
         "contractVersion": "mere.run/plugin.v1",
@@ -1143,6 +1147,12 @@ def command_redact_export(_spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
+def command_text_lora(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    native = shlex.split(getattr(args, "mere_run_command", ""))
+    print_json(text_lora.run(args, native))
+    return 0
+
+
 def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
     parser.add_argument("--output-dir", required=True, type=pathlib.Path)
     parser.add_argument("--manifest", type=pathlib.Path)
@@ -1365,6 +1375,10 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         export.add_argument("--review", required=True, type=pathlib.Path, help="Approved review JSON.")
         review.set_defaults(func=command_redaction_review)
         export.set_defaults(func=command_redact_export)
+    if spec.kind == "dataset":
+        training = sub.add_parser("text-lora", help="Prepare, train, and evaluate a local text LoRA.")
+        text_lora.add_commands(training)
+        training.set_defaults(func=command_text_lora)
     return parser
 
 
