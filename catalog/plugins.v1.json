@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-21T13:52:33Z",
+  "updatedAt": "2026-11-21T16:05:54Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -113,7 +113,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -291,7 +291,7 @@
     {
       "id": "mere-vfx-tools",
       "name": "VFX Tools",
-      "description": "Run local shot-oriented VFX workflows for roto, mattes, tracking, motion, native depth and geometry, and verified TripoSR or reconstruction-only InstantMesh meshes.",
+      "description": "Run local VFX workflows for roto, mattes, tracking, motion, depth, native meshes, and IDOL Gaussian splats.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-vfx-tools",
       "subdirectory": "packages/mere-vfx-tools",
@@ -336,7 +336,8 @@
         "ply",
         "glb",
         "3dgs-initialization",
-        "mesh"
+        "mesh",
+        "gaussian-splat"
       ],
       "channels": {
         "main": {
@@ -344,7 +345,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-vfx-tools/0.2.0-1/envelope.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-vfx-tools/0.3.0-2/envelope.json"
           }
         }
       }
@@ -525,7 +526,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -533,7 +534,7 @@
     {
       "id": "mere-media-scrub",
       "name": "Media Scrub",
-      "description": "Batch OCR media frames and redact extracted sensitive text locally.",
+      "description": "Redact extracted text or review and cover sensitive areas in still images and frame folders.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-workflow-tools",
       "subdirectory": "packages/mere-workflow-tools",
@@ -542,7 +543,8 @@
         "media",
         "ocr",
         "pii-redaction",
-        "privacy"
+        "privacy",
+        "visual-redaction"
       ],
       "channels": {
         "main": {
@@ -550,7 +552,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -575,7 +577,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -602,7 +604,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -630,7 +632,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -655,7 +657,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }
@@ -679,7 +681,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.6.0-7/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.7.0-8/release.json"
           }
         }
       }

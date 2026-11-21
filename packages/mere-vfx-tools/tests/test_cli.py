@@ -10,7 +10,7 @@ from io import StringIO
 
 from PIL import Image, ImageDraw
 
-from mere_vfx_tools import cli
+from mere_vfx_tools import __version__, cli
 
 
 def write_image(path: pathlib.Path, color: tuple[int, int, int, int] = (20, 220, 30, 255)) -> None:
@@ -249,7 +249,7 @@ class MereVFXToolsTests(unittest.TestCase):
     def test_manifest_and_plan_contract(self) -> None:
         manifest = cli.plugin_manifest()
         self.assertEqual(manifest["contractVersion"], "mere.run/plugin.v1")
-        self.assertEqual(manifest["version"], "0.2.0")
+        self.assertEqual(manifest["version"], __version__)
         names = {command["name"] for command in manifest["commands"]}
         self.assertTrue(set(cli.TOOLS).issubset(names))
         self.assertEqual(manifest["security"]["cleanupDefault"], "none")
