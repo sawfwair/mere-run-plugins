@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-21T16:05:54Z",
+  "updatedAt": "2026-11-21T16:51:26Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -392,7 +392,7 @@
     {
       "id": "mere-film-tools",
       "name": "Film Studio",
-      "description": "Turn one idea into a governed local short-film production with a Pi producer-director, crash-safe specialist agents, multi-take local media selection, captions and mastering, explicit human review, and verified delivery.",
+      "description": "Turn one idea into a governed local short-film production with a Pi producer-director, crash-safe specialist agents, multi-take local media selection, regional retakes, editable timelines, captions and mastering, explicit human review, and verified delivery.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-film-tools",
       "subdirectory": "packages/mere-film-tools",
@@ -415,6 +415,8 @@
         "assembly",
         "generated-media-inspection",
         "multi-take-selection",
+        "regional-retake",
+        "editable-timeline",
         "captions",
         "loudness-mastering",
         "model-readiness",
@@ -435,7 +437,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-film-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-film-tools/0.1.0-1/envelope.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-film-tools/0.2.0-2/envelope.json"
           }
         }
       }

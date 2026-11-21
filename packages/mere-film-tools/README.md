@@ -71,3 +71,7 @@ evidence dashboard, and hash-bound human decision form.
 Mutating commands hold an OS-backed single-writer lock. After a crash, orphaned
 running work is converted into a retryable durable failure before execution
 continues. Rerolls archive prior takes instead of deleting them.
+
+Use `retake` to generate a candidate for part of a selected shot and
+`export-timeline` to hand an editable OpenTimelineIO cut to an editor. See the
+[Film Tools guide](https://plugins-docs.mere.run/plugins/film-tools).

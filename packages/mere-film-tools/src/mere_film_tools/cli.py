@@ -40,6 +40,7 @@ from .production import (
     validate_picture_lock_evidence,
     verify_production_models,
 )
+from .retake import MODALITIES, MODELS, RetakeRequest, create_retake
 from .state import (
     GATES,
     ProjectPaths,
@@ -60,6 +61,7 @@ from .state import (
     save,
     update_brief,
 )
+from .timeline import export_timeline
 
 PLUGIN_NAME = "mere-film-tools"
 
@@ -99,6 +101,8 @@ def plugin_manifest() -> JsonMap:
         {"name": "review", "description": "Run technical and independent creative review.", "stdout": "json"},
         {"name": "review-decision", "description": "Record a hash-bound explicit human review decision.", "stdout": "json"},
         {"name": "reroll", "description": "Archive a prior take and prepare a targeted shot reroll.", "stdout": "json"},
+        {"name": "retake", "description": "Generate a local candidate for a timed region of a selected shot.", "stdout": "json"},
+        {"name": "export-timeline", "description": "Export an editable OpenTimelineIO cut and its media.", "stdout": "json"},
         {"name": "export-animatic", "description": "Verify and export selected film assets for Animatic.", "stdout": "json"},
         {"name": "agent", "description": "Launch the bundled interactive Pi producer-director.", "stdout": "text"},
     ]
@@ -128,6 +132,8 @@ def plugin_manifest() -> JsonMap:
             "assembly",
             "generated-media-inspection",
             "multi-take-selection",
+            "regional-retake",
+            "editable-timeline",
             "captions",
             "loudness-mastering",
             "model-readiness",
@@ -682,6 +688,23 @@ def command_reroll(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_retake(args: argparse.Namespace) -> int:
+    paths, project, _run = load_state(args.run_manifest)
+    request = RetakeRequest(
+        args.shot, args.start_frame, args.end_frame, args.prompt, args.model, args.model_root,
+        args.decoder, args.modality, args.seed, args.media_timeout,
+    )
+    print_json(create_retake(paths, project, request, args.output_dir))
+    return 0
+
+
+def command_export_timeline(args: argparse.Namespace) -> int:
+    paths, project, _run = load_state(args.run_manifest)
+    selections = [path.expanduser().resolve() for path in args.retake]
+    print_json(export_timeline(paths, project, args.output_dir, selections))
+    return 0
+
+
 def command_export_animatic(args: argparse.Namespace) -> int:
     paths, project, run = load_state(args.run_manifest)
     print_json(export_animatic_handoff(paths, project, run, args.output))
@@ -810,7 +833,7 @@ def add_run_args(parser: argparse.ArgumentParser) -> None:
 
 
 def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
-    for name in ("run_manifest", "output_dir", "manifest", "output"):
+    for name in ("run_manifest", "output_dir", "manifest", "output", "model_root"):
         value = getattr(args, name, None)
         if value is not None:
             setattr(args, name, value.expanduser().resolve())
@@ -934,6 +957,28 @@ def build_parser() -> argparse.ArgumentParser:
     reroll.add_argument("--note", required=True)
     reroll.set_defaults(func=command_reroll)
 
+    retake = sub.add_parser("retake", help="Generate a candidate for a timed region of a selected shot.")
+    retake.add_argument("run_manifest", type=pathlib.Path)
+    retake.add_argument("--shot", required=True)
+    retake.add_argument("--start-frame", required=True, type=int, help="Inclusive frame in the selected shot, starting at zero.")
+    retake.add_argument("--end-frame", required=True, type=int, help="Exclusive frame in the selected shot.")
+    retake.add_argument("--prompt", required=True)
+    retake.add_argument("--output-dir", required=True, type=pathlib.Path, help="New directory for the candidate and receipt.")
+    retake.add_argument("--modality", choices=MODALITIES, default="video")
+    retake.add_argument("--model", choices=MODELS, default=MODELS[0])
+    retake.add_argument("--model-root", type=pathlib.Path)
+    retake.add_argument("--decoder", choices=("diffusion", "convolutional"), default="diffusion")
+    retake.add_argument("--seed", type=int, default=10)
+    retake.add_argument("--media-timeout", type=int, default=3600)
+    retake.set_defaults(func=command_retake)
+
+    timeline = sub.add_parser("export-timeline", help="Export an editable OpenTimelineIO cut and its media.")
+    timeline.add_argument("run_manifest", type=pathlib.Path)
+    timeline.add_argument("--output-dir", required=True, type=pathlib.Path)
+    timeline.add_argument("--retake", type=pathlib.Path, action="append", default=[], metavar="RECEIPT",
+                          help="Select a reviewed retake receipt. Repeat for multiple regions.")
+    timeline.set_defaults(func=command_export_timeline)
+
     export_animatic = sub.add_parser("export-animatic", help="Verify and export a film handoff for Animatic.")
     export_animatic.add_argument("run_manifest", type=pathlib.Path)
     export_animatic.add_argument("--output", type=pathlib.Path)
@@ -999,6 +1044,8 @@ def command_requires_project_lock(args: argparse.Namespace) -> bool:
         "review",
         "review-decision",
         "reroll",
+        "retake",
+        "export-timeline",
         "export-animatic",
         "cleanup",
         "recover",

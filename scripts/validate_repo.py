@@ -326,7 +326,7 @@ def validate_plugin_manifests() -> None:
         "mere-film-tools",
         {
             "manifest", "doctor", "plan", "run", "resume", "cleanup", "status", "brief",
-            "approve", "configure", "delegate", "review", "review-decision", "reroll", "agent",
+            "approve", "configure", "delegate", "review", "review-decision", "reroll", "retake", "export-timeline", "agent",
         },
     )
     validate_plugin_manifest(

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/film-retake.v1.schema.json",
+  "title": "mere.run Film Retake v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "createdAt", "projectId", "shotId", "sourceSha256", "region", "frameRate", "frameCount", "modality", "prompt", "seed", "requestedModel", "decoder", "candidate"],
+  "properties": {
+    "contractVersion": {"const": "mere.run/film-retake.v1"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "projectId": {"type": "string", "minLength": 1},
+    "shotId": {"type": "string", "minLength": 1},
+    "sourceSha256": {"$ref": "#/$defs/sha256"},
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startFrame", "endFrame"],
+      "properties": {
+        "startFrame": {"type": "integer", "minimum": 0},
+        "endFrame": {"type": "integer", "minimum": 1}
+      }
+    },
+    "frameRate": {"type": "string", "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
+    "frameCount": {"type": "integer", "minimum": 9},
+    "modality": {"enum": ["video", "audio", "both"]},
+    "prompt": {"type": "string", "minLength": 1},
+    "seed": {"type": "integer", "minimum": 0},
+    "requestedModel": {"enum": ["video-ltx25-distilled-bf16", "video-ltx25-full-bf16"]},
+    "decoder": {"enum": ["diffusion", "convolutional"]},
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256"],
+      "properties": {
+        "path": {"const": "retake.mp4"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

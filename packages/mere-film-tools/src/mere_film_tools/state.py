@@ -3,6 +3,7 @@ from __future__ import annotations
 import pathlib
 from dataclasses import dataclass
 
+from . import __version__
 from .common import (
     JsonMap,
     as_list,
@@ -244,7 +245,7 @@ def create_run_manifest(paths: ProjectPaths, run_id: str, project: JsonMap) -> J
     return {
         "contractVersion": PLUGIN_RUN_CONTRACT,
         "runId": run_id,
-        "plugin": {"name": "mere-film-tools", "version": "0.1.0"},
+        "plugin": {"name": "mere-film-tools", "version": __version__},
         "recipe": {
             "id": "pi-short-film-studio",
             "family": "film-production",

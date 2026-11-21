@@ -1,6 +1,6 @@
 {
   "name": "@mere/film-studio-pi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "keywords": ["pi-package", "mere.run", "film", "media"],
   "pi": {

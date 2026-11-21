@@ -196,3 +196,56 @@ selection receipt, SRT/WebVTT captions, media logs, generated assets, QC reports
 human decision, cuts, final master, checksums, and provenance. Inspect or
 continue safely with `status`, `resume`, and `run`. Delivery also extracts a
 checksum-backed poster still and 1280×720 thumbnail from the locked cut.
+
+## Retake part of a selected shot
+
+After Film Tools has recorded a selected clip, generate a local LTX 2.5
+candidate for the part you want to change.
+
+```bash
+mere-film-tools retake ./the-last-signal/run.json \
+  --shot beacon-fails --start-frame 24 --end-frame 48 \
+  --prompt 'Mara looks up as the rotating beacon slows.' \
+  --modality video --output-dir ./beacon-retake
+```
+
+Frame numbers are relative to the start of the selected clip. The start is
+inclusive and the end is exclusive. Use `--modality video` for picture,
+`--modality audio` for source audio, or `--modality both` for both. The
+source must have a constant frame rate, an LTX-compatible frame count
+(`8n+1`, at least nine frames), and dimensions divisible by 32. The requested
+region must fit within the clip and the scheduled shot. Use a fresh output
+directory for each candidate.
+
+The command runs the local Mere Run LTX 2.5 runtime. It accepts a managed
+`--model` or an explicit `--model-root`. For a checkpoint with the
+convolutional decoder, pass `--decoder convolutional`. See the
+[local LTX retake requirements](https://github.com/sawfwair/mere-run/blob/v0.73.1/docs/runtime/video.md#retake-a-region).
+
+Review `retake.mp4` before selecting its `retake.json` receipt. Film Tools
+writes the candidate separately from the selected clip and records the source
+and candidate hashes. See the
+[example retake receipt](https://github.com/sawfwair/mere-run-plugins/blob/main/examples/film/retake.json).
+
+## Export an editable timeline
+
+```bash
+mere-film-tools export-timeline ./the-last-signal/run.json \
+  --retake ./beacon-retake/retake.json \
+  --output-dir ./last-signal-edit
+```
+
+Import `film.otio` into an editor that reads OpenTimelineIO. The export
+copies referenced media into `media/`. If you move the directory, relink
+the clips to that folder in your editor. The picture follows the planned
+shot order and duration, with gaps wherever a selected source ends early.
+Production audio, dialogue, sound effects, and score are separate tracks
+when available. Overlapping cues use separate tracks. Add transitions and
+apply the final mix and mastering in the editor.
+
+Omit `--retake` to export the selected shots as they stand. Repeat
+`--retake` to include more reviewed regions. A retake replaces only the
+chosen interval and media type. The remaining edits reference the original
+selected clips. A changed source, overlapping retakes on the same track,
+or a retake at a different frame rate stops export. The editable export
+leaves the existing cut and its review state in place.
