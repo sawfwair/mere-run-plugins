@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-21T17:19:53Z",
+  "updatedAt": "2026-11-21T22:25:11Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -291,7 +291,7 @@
     {
       "id": "mere-vfx-tools",
       "name": "VFX Tools",
-      "description": "Run local VFX workflows for roto, mattes, tracking, motion, depth, native meshes, and IDOL Gaussian splats.",
+      "description": "Run local VFX workflows for roto, mattes, tracking, motion, depth, native meshes, IDOL Gaussian splats, and World camera handoffs.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-vfx-tools",
       "subdirectory": "packages/mere-vfx-tools",
@@ -337,7 +337,8 @@
         "glb",
         "3dgs-initialization",
         "mesh",
-        "gaussian-splat"
+        "gaussian-splat",
+        "world-handoff"
       ],
       "channels": {
         "main": {
@@ -345,7 +346,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-vfx-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-vfx-tools/0.3.0-2/envelope.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-vfx-tools/0.4.0-3/envelope.json"
           }
         }
       }

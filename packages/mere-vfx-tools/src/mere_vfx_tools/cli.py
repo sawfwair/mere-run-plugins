@@ -13,13 +13,14 @@ import shlex
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Callable, cast
 
 import PIL
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps, ImageStat
 
-from . import __version__
+from . import __version__, world_handoff
 
 JsonMap = dict[str, object]
 JsonList = list[object]
@@ -149,6 +150,12 @@ TOOLS: dict[str, ToolSpec] = {
         "Multi-view Geometry",
         "Solve ordered views into native relative cameras and colored point-cloud handoffs.",
         ("multi-view", "relative-depth", "camera", "point-cloud", "glb", "3dgs-initialization"),
+    ),
+    "world-handoff": ToolSpec(
+        "world-handoff",
+        "World Handoff",
+        "Seed a local World session, capture camera moves, and package editable clips and continuation frames.",
+        ("world", "camera", "world-handoff", "video"),
     ),
     "image-to-3d": ToolSpec(
         "image-to-3d",
@@ -312,7 +319,7 @@ def plugin_manifest() -> JsonMap:
         "capabilities": capabilities,
         "stdout": {"machineReadableByDefault": True, "diagnostics": "stderr"},
         "security": {
-            "usesUserCredentials": False,
+            "usesUserCredentials": True,
             "storesSecrets": False,
             "createsPaidResources": False,
             "cleanupDefault": "none",
@@ -3153,6 +3160,21 @@ def execute_multiview_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -
     artifact(manifest, delivery, "json", "multiview-image-to-3d-handoff")
 
 
+def execute_world_handoff(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest.get("request"), "request")
+    source = input_path(request, "image")
+    try:
+        delivery, paths = world_handoff.capture(source, options_for(manifest), output_dir)
+    except (OSError, ValueError) as exc:
+        raise PluginError(str(exc), 2) from None
+    for path in paths:
+        if path.suffix == ".mp4":
+            artifact(manifest, path, "video", "world-camera-clip")
+        else:
+            artifact(manifest, path, "image", "world-frame")
+    artifact(manifest, delivery, "json", "world-handoff")
+
+
 Executor = Callable[[JsonMap, pathlib.Path], None]
 EXECUTORS: dict[str, Executor] = {
     "roto": execute_roto,
@@ -3173,6 +3195,7 @@ EXECUTORS: dict[str, Executor] = {
     "video-depth": execute_video_depth,
     "multiview-geometry": execute_multiview_geometry,
     "image-to-3d": execute_image_to_3d,
+    "world-handoff": execute_world_handoff,
     "multiview-image-to-3d": execute_multiview_image_to_3d,
 }
 
@@ -3184,14 +3207,18 @@ def execute_manifest(path: pathlib.Path, manifest: JsonMap) -> JsonMap:
     executor = EXECUTORS.get(tool)
     if executor is None:
         raise PluginError(f"unsupported VFX tool: {tool}", 2)
-    update_manifest(path, manifest, "running")
-    try:
-        executor(manifest, output_dir)
-        update_manifest(path, manifest, "succeeded")
-    except Exception as exc:
-        manifest["error"] = str(exc)
-        update_manifest(path, manifest, "failed")
-        raise
+    lock = world_handoff.capture_lock(output_dir) if tool == "world-handoff" else nullcontext()
+    with lock:
+        if tool == "world-handoff" and (output_dir / "world").exists():
+            raise PluginError("a World capture already exists in this output. Inspect world/capture.json or use a fresh directory.", 2)
+        update_manifest(path, manifest, "running")
+        try:
+            executor(manifest, output_dir)
+            update_manifest(path, manifest, "succeeded")
+        except Exception as exc:
+            manifest["error"] = str(exc)
+            update_manifest(path, manifest, "failed")
+            raise
     return manifest
 
 
@@ -3216,10 +3243,28 @@ def command_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 3
 
 
+def validate_new_capture(args: argparse.Namespace) -> None:
+    if args.tool == "world-handoff" and (args.output_dir / "world").exists():
+        raise PluginError("a World capture already exists in this output. Inspect world/capture.json or use a fresh directory.", 2)
+
+
+def write_initial_manifest(path: pathlib.Path, manifest: JsonMap, tool: str) -> None:
+    if tool != "world-handoff":
+        write_json(path, manifest)
+        return
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            json.dump(manifest, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+    except FileExistsError:
+        raise PluginError("this output already has a run.json. Use a fresh directory or run the existing plan.", 2) from None
+
+
 def command_plan(args: argparse.Namespace) -> int:
+    validate_new_capture(args)
     manifest = make_manifest(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    write_json(args.output_dir / "run.json", manifest)
+    write_initial_manifest(args.output_dir / "run.json", manifest, args.tool)
     print_json(manifest)
     return 0
 
@@ -3252,10 +3297,11 @@ def command_cleanup(args: argparse.Namespace) -> int:
 
 
 def command_one_shot(args: argparse.Namespace) -> int:
+    validate_new_capture(args)
     manifest = make_manifest(args)
     path = args.output_dir / "run.json"
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    write_json(path, manifest)
+    write_initial_manifest(path, manifest, args.tool)
     if args.dry_run:
         print_json(manifest)
     else:

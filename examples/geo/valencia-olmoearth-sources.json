@@ -1,0 +1,38 @@
+{
+  "kind": "mere.geo/olmoearth-v1.2-source-recipe",
+  "version": 1,
+  "sample_id": "valencia-multisensor-context",
+  "target": {
+    "aoi": [
+      -0.405,
+      39.401,
+      -0.392,
+      39.413
+    ],
+    "crs": "EPSG:32630"
+  },
+  "timesteps": [
+    {
+      "observed_at": "2024-10-01T10:47:59.024000Z",
+      "S2L2A": {
+        "collection": "sentinel-2-l2a",
+        "item": "S2B_MSIL2A_20241001T104759_R051_T30SYJ_20241001T133447"
+      },
+      "S1RTC": {
+        "collection": "sentinel-1-rtc",
+        "item": "S1A_IW_GRDH_1SDV_20241001T061016_20241001T061041_055905_06D589_rtc"
+      }
+    },
+    {
+      "observed_at": "2024-11-05T10:52:31.025000Z",
+      "S2L2A": {
+        "collection": "sentinel-2-l2a",
+        "item": "S2A_MSIL2A_20241105T105231_R051_T30SYJ_20241105T150152"
+      },
+      "S1RTC": {
+        "collection": "sentinel-1-rtc",
+        "item": "S1A_IW_GRDH_1SDV_20241106T061016_20241106T061041_056430_06EA4C_rtc"
+      }
+    }
+  ]
+}

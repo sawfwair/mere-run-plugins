@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "valencia-flood",
+  "inputs": {
+    "bundle": {
+      "type": "asset_directory",
+      "required": true
+    }
+  },
+  "nodes": [
+    {
+      "id": "observe",
+      "kind": "geo.flood.segment",
+      "provider": "mere-geo-tools",
+      "arguments": {
+        "input_bundle": {
+          "$ref": "inputs.bundle"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "mask": {
+      "$ref": "nodes.observe.outputs.mask"
+    },
+    "probability": {
+      "$ref": "nodes.observe.outputs.probability"
+    },
+    "manifest": {
+      "$ref": "nodes.observe.outputs.manifest"
+    },
+    "preview": {
+      "$ref": "nodes.observe.outputs.preview"
+    }
+  }
+}

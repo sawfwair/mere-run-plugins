@@ -1,0 +1,18 @@
+{
+  "inputs": {"image": "./lighthouse.png"},
+  "options": {
+    "endpoint": "http://127.0.0.1:8791",
+    "stateDirectory": "./world-state",
+    "sampling": {"seed": 42},
+    "moves": [
+      {
+        "prompt": "Move along the same lighthouse hallway. Keep the stone walls and light consistent.",
+        "camera": {"motion": "forward", "translationMeters": [0, 0, 1], "rotationDegrees": [0, 0, 0]}
+      },
+      {
+        "prompt": "Turn toward the window in the same lighthouse hallway.",
+        "camera": {"motion": "yawRight", "translationMeters": [0, 0, 0], "rotationDegrees": [0, 20, 0]}
+      }
+    ]
+  }
+}

@@ -380,6 +380,7 @@ def validate_plugin_manifests() -> None:
             "multiview-geometry",
             "image-to-3d",
             "multiview-image-to-3d",
+            "world-handoff",
         },
     )
     workflow_tools = [

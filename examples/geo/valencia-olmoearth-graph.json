@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "kind": "mere.run/workflow-graph",
+  "name": "valencia-olmoearth",
+  "inputs": {
+    "bundle": {
+      "type": "asset_directory",
+      "required": true
+    }
+  },
+  "nodes": [
+    {
+      "id": "observe",
+      "kind": "geo.olmoearth.embed",
+      "provider": "mere-geo-tools",
+      "arguments": {
+        "input_bundle": {
+          "$ref": "inputs.bundle"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "embeddings": {
+      "$ref": "nodes.observe.outputs.embeddings"
+    },
+    "manifest": {
+      "$ref": "nodes.observe.outputs.manifest"
+    }
+  }
+}
