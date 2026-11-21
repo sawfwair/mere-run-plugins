@@ -4,7 +4,6 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
 import pathlib
 import re
 import shlex
@@ -30,8 +29,8 @@ from . import (
     transcript_formats,
 )
 from .graph_sdk import GraphProviderError
+from .native_runtime import runtime_command
 
-DEFAULT_MERE_RUN = "mere.run"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -1109,7 +1108,7 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
     if hasattr(args, "run_id"):
         validate_run_id(args.run_id)
     if hasattr(args, "mere_run_command") and not args.mere_run_command:
-        args.mere_run_command = os.environ.get("MERE_WORKFLOW_TOOLS_MERE_RUN") or DEFAULT_MERE_RUN
+        args.mere_run_command = shlex.join(runtime_command())
     for name in (
         "input",
         "output_dir",

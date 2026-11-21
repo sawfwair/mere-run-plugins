@@ -28,6 +28,7 @@ from .graph_sdk import (
     validate_catalog,
 )
 from .graph_sdk import load_invocation as load_graph_invocation
+from .native_runtime import runtime_command
 
 NODE_KIND = "document.convert"
 EXTRACT_KIND = "document.extract"
@@ -299,10 +300,10 @@ def extract_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonM
         models = [job.model, job.classifier] if job.tasks else [job.model]
         locations = output_locations(invocation, run_directory, EXTRACT_OUTPUT_TYPES)
         validate_source_outputs(job.source, locations)
-        structured_documents.native_request(structured_documents.runtime_command(), "extract", job.model,
+        structured_documents.native_request(runtime_command(), "extract", job.model,
                                            job.request(), preflight=True)
         if job.tasks:
-            structured_documents.native_request(structured_documents.runtime_command(), "classify", job.classifier,
+            structured_documents.native_request(runtime_command(), "classify", job.classifier,
                                                {"text": "Document preflight fixture", "tasks": job.tasks}, preflight=True)
     except (GraphProviderError, OSError, ValueError) as exc:
         diagnostics.append(diagnostic("document_extraction_invalid", "blocker", "Document extraction needs attention", str(exc)))
@@ -334,7 +335,7 @@ def execute_extraction(invocation: JsonMap, run_directory: pathlib.Path, write_e
     events = GraphEventStream(write_event)
     events.emit("progress", message="Extracting document fields", progress={"phase": "extract", "current": 0, "total": 1})
     try:
-        structured_documents.extract(structured_documents.runtime_command(), job, locations["review"], locations["csv"])
+        structured_documents.extract(runtime_command(), job, locations["review"], locations["csv"])
         if file_sha256(job.source) != input_hash:
             raise GraphProviderError("The input document changed during extraction.")
         files = [locations["review"], locations["csv"]]
