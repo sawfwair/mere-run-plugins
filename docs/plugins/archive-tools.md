@@ -4,6 +4,9 @@ This guide is for teams that need to search years of mixed files on a shared
 drive. `mere-archive-tools` builds a local SQLite index without modifying the
 source files or uploading them to a hosted service.
 
+Use `research` to collect public web pages with SearXNG and Firecrawl and
+index the saved sources locally.
+
 The plugin is an adaptable indexing tool, not a document-management product.
 Your organization owns authentication, authorization, retention, encryption,
 backup, and sharing policy.
@@ -26,8 +29,9 @@ also use these local `mere.run` commands:
 - `mere.run vision ocr`
 - `mere.run vision embed`
 
-`doctor` checks each command, SQLite full-text search, and AnyDoc. The plugin
-doesn't use credentials or create paid resources.
+`doctor` checks each command, SQLite full-text search, and AnyDoc. Local
+indexing and search use no credentials. Web research uses the services you
+configure for SearXNG and Firecrawl.
 
 Python 3.10 or later is required only when contributors run the package
 directly from source.
@@ -51,6 +55,47 @@ sensitive relationships.
 
 In `full-content`, *full* means the complete PII-reduced derivative. The plugin
 never stores the original binary or unreduced extracted text in the index.
+
+## Collect and index web research
+
+Install the SearXNG and Firecrawl plugins and start their services. See
+[SearXNG setup](/plugins/searxng-search#install-a-local-instance) and
+[Firecrawl Local setup](/plugins/firecrawl-local#install-the-adapter-and-start-firecrawl).
+To index the collection, install the
+`text-anonymize-privacy-filter` and `vision-embed-qwen3-vl-2b` models.
+
+```bash
+mere.run plugin run mere-archive-tools -- research \
+  --query "municipal flood map methodology" --output-dir ./flood-research --limit 8
+```
+
+SearXNG sends the query to its configured search engines. Firecrawl fetches
+the selected public URLs. Archive Tools deduplicates URLs and identical page
+text, then saves the following files:
+
+- `collection/sources/` contains the Markdown snapshots.
+- `collection/sources.json` maps citation IDs to public URLs, snapshot paths,
+  content hashes, and skipped results. It also indicates truncated snapshots.
+- `collection/citations.md` lists source links using the same citation IDs.
+- `index/archive.sqlite3` contains the local reduced-content search index.
+- `run.json` records the settings, status, and paths to the collection and index.
+
+The run directory is owner-only. Page snapshots can contain unredacted text.
+Review them before sharing. The archive index uses the safe-content tier and
+reduces PII before it saves derived content.
+
+Add `--dry-run` to write the plan without contacting either service. Add
+`--collection-only` to save the sources and citations without building an
+index. To continue an interrupted run or retry indexing, use `resume`.
+An existing collection is reused.
+
+```bash
+mere.run plugin run mere-archive-tools -- resume ./flood-research/run.json
+mere.run plugin run mere-archive-tools -- search \
+  --database ./flood-research/index/archive.sqlite3 --query "methodology"
+```
+
+Match a search result’s file name to its citation ID in `sources.json`.
 
 ## Build an index
 

@@ -294,7 +294,7 @@ def validate_plugin_manifests() -> None:
     validate_plugin_manifest(
         "mere_archive_tools",
         "mere-archive-tools",
-        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "index", "search", "stats"},
+        {"manifest", "doctor", "plan", "run", "resume", "cleanup", "index", "search", "research", "stats"},
     )
     validate_plugin_manifest(
         "mere_geo_tools",
@@ -711,6 +711,18 @@ def validate_archive_tools_plan() -> None:
             fail("archive-tools plan should count supported source files")
         if not (output / "run.json").is_file():
             fail("archive-tools plan should write run.json")
+        research_root = pathlib.Path(tmp) / "research"
+        research_plan = subprocess.run(
+            [sys.executable, "-m", "mere_archive_tools", "research", "--query", "Flood maps",
+             "--output-dir", str(research_root), "--dry-run", "--mere-run-command", "fake-mere-run"],
+            cwd=ROOT, env=plugin_env(), text=True, capture_output=True, check=True,
+        )
+        receipt = json.loads(research_plan.stdout)
+        validate_schema(
+            pathlib.Path("mere-archive-tools research plan"), contract_schema("run-manifest.v1.schema.json"), receipt,
+        )
+        if receipt["status"] != "planned" or set(research_root.iterdir()) != {research_root / "run.json"}:
+            fail("archive-tools research dry run must only write the plan")
 
 
 def validate_film_tools_plan() -> None:

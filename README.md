@@ -52,7 +52,7 @@ The catalog contains 21 companion executables:
 | --- | --- |
 | Analyze geospatial data | [Geospatial Tools](https://plugins-docs.mere.run/plugins/geo-tools) |
 | Index and search faces in a photo library | [Face Tools](https://plugins-docs.mere.run/plugins/face-tools) |
-| Index and search a shared drive | [Archive Tools](https://plugins-docs.mere.run/plugins/archive-tools) |
+| Index a shared drive or collect cited web sources | [Archive Tools](https://plugins-docs.mere.run/plugins/archive-tools) |
 | Create visual-effects shot artifacts | [VFX Tools](https://plugins-docs.mere.run/plugins/vfx-tools) |
 | Operate a selected macOS window locally | [Computer Use](https://plugins-docs.mere.run/plugins/computer-use) |
 | Hand off bounded chat or agent work | [Frontier Handoff](https://plugins-docs.mere.run/plugins/frontier-handoff) |
