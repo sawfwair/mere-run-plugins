@@ -1,6 +1,6 @@
 # Official plugins
 
-The live catalog contains 22 official companion executables.
+The live catalog contains 23 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
@@ -24,6 +24,7 @@ The live catalog contains 22 official companion executables.
 | [Media Scrub](/plugins/media-scrub) | `mere-media-scrub` | Batch frame OCR and redaction | Local |
 | [Dataset Tools](/plugins/dataset-tools) | `mere-dataset-tools` | LoRA captions, OCR, and contact sheets | Local |
 | [Transcript Tools](/plugins/transcript-tools) | `mere-transcript-tools` | Speech transcription and redaction | Local |
+| [Audio Post](/plugins/audio-post) | `mere-audio-post` | Audio restoration, stems, MIDI, Foley, and loudness | Local |
 | [Image Compose](/plugins/image-compose) | `mere-image-compose` | Repeatable image generation compositions | Local |
 | [Batch Runner](/plugins/batch-runner) | `mere-batch-runner` | Resumable JSONL core-command batches | Local |
 

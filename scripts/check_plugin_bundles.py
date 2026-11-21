@@ -61,8 +61,11 @@ class BundleContractTests(unittest.TestCase):
                 self.assertRegex(executable, r"^mere-[a-z0-9-]+$")
                 self.assertRegex(module, r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
                 module_roots.add(module.split(".", 1)[0])
+            inputs = path.parent
+            frozen = (inputs / "frozen_entrypoint.py").read_text()
+            for module in recipe["entrypoints"].values():
+                self.assertIn(f'"{module}"', frozen, bundle)
             if bundle != "workflow-tools":
-                inputs = path.parent
                 for required in ("BUNDLE_NOTICES.txt", "build-constraints.txt", "builder-requirements.in",
                                  "builder-requirements.lock", "frozen_entrypoint.py", "launcher.c",
                                  "requirements.lock"):
@@ -70,9 +73,6 @@ class BundleContractTests(unittest.TestCase):
                 self.assertTrue(module_roots.issubset(set(recipe.get("collectAll", []))), bundle)
                 self.assertIn(recipe["package"], recipe.get("copyMetadata", []), bundle)
                 self.assertIn("pyinstaller", recipe.get("copyMetadata", []), bundle)
-                frozen = (inputs / "frozen_entrypoint.py").read_text()
-                for module in recipe["entrypoints"].values():
-                    self.assertIn(f'"{module}"', frozen, bundle)
                 requirements = (inputs / "requirements.lock").read_text().lower()
                 if bundle in pillow_bundles:
                     self.assertIn("pillow==12.3.0 \\", requirements, bundle)

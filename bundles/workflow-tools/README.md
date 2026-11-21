@@ -5,7 +5,7 @@ The private release tools own build, signing, notarization, and publication.
 This directory contains public, reviewable inputs, not release credentials.
 
 - `recipe.json`: pinned standalone CPython archive and SHA-256, minimum macOS
-  version, and the seven plugin entrypoints that share one runtime.
+  version, and the plugin entrypoints that share one runtime.
 - `requirements.lock`: exact runtime dependencies and accepted wheel hashes.
 - `build-constraints.txt`: package build dependency version.
 - `builder-requirements.lock`: hashed PyInstaller build dependencies.
