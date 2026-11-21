@@ -59,6 +59,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/guide/introduction' },
             { text: 'Getting started', link: '/guide/getting-started' },
+            { text: 'Check plugin readiness', link: '/guide/check-readiness' },
             { text: 'Choose a plugin', link: '/guide/choosing-a-plugin' },
             { text: 'Core concepts', link: '/guide/core-concepts' },
             { text: 'Lifecycle', link: '/guide/lifecycle' },

@@ -13,9 +13,8 @@ mere.run --help
 mere.run model list
 ```
 
-For a provider workflow, you might also need provider credentials or external
-tools. The plugin's `doctor` command reports those requirements without
-creating resources.
+The [readiness guide](/guide/check-readiness) lists the models, tools, and
+services to check for each plugin.
 
 ## Inspect the catalog
 
@@ -48,29 +47,34 @@ To install the plugin, confirm the command:
 mere.run plugin install mere-image-tools --yes
 ```
 
+On Apple Silicon with macOS 15 or later, the CLI installs the signed bundle.
+For a pipx install on Linux or macOS, add `--source`.
+
 ## Check the installation
 
 To verify local dependencies, run:
 
 ```bash
-mere-image-tools doctor
+mere.run plugin doctor mere-image-tools
+mere.run model info vision-segment-sam31
 ```
 
 To inspect the plugin's capabilities and command contract, run:
 
 ```bash
-mere-image-tools manifest --json
+mere.run plugin run mere-image-tools -- manifest --json
 ```
 
-The `doctor` command checks the machine. The `manifest --json` command
-describes the plugin and doesn't perform a readiness check or workflow.
+Use `doctor` to check the plugin's runtime and `model info` to check the
+SAM 3.1 model. If the model is missing, install it with
+`mere.run model pull vision-segment-sam31`.
 
 ## Plan a subject knockout
 
 To write a plan without running inference, run:
 
 ```bash
-mere-image-tools plan \
+mere.run plugin run mere-image-tools -- plan \
   --input ./frame.png \
   --output ./subject.png \
   --mask-output ./subject-mask.png \
@@ -85,7 +89,7 @@ resolved command, input paths, output paths, and cleanup policy in that file.
 To execute the reviewed plan, pass its manifest to `run`:
 
 ```bash
-mere-image-tools run ./subject.run.json
+mere.run plugin run mere-image-tools -- run ./subject.run.json
 ```
 
 The exact manifest path appears in the `plan` output. Keep the `run.json` file
@@ -95,7 +99,7 @@ For an interactive local task that doesn't require a separate approval step,
 use the one-shot command:
 
 ```bash
-mere-image-tools knockout \
+mere.run plugin run mere-image-tools -- knockout \
   --input ./frame.png \
   --output ./subject.png \
   --mask-output ./subject-mask.png \

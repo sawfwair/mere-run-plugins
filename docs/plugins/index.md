@@ -14,7 +14,7 @@ The live catalog contains 23 official companion executables.
 | [Computer Use](/plugins/computer-use) | `mere-computer-use` | Selected-window desktop agent with local vision | Local macOS |
 | [Frontier Handoff](/plugins/frontier-handoff) | `mere-frontier-handoff` | Bounded chat and agent tasks through a signed-in Claude Code or Codex CLI | Local handoff to a user account |
 | [Firecrawl Local](/plugins/firecrawl-local) | `mere-firecrawl-local` | Read a public page as Markdown | User-configured Firecrawl Local |
-| [SearXNG Search](/plugins/searxng-search) | `mere-web-search` | Install a local SearXNG instance and search the web | Local Docker and SearXNG engines |
+| [SearXNG Search](/plugins/searxng-search) | `mere-searxng-search` | Install a local SearXNG instance and search the web | Local Docker and SearXNG engines |
 | [Animatic Tools](/plugins/animatic-tools) | `mere-animatic-tools` | Animatic production kits and delivery prep | Local |
 | [Film Studio](/plugins/film-tools) | `mere-film-tools` | Pi-directed short-film development, local production, review, and delivery | Local plus user-selected Pi provider |
 | [ShotGrid Tools](/plugins/shotgrid-tools) | `mere-shotgrid-tools` | Production tracking and review publishing | User-controlled provider |
@@ -38,6 +38,9 @@ mere.run plugin install mere-vfx-tools --yes
 Catalog IDs are stable machine identifiers. Some shared-package plugins have an
 ID that matches the executable rather than the Python distribution name.
 Omit `--yes` to preview the resolved installation command.
+
+Use the [readiness guide](/guide/check-readiness) to check what your workflow
+needs and to upgrade, roll back, or switch installation methods.
 
 ## Shared contract
 
