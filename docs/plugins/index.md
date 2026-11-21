@@ -1,6 +1,6 @@
 # Official plugins
 
-The live catalog contains 22 official companion executables.
+The live catalog contains 23 official companion executables.
 
 | Plugin | Command | Primary job | Execution |
 | --- | --- | --- | --- |
