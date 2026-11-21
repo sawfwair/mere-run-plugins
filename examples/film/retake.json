@@ -1,0 +1,20 @@
+{
+  "contractVersion": "mere.run/film-retake.v1",
+  "createdAt": "2026-11-21T16:00:00Z",
+  "projectId": "the-last-signal",
+  "shotId": "beacon-fails",
+  "sourceSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "region": {"startFrame": 24, "endFrame": 48},
+  "frameRate": "24/1",
+  "frameCount": 97,
+  "modality": "video",
+  "prompt": "Mara looks up as the rotating beacon slows.",
+  "seed": 10,
+  "requestedModel": "video-ltx25-distilled-bf16",
+  "decoder": "diffusion",
+  "candidate": {
+    "path": "retake.mp4",
+    "bytes": 1739221,
+    "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

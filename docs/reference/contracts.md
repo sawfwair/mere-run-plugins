@@ -33,6 +33,7 @@ plugins, recipes, and downstream automation.
 | [`film-captions.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-captions.v1.schema.json) | Source-bound SRT and WebVTT dialogue captions |
 | [`film-human-review.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-human-review.v1.schema.json) | Explicit decision bound to an exact cut and review evidence set |
 | [`film-delivery.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-delivery.v1.schema.json) | Checksum-backed master, captions, marketing stills, review package, and provenance handoff |
+| [`film-retake.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-retake.v1.schema.json) | Hash-bound native LTX retake candidate, source shot, and editable frame interval |
 | [`film-animatic-handoff.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-animatic-handoff.v1.schema.json) | Verified cast, locations, shot timing, deterministic seeds, and media for native Animatic import |
 | [`workflow-graph.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-graph.v1.schema.json) | Portable executable graph |
 | [`graph-node-provider.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-provider.v1.schema.json) | Typed provider node catalog |
