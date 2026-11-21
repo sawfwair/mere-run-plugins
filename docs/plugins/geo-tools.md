@@ -146,8 +146,10 @@ grid. The flood model uses four acquisition windows, which span different
 dates for the optical and radar observations. Review cloud cover and dates
 when you interpret a candidate mask.
 
-With the relevant native models installed on Apple Silicon, use the prepared
-directory as the graph’s `bundle` input.
+Use the [native Geo model setup](https://github.com/sawfwair/mere-run/blob/v0.73.1/docs/runtime/geo.md#convert-a-checkpoint)
+to install and convert the relevant checkpoint on Apple Silicon. For graph
+execution, keep the converted files in the resolved managed model directory.
+Then use the prepared directory as the graph’s `bundle` input.
 
 ```bash
 jq -n --arg bundle "$PWD/valencia-flood-data" '{bundle: $bundle}' > inputs.json
