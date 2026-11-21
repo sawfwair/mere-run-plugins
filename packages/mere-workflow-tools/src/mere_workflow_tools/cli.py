@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from typing import Callable, cast
 
@@ -25,6 +26,8 @@ from . import (
     graph_provider,
     graph_templates,
     image_graph_provider,
+    structured_documents,
+    transcript_formats,
 )
 from .graph_sdk import GraphProviderError
 
@@ -133,7 +136,14 @@ def print_json(payload: object) -> None:
 
 def write_json(path: pathlib.Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+        temporary = pathlib.Path(handle.name)
+        try:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def as_map(value: object, label: str) -> JsonMap:
@@ -192,7 +202,9 @@ def tree_sha256(paths: list[pathlib.Path]) -> str:
         hasher.update(len(encoded).to_bytes(4, "big"))
         hasher.update(encoded)
         if path.is_file():
-            hasher.update(path.read_bytes())
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    hasher.update(chunk)
     return "sha256:" + hasher.hexdigest()
 
 
@@ -262,6 +274,9 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
         {"name": "cleanup", "description": "Mark a local run as cleanup-skipped.", "stdout": "json"},
         {"name": spec.one_shot, "description": f"Plan and run {spec.recipe_title}.", "stdout": "json"},
     ]
+    if spec.kind == "doc":
+        commands.append({"name": "extract-fields", "description": "Extract, review, and optionally classify named fields.",
+                         "stdout": "json"})
     capabilities = list(spec.capabilities)
     manifest: JsonMap = {
         "contractVersion": "mere.run/plugin.v1",
@@ -346,7 +361,56 @@ def add_step(manifest: JsonMap, name: str, argv: list[str], outputs: dict[str, s
     manifest_steps(manifest).append(step)
 
 
+def structured_job(source: pathlib.Path, options: JsonMap) -> structured_documents.Extraction:
+    return structured_documents.Extraction(
+        source=source, fields=as_map(options["fields"], "fields"), model=str(options["model"]),
+        tasks=structured_documents.read_tasks(options["tasks"]), classifier=str(options["classifier"]),
+    )
+
+
+def make_structured_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
+    fields = load_json(args.fields_json)
+    tasks = [] if args.classify_json is None else structured_documents.read_tasks(json.loads(args.classify_json.read_text()))
+    options: JsonMap = {"fields": fields, "tasks": tasks, "model": args.field_model, "classifier": args.classify_model}
+    structured_job(args.input, options).request()
+    inputs = [args.input, args.fields_json] + ([args.classify_json] if args.classify_json is not None else [])
+    receipt = args.manifest or default_manifest_path(args.output_dir)
+    artifact_paths = [args.output_dir / "review.json", args.output_dir / "fields.csv"]
+    if receipt in artifact_paths or any(
+        proposed_path == original or (proposed_path.exists() and proposed_path.samefile(original))
+        for proposed_path in [receipt, *artifact_paths] for original in inputs
+    ):
+        raise PluginError("Structured document outputs and run manifest must preserve the input files.", 2)
+    manifest = base_manifest(spec, args, inputs)
+    command = [spec.executable, "extract-fields", "--input", str(args.input), "--output-dir", str(args.output_dir),
+               "--fields-json", str(args.fields_json), "--field-model", args.field_model, "--classify-model", args.classify_model,
+               "--run-id", args.run_id, "--mere-run-command", args.mere_run_command]
+    if args.classify_json is not None:
+        command.extend(["--classify-json", str(args.classify_json)])
+    if args.manifest:
+        command.extend(["--manifest", str(args.manifest)])
+    manifest["command"] = command
+    manifest_tool(manifest).update({"workflow": "document-extract-fields", "fieldModel": args.field_model,
+                                   "classifierModel": args.classify_model if tasks else None})
+    manifest_local(manifest)["input"] = str(args.input)
+    manifest_steps(manifest).append({
+        "name": "extract-fields", "python": "structured-document", "source": str(args.input), "options": options,
+        "outputs": {"review": str(args.output_dir / "review.json"), "csv": str(args.output_dir / "fields.csv")},
+    })
+    return manifest
+
+
+def run_structured_document_step(manifest: JsonMap, step: JsonMap) -> None:
+    source = pathlib.Path(str(step["source"]))
+    job = structured_job(source, as_map(step["options"], "structured extraction options"))
+    outputs = as_map(step["outputs"], "step.outputs")
+    command = string_list(manifest_tool(manifest)["mereRunCommand"], "tool.mereRunCommand")
+    structured_documents.extract(command, job, pathlib.Path(str(outputs["review"])), pathlib.Path(str(outputs["csv"])))
+
+
 def make_doc_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
+    if getattr(args, "fields_json", None) is not None:
+        return make_structured_doc_manifest(spec, args)
     input_path = args.input
     ensure_file(input_path, "input document")
     manifest = base_manifest(spec, args, [input_path])
@@ -480,28 +544,94 @@ def make_dataset_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
 
 
 def make_transcript_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
-    ensure_file(args.input, "audio input")
-    if args.input.suffix.lower() not in AUDIO_EXTENSIONS:
-        raise PluginError(f"unsupported audio extension: {args.input.suffix}", 2)
-    manifest = base_manifest(spec, args, [args.input])
-    transcript = args.output_dir / f"{args.input.stem}.txt"
-    redacted = args.output_dir / f"{args.input.stem}.redacted.txt"
+    source = args.input
+    if args.diarize_model and not args.diarize:
+        raise PluginError("--diarize-model requires --diarize.", 2)
+    if source.is_dir():
+        if args.output_dir == source or source in args.output_dir.parents:
+            raise PluginError("Use a separate output directory for a folder transcript.", 2)
+        inputs = sorted(path for path in source.rglob("*") if path.is_file() and not path.is_symlink()
+                        and path.suffix.lower() in AUDIO_EXTENSIONS)
+        if not inputs:
+            raise PluginError(f"No supported audio files found in {source}.", 2)
+    else:
+        ensure_file(source, "audio input")
+        if source.suffix.lower() not in AUDIO_EXTENSIONS:
+            raise PluginError(f"unsupported audio extension: {source.suffix}", 2)
+        inputs = [source]
+    receipt = args.manifest or default_manifest_path(args.output_dir)
+    if receipt in inputs or (source.is_dir() and source in receipt.parents):
+        raise PluginError("Write the transcript run manifest outside the source recordings.", 2)
+    manifest = base_manifest(spec, args, inputs)
     manifest["command"] = one_shot_command(spec, args)
-    manifest_local(manifest)["input"] = str(args.input)
-    manifest_tool(manifest).update({"workflow": "transcribe-redact", "asrBackend": args.backend, "redact": args.redact})
-    transcribe_argv = ["speech", "transcribe", str(args.input), "--output", str(transcript), "--backend", args.backend]
-    if args.language:
-        transcribe_argv.extend(["--language", args.language])
-    add_step(manifest, "transcribe", transcribe_argv, {"transcript": str(transcript)})
-    if args.redact:
-        add_step(
-            manifest,
-            "redact-transcript",
-            ["text", "anonymize", "--output", str(redacted), "--replacement", args.replacement],
-            {"redactedTranscript": str(redacted)},
-            stdin_path=str(transcript),
-        )
+    manifest_local(manifest)["input"] = str(source)
+    manifest_tool(manifest).update({
+        "workflow": "transcribe-redact", "asrBackend": args.backend, "redact": args.redact,
+        "diarize": args.diarize, "subtitles": args.subtitles,
+    })
+    for index, audio in enumerate(inputs, start=1):
+        output = args.output_dir / audio.relative_to(source) if source.is_dir() else args.output_dir
+        add_transcript_steps(manifest, args, audio, output, f"{index:03}-" if source.is_dir() else "")
     return manifest
+
+
+def add_transcript_steps(
+    manifest: JsonMap, args: argparse.Namespace, audio: pathlib.Path, output: pathlib.Path, prefix: str,
+) -> None:
+    transcript = output / f"{audio.stem}.txt"
+    raw_alignment = output / f"{audio.stem}.alignment.txt"
+    transcribe_output = raw_alignment if args.subtitles else transcript
+    argv = ["speech", "transcribe", str(audio), "--output", str(transcribe_output), "--backend", args.backend]
+    if args.language:
+        argv.extend(["--language", args.language])
+    if args.model:
+        argv.extend(["--model", args.model])
+    if args.subtitles:
+        argv.append("--timestamps")
+    add_step(manifest, prefix + "transcribe", argv, {"alignment" if args.subtitles else "transcript": str(transcribe_output)})
+    diarization = output / f"{audio.stem}.speakers.json"
+    if args.diarize:
+        argv = ["speech", "diarize", str(audio), "--format", "json", "--output", str(diarization)]
+        if args.diarize_model:
+            argv.extend(["--model", args.diarize_model])
+        add_step(manifest, prefix + "diarize", argv, {"speakers": str(diarization)})
+    if args.subtitles:
+        caption_text = output / f"{audio.stem}.caption-text.txt"
+        manifest_steps(manifest).append({
+            "name": prefix + "prepare-captions", "python": "prepare-captions",
+            "alignment": str(raw_alignment), "outputs": {"transcript": str(transcript), "captions": str(caption_text)},
+        })
+        caption_input = caption_text
+        if args.redact:
+            caption_input = output / f"{audio.stem}.caption-text.redacted.txt"
+            add_step(manifest, prefix + "redact-captions",
+                     ["text", "anonymize", "--output", str(caption_input), "--replacement", args.replacement],
+                     {"redactedCaptionText": str(caption_input)}, stdin_path=str(caption_text))
+        suffixes = ("srt", "vtt") if args.subtitles == "both" else (args.subtitles,)
+        stem = audio.stem + (".redacted" if args.redact else "")
+        manifest_steps(manifest).append({
+            "name": prefix + "export-captions", "python": "export-captions", "alignment": str(raw_alignment),
+            "captionText": str(caption_input), "diarization": str(diarization) if args.diarize else None,
+            "outputs": {suffix: str(output / f"{stem}.{suffix}") for suffix in suffixes},
+        })
+    if args.redact:
+        redacted = output / f"{audio.stem}.redacted.txt"
+        add_step(manifest, prefix + "redact-transcript",
+                 ["text", "anonymize", "--output", str(redacted), "--replacement", args.replacement],
+                 {"redactedTranscript": str(redacted)}, stdin_path=str(transcript))
+
+
+def run_caption_step(step: JsonMap) -> None:
+    text, cues = transcript_formats.read_cues(pathlib.Path(str(step["alignment"])))
+    outputs = as_map(step["outputs"], "step.outputs")
+    if step["python"] == "prepare-captions":
+        pathlib.Path(str(outputs["transcript"])).write_text(text + "\n", encoding="utf-8")
+        pathlib.Path(str(outputs["captions"])).write_text("\n".join(cue.text for cue in cues), encoding="utf-8")
+        return
+    caption_text = pathlib.Path(str(step["captionText"])).read_text(encoding="utf-8").splitlines()
+    speakers = transcript_formats.read_speakers(pathlib.Path(str(step["diarization"]))) if step.get("diarization") else []
+    for output in outputs.values():
+        transcript_formats.write_subtitles(pathlib.Path(str(output)), cues, caption_text, speakers)
 
 
 def make_image_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
@@ -597,6 +727,14 @@ def one_shot_command(spec: ToolSpec, args: argparse.Namespace) -> list[str]:
             "--redact" if args.redact else "--no-redact",
             "--replacement", args.replacement,
         ])
+    if spec.kind == "transcript":
+        command.extend(["--backend", args.backend, "--redact" if args.redact else "--no-redact",
+                        "--replacement", args.replacement])
+        for flag in ("language", "model", "subtitles", "diarize_model"):
+            if value := getattr(args, flag):
+                command.extend([f"--{flag.replace('_', '-')}", value])
+        if args.diarize:
+            command.append("--diarize")
     return command
 
 
@@ -616,6 +754,10 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
                 )
             elif step.get("python") == "anydoc-markdown":
                 run_anydoc_step(manifest, step)
+            elif step.get("python") in {"prepare-captions", "export-captions"}:
+                run_caption_step(step)
+            elif step.get("python") == "structured-document":
+                run_structured_document_step(manifest, step)
             else:
                 run_mere_step(manifest, step)
         files = collect_artifacts(manifest)
@@ -672,7 +814,8 @@ def run_mere_step(manifest: JsonMap, step: JsonMap) -> None:
         stderr=subprocess.STDOUT,
         check=False,
     )
-    if process.stdout:
+    private = manifest_tool(manifest).get("workflow") in {"transcribe-redact", "document-extract-fields"}
+    if process.stdout and (process.returncode != 0 or not private):
         for line in process.stdout.splitlines():
             eprint(line)
     if process.returncode != 0:
@@ -931,8 +1074,12 @@ def add_kind_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
         parser.add_argument("--ocr-backend", default="lighton", choices=["lighton", "glm", "infinity"])
         parser.add_argument("--contact-sheet", action=argparse.BooleanOptionalAction, default=True)
     if spec.kind == "transcript":
-        parser.add_argument("--backend", default="auto", choices=["auto", "parakeet", "qwen"])
+        parser.add_argument("--backend", default="auto", choices=["auto", "parakeet", "qwen", "whistle", "nemotron", "sov"])
         parser.add_argument("--language")
+        parser.add_argument("--model", help="Managed transcription model ID or local path.")
+        parser.add_argument("--subtitles", choices=["srt", "vtt", "both"], help="Export timed captions.")
+        parser.add_argument("--diarize", action="store_true", help="Detect speakers and label overlapping captions.")
+        parser.add_argument("--diarize-model", help="Override the native speaker diarization model.")
         parser.add_argument("--redact", action=argparse.BooleanOptionalAction, default=True)
         parser.add_argument("--replacement", default="[{label}]")
     if spec.kind == "image_compose":
@@ -971,6 +1118,8 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
         "jobs",
         "ref_image",
         "lora",
+        "fields_json",
+        "classify_json",
         "request",
         "graph_run_dir",
         "workflow",
@@ -983,6 +1132,13 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
             if value is not None:
                 setattr(args, name, value.expanduser().resolve())
     return args
+
+
+def add_structured_doc_args(parser: argparse.ArgumentParser, *, required: bool) -> None:
+    parser.add_argument("--fields-json", required=required, type=pathlib.Path, help="Named Clairic field definitions.")
+    parser.add_argument("--classify-json", type=pathlib.Path, help="Optional GLiNER classification task array.")
+    parser.add_argument("--field-model", default=structured_documents.CLAIRIC_MODEL)
+    parser.add_argument("--classify-model", default=structured_documents.CLASSIFIER_MODEL)
 
 
 def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
@@ -1003,6 +1159,8 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     plan = sub.add_parser("plan", help="Create a local workflow plan.")
     add_common_plan_args(plan, spec)
     add_kind_args(plan, spec)
+    if spec.kind == "doc":
+        add_structured_doc_args(plan, required=False)
     plan.set_defaults(func=command_plan)
 
     run = sub.add_parser("run", help="Execute a planned workflow run manifest.")
@@ -1095,6 +1253,13 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     add_kind_args(one_shot, spec)
     one_shot.add_argument("--dry-run", action="store_true")
     one_shot.set_defaults(func=command_one_shot)
+    if spec.kind == "doc":
+        structured = sub.add_parser("extract-fields", help="Run local typed extraction and optional classification.")
+        add_common_plan_args(structured, spec)
+        structured.add_argument("--input", required=True, type=pathlib.Path)
+        structured.add_argument("--dry-run", action="store_true")
+        add_structured_doc_args(structured, required=True)
+        structured.set_defaults(func=command_one_shot)
     return parser
 
 
@@ -1108,6 +1273,9 @@ def main_for(kind: str, argv: list[str] | None = None) -> int:
     except PluginError as exc:
         eprint(f"Error: {exc}")
         return exc.exit_code
+    except (GraphProviderError, ValueError) as exc:
+        eprint(f"Error: {exc}")
+        return 2
     except KeyboardInterrupt:
         eprint("Interrupted.")
         return 130

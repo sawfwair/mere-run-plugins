@@ -1,6 +1,6 @@
 {
   "contractVersion": "mere.run/plugin-catalog.v1",
-  "updatedAt": "2026-11-21T13:34:14Z",
+  "updatedAt": "2026-11-21T13:52:33Z",
   "defaultChannel": "main",
   "plugins": [
     {
@@ -113,7 +113,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -514,6 +514,8 @@
         "ocr",
         "pii-redaction",
         "privacy",
+        "structured-extraction",
+        "classification",
         "graph-node-provider-v1"
       ],
       "channels": {
@@ -522,7 +524,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -547,7 +549,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -572,7 +574,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -580,7 +582,7 @@
     {
       "id": "mere-transcript-tools",
       "name": "Transcript Tools",
-      "description": "Transcribe local audio and optionally remove PII with mere.run.",
+      "description": "Transcribe local recordings in batches, label speakers, and export timed captions with optional redaction.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-workflow-tools",
       "subdirectory": "packages/mere-workflow-tools",
@@ -588,6 +590,8 @@
       "capabilities": [
         "speech",
         "transcription",
+        "speaker-diarization",
+        "subtitles",
         "pii-redaction",
         "privacy"
       ],
@@ -597,7 +601,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -622,7 +626,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
@@ -646,7 +650,7 @@
           "ref": "main",
           "spec": "git+https://github.com/sawfwair/mere-run-plugins.git@main#subdirectory=packages/mere-workflow-tools",
           "bundles": {
-            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.4.1-4/release.json"
+            "macos-arm64": "https://mere.run/releases/plugins/mere-workflow-tools/0.5.0-5/release.json"
           }
         }
       }
