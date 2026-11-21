@@ -11,7 +11,7 @@ import time
 import uuid
 from typing import cast
 
-from . import __version__, anydoc_backend
+from . import __version__, anydoc_backend, structured_documents
 from .graph_sdk import (
     INVOCATION_CONTRACT_VERSION,
     PREFLIGHT_CONTRACT_VERSION,
@@ -30,6 +30,8 @@ from .graph_sdk import (
 from .graph_sdk import load_invocation as load_graph_invocation
 
 NODE_KIND = "document.convert"
+EXTRACT_KIND = "document.extract"
+EXTRACT_OUTPUT_TYPES = {"review": "asset", "csv": "asset", "manifest": "asset"}
 PROVIDER_ID = "mere-doc-tools"
 OUTPUT_TYPES = {"markdown": "asset", "manifest": "asset", "text": "string", "stats": "json"}
 
@@ -75,12 +77,33 @@ def graph_catalog(provider_id: str, provider_version: str) -> JsonMap:
             },
         }],
     }
+    cast(list[JsonMap], catalog["nodes"]).append({
+        "kind": EXTRACT_KIND,
+        "title": "Extract structured document fields",
+        "description": "Extract local PDF, image, or text fields with Clairic and optionally suggest routing labels with GLiNER.",
+        "category": "documents",
+        "inputs": [
+            {"name": "input", "type": "asset", "required": True},
+            {"name": "fields", "type": "json", "required": True},
+            {"name": "model", "type": "string", "required": False, "default": structured_documents.CLAIRIC_MODEL},
+            {"name": "classification_tasks", "type": "json", "required": False, "default": []},
+            {"name": "classification_model", "type": "string", "required": False, "default": structured_documents.CLASSIFIER_MODEL},
+        ],
+        "outputs": [
+            {"name": "review", "type": "asset", "optional": False, "content_types": ["application/json"]},
+            {"name": "csv", "type": "asset", "optional": False, "content_types": ["text/csv"]},
+            {"name": "manifest", "type": "asset", "optional": False, "content_types": ["application/json"]},
+        ],
+        "requirements": extraction_requirements([]),
+        "traits": {"deterministic": False, "cacheable": False, "side_effects": "none",
+                   "supports_progress": True, "supports_previews": False},
+    })
     validate_catalog(catalog)
     return catalog
 
 
 def load_invocation(path: pathlib.Path) -> JsonMap:
-    return load_graph_invocation(path, {NODE_KIND})
+    return load_graph_invocation(path, {NODE_KIND, EXTRACT_KIND})
 
 
 def source_path(invocation: JsonMap) -> pathlib.Path:
@@ -106,12 +129,14 @@ def source_path(invocation: JsonMap) -> pathlib.Path:
     return source
 
 
-def output_locations(invocation: JsonMap, run_directory: pathlib.Path) -> dict[str, pathlib.Path]:
+def output_locations(
+    invocation: JsonMap, run_directory: pathlib.Path, output_types: dict[str, str] = OUTPUT_TYPES,
+) -> dict[str, pathlib.Path]:
     outputs = as_map(invocation.get("outputs"), "outputs")
-    if set(outputs) != set(OUTPUT_TYPES):
-        raise GraphProviderError(f"document.convert requires exactly these outputs: {', '.join(OUTPUT_TYPES)}")
+    if set(outputs) != set(output_types):
+        raise GraphProviderError(f"Document workflow requires exactly these outputs: {', '.join(output_types)}")
     locations: dict[str, pathlib.Path] = {}
-    for name, expected_type in OUTPUT_TYPES.items():
+    for name, expected_type in output_types.items():
         descriptor = as_map(outputs[name], f"outputs.{name}")
         if descriptor.get("type") != expected_type or descriptor.get("optional", False) is not False:
             raise GraphProviderError(f"outputs.{name} must be a required {expected_type}")
@@ -127,10 +152,12 @@ def output_locations(invocation: JsonMap, run_directory: pathlib.Path) -> dict[s
             raise GraphProviderError(f"outputs.{name} is not a file path")
         locations[name] = path
     paths = list(locations.values())
-    if paths[0] == paths[1] or paths[0] in paths[1].parents or paths[1] in paths[0].parents:
-        raise GraphProviderError("document output paths must be distinct files")
-    if all(path.exists() for path in paths) and paths[0].samefile(paths[1]):
-        raise GraphProviderError("document outputs must not alias the same file")
+    for index, first in enumerate(paths):
+        for second in paths[index + 1:]:
+            if first == second or first in second.parents or second in first.parents:
+                raise GraphProviderError("document output paths must be distinct files")
+            if first.exists() and second.exists() and first.samefile(second):
+                raise GraphProviderError("document outputs must not alias the same file")
     return locations
 
 
@@ -141,6 +168,8 @@ def validate_source_outputs(source: pathlib.Path, locations: dict[str, pathlib.P
 
 
 def graph_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap:
+    if invocation.get("kind") == EXTRACT_KIND:
+        return extract_preflight(invocation, run_directory)
     diagnostics: list[JsonMap] = []
     try:
         source = source_path(invocation)
@@ -182,6 +211,9 @@ def write_manifest(path: pathlib.Path, manifest: JsonMap) -> None:
 
 
 def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event: EventWriter) -> None:
+    if invocation.get("kind") == EXTRACT_KIND:
+        execute_extraction(invocation, run_directory, write_event)
+        return
     preflight = graph_preflight(invocation, run_directory)
     if preflight["status"] != "ok":
         messages = [str(item["message"]) for item in cast(list[JsonMap], preflight["diagnostics"])]
@@ -237,3 +269,85 @@ def graph_execute(invocation: JsonMap, run_directory: pathlib.Path, write_event:
         "text": text,
         "stats": {"input_sha256": input_hash, "markdown_sha256": markdown_hash, "byte_count": markdown_path.stat().st_size, "backend_version": backend_version},
     })
+
+
+
+def extraction_requirements(models: list[str]) -> JsonMap:
+    return {"model_ids": models, "accelerator_backends": ["metal", "cuda"],
+            "minimum_accelerator_memory_bytes": None, "network_access": False}
+
+
+def extraction_job(invocation: JsonMap) -> structured_documents.Extraction:
+    arguments = as_map(invocation.get("arguments"), "arguments")
+    source = arguments.get("input")
+    model = arguments.get("model", structured_documents.CLAIRIC_MODEL)
+    classifier = arguments.get("classification_model", structured_documents.CLASSIFIER_MODEL)
+    if not isinstance(source, str) or not source or not isinstance(model, str) or not isinstance(classifier, str):
+        raise GraphProviderError("Provide a document path and valid model identifiers.")
+    return structured_documents.Extraction(
+        source=pathlib.Path(source).expanduser().resolve(), fields=as_map(arguments.get("fields"), "fields"),
+        model=model, tasks=structured_documents.read_tasks(arguments.get("classification_tasks", [])),
+        classifier=classifier,
+    )
+
+
+def extract_preflight(invocation: JsonMap, run_directory: pathlib.Path) -> JsonMap:
+    diagnostics: list[JsonMap] = []
+    models: list[str] = []
+    try:
+        job = extraction_job(invocation)
+        models = [job.model, job.classifier] if job.tasks else [job.model]
+        locations = output_locations(invocation, run_directory, EXTRACT_OUTPUT_TYPES)
+        validate_source_outputs(job.source, locations)
+        structured_documents.native_request(structured_documents.runtime_command(), "extract", job.model,
+                                           job.request(), preflight=True)
+        if job.tasks:
+            structured_documents.native_request(structured_documents.runtime_command(), "classify", job.classifier,
+                                               {"text": "Document preflight fixture", "tasks": job.tasks}, preflight=True)
+    except (GraphProviderError, OSError, ValueError) as exc:
+        diagnostics.append(diagnostic("document_extraction_invalid", "blocker", "Document extraction needs attention", str(exc)))
+    return {"contract_version": PREFLIGHT_CONTRACT_VERSION, "status": "blocked" if diagnostics else "ok",
+            "diagnostics": diagnostics, "requirements": extraction_requirements(models)}
+
+
+def execute_extraction(invocation: JsonMap, run_directory: pathlib.Path, write_event: EventWriter) -> None:
+    job = extraction_job(invocation)
+    locations = output_locations(invocation, run_directory, EXTRACT_OUTPUT_TYPES)
+    validate_source_outputs(job.source, locations)
+    input_hash = file_sha256(job.source)
+    manifest_path = locations["manifest"]
+    manifest: JsonMap = {
+        "contractVersion": "mere.run/plugin-run.v1",
+        "runId": f"{invocation['job_id']}-{invocation['node_id']}",
+        "plugin": {"name": PROVIDER_ID, "version": __version__},
+        "recipe": {"id": "doc-extract-fields", "family": "local-workflow"},
+        "status": "running", "createdAt": now_iso(),
+        "dataset": {"path": str(job.source.parent), "pairCount": 1, "sha256": input_hash},
+        "command": [],
+        "local": {"input": str(job.source), "outputDirectory": str(run_directory.resolve()), "runManifest": str(manifest_path)},
+        "tool": {"name": PROVIDER_ID, "workflow": "document-extract-fields", "fieldModel": job.model,
+                 "classifierModel": job.classifier if job.tasks else None},
+        "artifacts": {"localDirectory": str(run_directory.resolve()), "files": [], "sha256": {}},
+        "cleanup": {"default": "none", "status": "not-started"},
+    }
+    write_manifest(manifest_path, manifest)
+    events = GraphEventStream(write_event)
+    events.emit("progress", message="Extracting document fields", progress={"phase": "extract", "current": 0, "total": 1})
+    try:
+        structured_documents.extract(structured_documents.runtime_command(), job, locations["review"], locations["csv"])
+        if file_sha256(job.source) != input_hash:
+            raise GraphProviderError("The input document changed during extraction.")
+        files = [locations["review"], locations["csv"]]
+        manifest["artifacts"] = {"localDirectory": str(run_directory.resolve()), "files": [str(path) for path in files],
+                                 "sha256": {str(path): file_sha256(path) for path in files}}
+        manifest["status"] = "succeeded"
+    except (GraphProviderError, OSError, ValueError) as exc:
+        manifest.update({"status": "failed", "error": str(exc)})
+        write_manifest(manifest_path, manifest)
+        raise GraphProviderError(str(exc)) from None
+    write_manifest(manifest_path, manifest)
+    outputs = {name: relative_path(path, run_directory) for name, path in locations.items()}
+    for name, content_type in (("review", "application/json"), ("csv", "text/csv"), ("manifest", "application/json")):
+        events.emit("artifact_ready", artifact={"name": name, "path": outputs[name], "content_type": content_type})
+    events.emit("progress", progress={"phase": "extract", "current": 1, "total": 1})
+    events.emit("node_result", outputs=outputs)

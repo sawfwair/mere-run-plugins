@@ -409,8 +409,8 @@ def validate_graph_provider() -> None:
     if doc_catalog["provider_id"] != "mere-doc-tools":
         fail("document graph provider reported the wrong provider id")
     doc_nodes = as_list(doc_catalog["nodes"], "document graph nodes")
-    if len(doc_nodes) != 1 or as_map(doc_nodes[0], "document graph node")["kind"] != "document.convert":
-        fail("document graph provider must expose document.convert")
+    if {as_map(node, "document graph node")["kind"] for node in doc_nodes} != {"document.convert", "document.extract"}:
+        fail("document graph provider must expose document.convert and document.extract")
     invocation_path = ROOT / "examples/documents/convert.invocation.json"
     validate_schema(invocation_path, contract_schema("graph-node-invocation.v1.schema.json"), load_json(invocation_path))
 

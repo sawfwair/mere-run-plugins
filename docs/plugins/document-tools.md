@@ -141,6 +141,43 @@ and one final result only after success. It refuses source/output aliases and
 detects source changes during conversion. Cross-run caching is disabled because
 the AnyDoc version can change independently of the plugin version.
 
+## Extract structured fields
+
+Use local Clairic extraction when you need named values from a PDF, an image,
+or a UTF-8 text file up to 4 MiB. Install a compatible Clairic model first.
+For model requirements and field types, see the [Clairic runtime guide](https://docs.mere.run/runtime/clairic).
+
+Save your field definitions as `fields.json`.
+
+```json
+{
+  "vendor": {"type": "text", "instructions": "The invoice vendor"},
+  "total": {"type": "number", "decimals": 2}
+}
+```
+
+```bash
+mere.run plugin run mere-doc-tools -- extract-fields \
+  --input ./invoice.pdf --fields-json ./fields.json --output-dir ./invoice-review
+```
+
+Add `--dry-run` to inspect the plan. Add `--classify-json` pointing to a JSON
+array of GLiNER tasks, such as `[{"name":"queue","labels":["finance","other"]}]`,
+to suggest routing labels from the extracted values. Install the GLiNER2.5
+Decide model before using this option. Routing is held for review if extraction
+finds incomplete or invalid fields.
+
+Open `review.json` to inspect the model response, field status, and any routing
+suggestions. Use `fields.csv` to review the extracted row in a spreadsheet
+and `run.json` to inspect artifact hashes. This workflow retains extracted
+values locally. Treat the review and CSV as sensitive if your source is
+sensitive.
+
+In Graph Studio, add **Extract structured document fields**
+(`document.extract`) and provide an input asset and the field definitions.
+The node emits the review JSON, CSV, and run manifest. Use
+`classification_tasks` to enable GLiNER routing suggestions in the graph.
+
 ## Conversion failures
 
 Missing or incompatible AnyDoc installations return exit code `3` with install
