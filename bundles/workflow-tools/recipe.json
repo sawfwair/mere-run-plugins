@@ -15,5 +15,7 @@
     "mere-image-compose": "mere_workflow_tools.image_compose_cli",
     "mere-batch-runner": "mere_workflow_tools.batch_cli",
     "mere-identity-tools": "mere_workflow_tools.identity_cli"
-  }
+  },
+  "collectAll": ["mere_workflow_tools", "anydoc"],
+  "copyMetadata": ["mere-workflow-tools", "firecrawl-anydoc", "pyinstaller"]
 }
