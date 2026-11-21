@@ -11,7 +11,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest.mock import patch
 
-from mere_workflow_tools import cli, doc_graph_provider, structured_documents, transcript_formats
+from mere_workflow_tools import cli, doc_graph_provider, graph_sdk, structured_documents, transcript_formats
 
 
 def invoke(kind: str, arguments: list[str]) -> tuple[int, dict[str, object], str]:
@@ -116,12 +116,15 @@ class ExtendedWorkflowTests(unittest.TestCase):
             source = root / "invoice.txt"
             source.write_text("Total: 12")
             invocation = {
-                "contract_version": "mere.run/plugin-graph-node-invocation.v1",
+                "contract_version": graph_sdk.INVOCATION_CONTRACT_VERSION,
                 "kind": "document.extract", "job_id": "8fd84952-e9ca-4f14-9e77-32380a576d8b", "node_id": "extract",
                 "arguments": {"input": str(source), "fields": {"total": {"type": "number"}}},
                 "outputs": {name: {"type": "asset", "path": str(path), "optional": False} for name, path in
                             {"csv": "fields.csv", "review": "review.json", "manifest": "manifest.json"}.items()},
             }
+            request_path = root / "invocation.json"
+            request_path.write_text(json.dumps(invocation))
+            invocation = doc_graph_provider.load_invocation(request_path)
             events: list[dict[str, object]] = []
             with patch.object(structured_documents, "native_request", return_value={
                 "truncated": False, "answers": {"total": {"value": 12, "valid": True, "complete": True}},

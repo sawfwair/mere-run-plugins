@@ -27,8 +27,7 @@ mere.run plugin run mere-transcript-tools -- transcribe \
 A folder run includes supported recordings in subfolders. Each recording gets a
 separate output directory based on its relative path, including its extension.
 Use `--subtitles srt`, `vtt`, or `both`. The ASR model must return real
-timestamps. If the selected model returns only plain text, choose a backend
-with alignment support. `--diarize` writes speaker intervals and labels each
+timestamps. Choose Parakeet or Whistle for alignment output. `--diarize` writes speaker intervals and labels each
 cue with the speaker who overlaps it most.
 
 Redaction is enabled by default for transcripts and subtitle exports. Use
