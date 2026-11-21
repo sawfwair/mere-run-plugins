@@ -7,7 +7,7 @@ The live catalog contains 23 official companion executables.
 | [Identity Tools](/plugins/identity-tools) | `mere-identity-tools` | Local identity curricula, text adapters, evaluation, and sanitized reports | Local or Relay |
 | [Geospatial Tools](/plugins/geo-tools) | `mere-geo-tools` | Humanitarian hazard candidates and Earth-observation embeddings with raster provenance | Local or Relay |
 | [Face Tools](/plugins/face-tools) | `mere-face-tools` | Photo-library indexing and reference-face search | Local |
-| [Archive Tools](/plugins/archive-tools) | `mere-archive-tools` | PII-reduced shared-drive indexing and search | Local |
+| [Archive Tools](/plugins/archive-tools) | `mere-archive-tools` | PII-reduced indexing, search, and cited web research | Local or web services |
 | [VFX Tools](/plugins/vfx-tools) | `mere-vfx-tools` | Shot-oriented VFX and verified 3D handoffs | Local |
 | [Perform](/plugins/perform) | `mere-perform` | Realtime Magenta Heart performance | Local |
 | [Image Tools](/plugins/image-tools) | `mere-image-tools` | Subject knockout and matte cleanup | Local |

@@ -8,13 +8,15 @@ import math
 import os
 import pathlib
 import re
+import shlex
+import shutil
 import sqlite3
 import sys
 from collections import Counter
 from typing import cast
 
-from . import __version__, benchmark, database, extractors, pi_harness
-from .runtime import InferenceError, MereRunClient, split_command
+from . import __version__, benchmark, database, extractors, pi_harness, research
+from .runtime import InferenceError, MereRunClient, as_list, split_command
 
 PLUGIN_NAME = "mere-archive-tools"
 DEFAULT_MERE_RUN = "mere.run"
@@ -182,6 +184,7 @@ def plugin_manifest() -> JsonMap:
         ("index", "Plan and run a resumable shared-drive index."),
         ("search", "Search the archive with a PII-reduced text query."),
         ("investigate", "Answer a compound archive question with bounded, source-linked searches."),
+        ("research", "Collect cited web sources and prepare a local search index."),
         ("stats", "Report index coverage and retention settings."),
         ("benchmark", "Prepare, mutate, and evaluate archive benchmark datasets."),
     ]
@@ -190,7 +193,7 @@ def plugin_manifest() -> JsonMap:
         "name": PLUGIN_NAME,
         "version": __version__,
         "executable": PLUGIN_NAME,
-        "description": "Build and search a local PII-reduced shared-drive index without modifying source files.",
+        "description": "Collect cited web sources or build and search a local PII-reduced shared-drive index.",
         "homepage": "https://github.com/sawfwair/mere-run-plugins/tree/main/packages/mere-archive-tools",
         "commands": [
             {"name": name, "description": description, "stdout": "json"}
@@ -211,10 +214,11 @@ def plugin_manifest() -> JsonMap:
             "sqlite",
             "deduplication",
             "archive-benchmark",
+            "web-research",
         ],
         "stdout": {"machineReadableByDefault": True, "diagnostics": "stderr"},
         "security": {
-            "usesUserCredentials": False,
+            "usesUserCredentials": True,
             "storesSecrets": False,
             "createsPaidResources": False,
             "cleanupDefault": "none",
@@ -628,7 +632,7 @@ def command_run(args: argparse.Namespace) -> int:
     if args.dry_run:
         print_json(manifest)
         return 0
-    print_json(execute_index(args.run_manifest, manifest))
+    print_json(execute_run(args.run_manifest, manifest))
     return 0
 
 
@@ -637,7 +641,7 @@ def command_resume(args: argparse.Namespace) -> int:
     if args.inspect_only or manifest.get("status") == "succeeded":
         print_json(manifest)
         return 0
-    print_json(execute_index(args.run_manifest, manifest))
+    print_json(execute_run(args.run_manifest, manifest))
     return 0
 
 
@@ -667,6 +671,127 @@ def command_index(args: argparse.Namespace) -> int:
         return 0
     print_json(execute_index(manifest_path, manifest))
     return 0
+
+
+def command_research(args: argparse.Namespace) -> int:
+    query = args.query.strip()
+    research.validate_query(query, args.limit)
+    root = args.output_dir
+    try:
+        root.mkdir(mode=0o700, parents=True)
+    except FileExistsError:
+        raise PluginError("Choose a fresh research directory or resume its run.json.", 2) from None
+    manifest_path = root / "run.json"
+    command = [
+        PLUGIN_NAME, "research", f"--query={query}", "--output-dir", str(root), "--limit", str(args.limit),
+        "--mere-run-command", args.mere_run_command,
+    ]
+    if args.collection_only:
+        command.append("--collection-only")
+    created = now_iso()
+    manifest: JsonMap = {
+        "contractVersion": "mere.run/plugin-run.v1",
+        "runId": default_run_id().replace("archive-index-", "archive-research-", 1),
+        "plugin": {"name": PLUGIN_NAME, "version": __version__},
+        "recipe": {"id": "web-research", "family": "local-archive-search"},
+        "status": "planned",
+        "createdAt": created,
+        "updatedAt": created,
+        "dataset": {"path": str(root / "collection" / "sources"), "pairCount": args.limit},
+        "command": command,
+        "tool": {"name": "research", "backend": "searxng+firecrawl+sqlite"},
+        "settings": {
+            "query": query, "limit": args.limit, "mereRunCommand": args.mere_run_command,
+            "collectionOnly": args.collection_only,
+        },
+        "privacy": {"sourceSnapshots": "raw-markdown", "indexTier": "safe-content"},
+        "artifacts": {},
+        "cleanup": {"default": "none", "status": "not-started"},
+    }
+    research.write_private_json(manifest_path, manifest)
+    print_json(manifest if args.dry_run else execute_run(manifest_path, manifest))
+    return 0
+
+
+def execute_run(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
+    if as_map(manifest.get("recipe"), "recipe").get("id") != "web-research":
+        return execute_index(manifest_path, manifest)
+    with research.run_lock(manifest_path.parent):
+        current = load_manifest(manifest_path)
+        if current.get("status") == "succeeded":
+            return current
+        return execute_research(manifest_path, current)
+
+
+def execute_research(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
+    root = manifest_path.parent
+    options = as_map(manifest["settings"], "research settings")
+    query, limit = str(options["query"]), as_int(options["limit"], "research limit")
+    runtime = str(options["mereRunCommand"])
+    research.validate_query(query, limit)
+    collection_only = options["collectionOnly"]
+    if not isinstance(collection_only, bool):
+        raise PluginError("The research plan has an invalid collection mode.", 2)
+    manifest["status"] = "running"
+    manifest["updatedAt"] = now_iso()
+    manifest.pop("error", None)
+    research.write_private_json(manifest_path, manifest)
+    try:
+        collection = research.collect(runtime, root, query, limit)
+        location = root / "collection"
+        sources = as_list(collection["sources"], "research sources")
+        as_map(manifest["dataset"], "dataset")["pairCount"] = len(sources)
+        artifacts: JsonMap = {
+            "collection": str(location), "sources": str(location / "sources.json"),
+            "citations": str(location / "citations.md"),
+        }
+        manifest["artifacts"] = artifacts
+        manifest["progress"] = {
+            "sources": len(sources),
+            "skipped": len(as_list(collection["skipped"], "skipped research candidates")),
+        }
+        research.write_private_json(manifest_path, manifest)
+        if not collection_only:
+            artifacts.update(index_research_collection(root, runtime))
+        manifest["status"] = "succeeded"
+    except (Exception, KeyboardInterrupt) as exc:
+        manifest["status"] = "failed"
+        manifest["error"] = str(exc) if isinstance(exc, research.ResearchError) else type(exc).__name__
+        raise
+    finally:
+        manifest["updatedAt"] = now_iso()
+        research.write_private_json(manifest_path, manifest)
+    return manifest
+
+
+def index_research_collection(root: pathlib.Path, runtime: str) -> JsonMap:
+    research.check_index_models(runtime)
+    index = root / "index"
+    manifest_path = index / "run.json"
+    database_path = index / "archive.sqlite3"
+    if index.is_symlink() or manifest_path.is_symlink() or database_path.is_symlink():
+        raise PluginError("Research index paths must remain inside the run directory.", 2)
+    if manifest_path.is_file():
+        manifest = load_manifest(manifest_path)
+        expected = {"runManifest": str(manifest_path), "outputDirectory": str(index), "database": str(database_path)}
+        if manifest.get("local") != expected or as_map(manifest["dataset"], "index dataset")["path"] != str(root / "collection" / "sources"):
+            raise PluginError("The saved research index plan points outside this run.", 2)
+        settings = as_map(manifest["settings"], "research index settings")
+        if settings.get("storageTier") != "safe-content" or settings.get("mereRunCommand") != runtime:
+            raise PluginError("The saved research index options changed after planning.", 2)
+    else:
+        parser = argparse.ArgumentParser(add_help=False)
+        add_index_args(parser)
+        args = normalize_args(parser.parse_args([
+            "--source", str(root / "collection" / "sources"), "--output-dir", str(index),
+            "--database", str(database_path), "--mere-run-command", runtime,
+            "--storage-tier", "safe-content", "--no-continue-on-error",
+        ]))
+        manifest = index_manifest(args)
+        research.write_private_json(manifest_path, manifest)
+    if manifest.get("status") != "succeeded" or not database_path.is_file():
+        execute_index(manifest_path, manifest)
+    return {"database": str(database_path), "indexReceipt": str(manifest_path)}
 
 
 def search_database(
@@ -892,6 +1017,11 @@ def add_index_args(parser: argparse.ArgumentParser) -> None:
 def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
     if hasattr(args, "mere_run_command") and not args.mere_run_command:
         args.mere_run_command = os.environ.get("MERE_ARCHIVE_TOOLS_MERE_RUN") or DEFAULT_MERE_RUN
+        if getattr(args, "command", None) == "research" and args.mere_run_command == DEFAULT_MERE_RUN:
+            helper = pathlib.Path("/Applications/MereRun.app/Contents/Helpers/mere.run")
+            executable = os.environ.get("MERE_RUN_EXECUTABLE") or shutil.which(DEFAULT_MERE_RUN)
+            if executable or os.access(helper, os.X_OK):
+                args.mere_run_command = shlex.join([executable or str(helper)])
     for name in ("source", "database", "output_dir", "run_manifest", "benchmark_manifest", "output", "diagnostics"):
         if hasattr(args, name) and getattr(args, name) is not None:
             setattr(args, name, getattr(args, name).expanduser().resolve())
@@ -986,6 +1116,15 @@ def build_parser() -> argparse.ArgumentParser:
     investigate.add_argument("--pi-command", default=os.environ.get("MERE_ARCHIVE_TOOLS_PI", ""))
     investigate.set_defaults(func=command_investigate)
 
+    web_research = sub.add_parser("research", help="Collect public web sources and build a local archive index.")
+    web_research.add_argument("--query", required=True, help="Search query sent to your configured SearXNG instance.")
+    web_research.add_argument("--output-dir", required=True, type=pathlib.Path, help="Path to a fresh run directory.")
+    web_research.add_argument("--limit", type=int, default=8, help="Maximum number of search results to consider.")
+    web_research.add_argument("--collection-only", action="store_true", help="Save sources and citations without indexing.")
+    web_research.add_argument("--dry-run", action="store_true", help="Save the plan without contacting services.")
+    web_research.add_argument("--mere-run-command", default="")
+    web_research.set_defaults(func=command_research)
+
     stats = sub.add_parser("stats", help="Report archive database statistics.")
     stats.add_argument("--database", required=True, type=pathlib.Path)
     stats.set_defaults(func=command_stats)
@@ -1030,6 +1169,7 @@ def main(argv: list[str] | None = None) -> int:
         InferenceError,
         extractors.ExtractionError,
         pi_harness.InvestigationError,
+        research.ResearchError,
         ValueError,
     ) as exc:
         eprint(f"Error: {exc}")
