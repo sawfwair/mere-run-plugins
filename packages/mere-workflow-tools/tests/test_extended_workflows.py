@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -22,6 +25,12 @@ def invoke(kind: str, arguments: list[str]) -> tuple[int, dict[str, object], str
 
 
 class ExtendedWorkflowTests(unittest.TestCase):
+    def test_workflow_command_uses_the_configured_runtime_without_path(self) -> None:
+        executable = "/some directory/Contents/Helpers/mere.run"
+        with patch.dict(os.environ, {"MERE_RUN_EXECUTABLE": executable, "PATH": ""}, clear=True):
+            arguments = cli.normalize_args(argparse.Namespace(mere_run_command=None))
+        self.assertEqual(shlex.split(arguments.mere_run_command), [executable])
+
     def test_batch_captions_keep_source_identity_and_never_export_raw_redacted_cues(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
