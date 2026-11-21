@@ -153,8 +153,8 @@ TOOLS: dict[str, ToolSpec] = {
     "image-to-3d": ToolSpec(
         "image-to-3d",
         "Image to Native 3D",
-        "Reconstruct one image into verified native TripoSR OBJ, PLY, and GLB meshes.",
-        ("image-to-3d", "triposr", "obj", "ply", "glb", "mesh", "blender"),
+        "Reconstruct one image as a native mesh or an IDOL Gaussian splat.",
+        ("image-to-3d", "triposr", "obj", "ply", "glb", "mesh", "blender", "gaussian-splat"),
     ),
     "multiview-image-to-3d": ToolSpec(
         "multiview-image-to-3d",
@@ -2100,7 +2100,7 @@ def single_image_to_3d_source(request: JsonMap) -> pathlib.Path:
         raise PluginError(f"request.inputs.{key} must be one local image path", 2)
     if len(paths) != 1:
         raise PluginError(
-            "native TripoSR image-to-3d requires exactly one image; use multiview-geometry for ordered views",
+            "native image-to-3d requires exactly one image; use multiview-geometry for ordered views",
             2,
         )
     return paths[0].resolve()
@@ -2441,6 +2441,9 @@ def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
     if mode == "native-triposr":
         execute_native_image_to_3d(manifest, output_dir)
         return
+    if mode == "native-idol":
+        execute_native_image_to_3d_idol(manifest, output_dir)
+        return
     if mode == "native-trellis2":
         execute_native_image_to_3d_trellis2(manifest, output_dir)
         return
@@ -2448,9 +2451,174 @@ def execute_image_to_3d(manifest: JsonMap, output_dir: pathlib.Path) -> None:
         execute_supplied_depth_image_to_3d(manifest, output_dir)
         return
     raise PluginError(
-        "request.options.reconstructionMode must be 'native-triposr', 'native-trellis2', or 'supplied-depth-2.5d'",
+        "request.options.reconstructionMode must be 'native-triposr', 'native-trellis2', 'native-idol', or 'supplied-depth-2.5d'",
         2,
     )
+
+
+def validate_idol_ply(path: pathlib.Path, count: int) -> None:
+    properties = (
+        "x", "y", "z", "nx", "ny", "nz", "f_dc_0", "f_dc_1", "f_dc_2", "opacity",
+        "scale_0", "scale_1", "scale_2", "rot_0", "rot_1", "rot_2", "rot_3",
+    )
+    expected = [
+        b"ply\n", b"format binary_little_endian 1.0\n", f"element vertex {count}\n".encode(),
+        *(f"property float {name}\n".encode() for name in properties),
+        b"end_header\n",
+    ]
+    with path.open("rb") as stream:
+        header: list[bytes] = []
+        while len(header) <= len(expected) + 8 and stream.tell() < 4096:
+            line = stream.readline(256)
+            if not line:
+                break
+            header.append(line)
+            if line == b"end_header\n":
+                break
+        contract = [line for line in header if not line.startswith(b"comment ")]
+        if contract != expected or path.stat().st_size - stream.tell() != count * len(properties) * 4:
+            raise PluginError("native IDOL output is not the declared binary Gaussian-splat PLY")
+
+
+def execute_native_image_to_3d_idol(manifest: JsonMap, output_dir: pathlib.Path) -> None:
+    request = as_map(manifest["request"], "request")
+    inputs = as_map(request["inputs"], "request.inputs")
+    options = options_for(manifest)
+    if any(inputs.get(key) is not None for key in ("depthImages", "video", "frames")):
+        raise PluginError("native IDOL reconstructs exactly one still image", 2)
+    source = single_image_to_3d_source(request)
+    source_hash = sha256(source)
+    mode = option_string(options, "inputMode", "synthetic")
+    count = options.get("numGaussians", 262144)
+    steps = options.get("steps", 50)
+    seed = options.get("seed", 42)
+    already_framed = option_bool(options, "alreadyFramed", False)
+    if mode not in {"synthetic", "real"}:
+        raise PluginError("request.options.inputMode must be 'synthetic' or 'real'", 2)
+    if type(count) is not int or not 32768 <= count <= 1048576 or count % 32:
+        raise PluginError("request.options.numGaussians must be a multiple of 32 from 32768 to 1048576", 2)
+    if type(steps) is not int or not 1 <= steps <= 1000 or type(seed) is not int or not 0 <= seed < 2**64:
+        raise PluginError("request.options.steps must be 1–1000 and seed must be an unsigned 64-bit integer", 2)
+
+    native_output = output_dir / "native-idol"
+    argv = runtime_command(manifest, "mereRunCommand") + [
+        "vision", "image-to-3d-idol", str(source), "--output", str(native_output),
+        "--mode", mode, "--num-gaussians", str(count), "--steps", str(steps), "--seed", str(seed),
+    ]
+    for key in ("model", "dino", "vae"):
+        value = option_string(options, key)
+        directory = pathlib.Path(value).expanduser().resolve()
+        if not value or not directory.is_dir():
+            raise PluginError(f"request.options.{key} must name an existing local checkpoint directory", 2)
+        argv.extend([f"--{key}", str(directory)])
+    if already_framed:
+        argv.append("--already-framed")
+    payload = run_json_process(argv + ["--json"], "mere.run vision image-to-3d-idol")
+    if native_output.is_symlink():
+        raise PluginError("native IDOL output directory must be local to the run")
+    native_path = confined_path(native_output, "manifest.json", "native IDOL manifest")
+    native = read_json_map(native_path, "native IDOL manifest")
+    if payload != native:
+        raise PluginError("native IDOL result and run manifest disagree")
+    expected = {
+        "schemaVersion": 1, "status": "completed", "backend": "mere.run-native-mlx",
+        "repository": "speridlabs/idol", "mode": mode,
+        "alreadyFramed": already_framed, "gaussianCount": count,
+    }
+    if any(native.get(key) != value for key, value in expected.items()):
+        raise PluginError("native IDOL run manifest does not match the requested reconstruction")
+    reported_source = native.get("inputPath")
+    if not isinstance(reported_source, str) or pathlib.Path(reported_source).resolve() != source:
+        raise PluginError("native IDOL input path does not match the requested image")
+    if validated_sha256(native.get("inputSHA256"), "native IDOL input") != source_hash or sha256(source) != source_hash:
+        raise PluginError("native IDOL input checksum does not match the requested image")
+    for key in ("revision", "referenceRevision"):
+        if not isinstance(native.get(key), str) or not re.fullmatch(r"[0-9a-f]{40}", cast(str, native[key])):
+            raise PluginError(f"native IDOL run manifest has an invalid {key}")
+    settings = as_map(native.get("settings"), "native IDOL settings")
+    if any(settings.get(key) != value for key, value in {"steps": steps, "seed": seed, "gaussianCount": count}.items()):
+        raise PluginError("native IDOL settings do not match the requested reconstruction")
+
+    checkpoints = validate_idol_pins(native.get("checkpoints"), "checkpoint")
+    required_checkpoints = {
+        "birefnet.safetensors", "denoiser.safetensors", "decoder.safetensors", "decoder_gs.safetensors",
+        "idol/config.json", "dinov3/config.json", "dinov3/model.safetensors",
+        "flux2-vae/config.json", "flux2-vae/diffusion_pytorch_model.safetensors",
+    }
+    if not required_checkpoints <= checkpoints.keys():
+        raise PluginError("native IDOL manifest does not record all checkpoint components")
+    pins = validate_idol_pins(native.get("artifacts"), "artifact")
+    outputs = {"splat": "object.ply", "preparedImage": "input.png", "camera": "camera.json"}
+    if pins.keys() != set(outputs.values()):
+        raise PluginError("native IDOL manifest must record the splat, prepared image, and camera")
+    assets: dict[str, dict[str, str]] = {}
+    for kind, filename in outputs.items():
+        path = confined_path(native_output, filename, f"native IDOL {kind}")
+        digest, size = pins[filename]
+        if path.stat().st_size != size or sha256(path) != digest:
+            raise PluginError(f"native IDOL {kind} does not match its recorded bytes")
+        assets[kind] = {"path": str(path), "sha256": digest}
+
+    validate_idol_ply(native_output / outputs["splat"], count)
+    try:
+        with Image.open(native_output / outputs["preparedImage"]) as prepared:
+            if prepared.format != "PNG" or prepared.size != (1024, 1024):
+                raise PluginError("native IDOL prepared input must be a 1024 × 1024 PNG")
+            prepared.verify()
+    except (OSError, SyntaxError) as exc:
+        raise PluginError(f"native IDOL prepared input is invalid: {exc}") from None
+    camera = read_json_map(native_output / outputs["camera"], "native IDOL camera")
+    if camera != native.get("camera") or any(
+        type(camera.get(key)) not in (int, float) or not math.isfinite(cast(float, camera[key]))
+        for key in ("yaw", "pitch", "radius", "fov")
+    ):
+        raise PluginError("native IDOL camera is invalid or differs from the run manifest")
+
+    delivery = output_dir / "image-to-3d.json"
+    write_json(delivery, {
+        "schemaVersion": "mere.run/vfx-image-to-3d.v2",
+        "source": str(source),
+        "sourceSHA256": source_hash,
+        "reconstructionMode": "native-idol",
+        "geometryMode": "native-single-image-object-reconstruction",
+        "representation": "gaussian-splats",
+        "nativeInference": True,
+        "modelID": "idol",
+        "repository": native["repository"],
+        "revision": native["revision"],
+        "referenceRevision": native["referenceRevision"],
+        "checkpoints": native["checkpoints"],
+        "settings": settings,
+        "nativeManifest": str(native_path),
+        "nativeManifestSha256": sha256(native_path),
+        "coordinateSystem": "model-y-up",
+        "units": "normalized-object-space",
+        "metricGeometry": False,
+        "inferredUnseenGeometry": True,
+        "gaussianCount": count,
+        "camera": {
+            **camera, "coordinateSystem": "model-z-up",
+            "angleUnits": {"yaw": "radians", "pitch": "radians", "fov": "degrees"},
+        },
+        "assets": assets,
+    })
+    artifact(manifest, native_path, "json", "native-idol-run-manifest")
+    artifact(manifest, native_output / outputs["splat"], "gaussian-splat", "native-idol-splat")
+    artifact(manifest, native_output / outputs["preparedImage"], "image", "native-idol-prepared-image")
+    artifact(manifest, native_output / outputs["camera"], "json", "native-idol-camera")
+    artifact(manifest, delivery, "json", "image-to-3d-handoff")
+
+
+def validate_idol_pins(value: object, label: str) -> dict[str, tuple[str, int]]:
+    pins: dict[str, tuple[str, int]] = {}
+    for record in as_list(value, f"native IDOL {label} pins"):
+        pin = as_map(record, f"native IDOL {label} pin")
+        name = pin.get("filename")
+        size = pin.get("byteCount")
+        if not isinstance(name, str) or not name or name in pins or type(size) is not int or size < 1:
+            raise PluginError(f"native IDOL {label} contains an invalid or duplicate pin")
+        pins[name] = (validated_sha256(pin.get("sha256"), f"native IDOL {label} {name}"), size)
+    return pins
 
 
 def execute_native_image_to_3d_trellis2(manifest: JsonMap, output_dir: pathlib.Path) -> None:

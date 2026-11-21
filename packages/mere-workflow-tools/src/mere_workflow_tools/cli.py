@@ -26,6 +26,7 @@ from . import (
     graph_provider,
     graph_templates,
     image_graph_provider,
+    media_redaction,
     structured_documents,
     transcript_formats,
 )
@@ -72,8 +73,8 @@ TOOLS: dict[str, ToolSpec] = {
         kind="media",
         plugin_name="mere-media-scrub",
         executable="mere-media-scrub",
-        description="Scan media frames for local text extraction and PII redaction.",
-        capabilities=["media", "ocr", "pii-redaction", "privacy"],
+        description="Scrub text and export visually reviewed redactions from still images and frames.",
+        capabilities=["media", "ocr", "pii-redaction", "privacy", "visual-redaction"],
         one_shot="scrub",
         recipe_id="media-ocr-scrub",
         recipe_title="Media OCR scrub",
@@ -287,6 +288,11 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
     if spec.kind == "doc":
         commands.append({"name": "extract-fields", "description": "Extract, review, and optionally classify named fields.",
                          "stdout": "json"})
+    if spec.kind == "media":
+        commands.extend([
+            {"name": "redaction-review", "description": "Create an offline image redaction review.", "stdout": "json"},
+            {"name": "redact-export", "description": "Export images from an approved redaction review.", "stdout": "json"},
+        ])
     capabilities = list(spec.capabilities)
     manifest: JsonMap = {
         "contractVersion": "mere.run/plugin.v1",
@@ -1125,6 +1131,18 @@ def command_graph_compile(_spec: ToolSpec, args: argparse.Namespace) -> int:
         raise PluginError(str(exc), 2) from None
 
 
+def command_redaction_review(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    result = media_redaction.create_review(image_inputs(args.input), args.input, args.output_dir)
+    print_json(result)
+    return 0
+
+
+def command_redact_export(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    result = media_redaction.export_review(image_inputs(args.input), args.input, args.review, args.output_dir)
+    print_json(result)
+    return 0
+
+
 def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
     parser.add_argument("--output-dir", required=True, type=pathlib.Path)
     parser.add_argument("--manifest", type=pathlib.Path)
@@ -1203,6 +1221,7 @@ def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
         "output",
         "inputs_output",
         "asset_root",
+        "review",
     ):
         if hasattr(args, name):
             value = getattr(args, name)
@@ -1337,6 +1356,15 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         structured.add_argument("--dry-run", action="store_true")
         add_structured_doc_args(structured, required=True)
         structured.set_defaults(func=command_one_shot)
+    if spec.kind == "media":
+        review = sub.add_parser("redaction-review", help="Create an offline image redaction review.")
+        export = sub.add_parser("redact-export", help="Export PNGs from an approved review.")
+        for operation in (review, export):
+            operation.add_argument("--input", required=True, type=pathlib.Path)
+            operation.add_argument("--output-dir", required=True, type=pathlib.Path)
+        export.add_argument("--review", required=True, type=pathlib.Path, help="Approved review JSON.")
+        review.set_defaults(func=command_redaction_review)
+        export.set_defaults(func=command_redact_export)
     return parser
 
 

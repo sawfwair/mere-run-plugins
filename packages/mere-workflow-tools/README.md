@@ -26,7 +26,7 @@ source-checkout binary.
 ## Tool map
 
 - `mere-doc-tools`: local AnyDoc Markdown conversion or `mere.run vision ocr`, plus optional `mere.run text anonymize`
-- `mere-media-scrub`: OCR/redaction over image folders or single frames
+- `mere-media-scrub`: OCR and text redaction, plus offline visual review and PNG export for still images and frame folders
 - `mere-dataset-tools`: `mere.run vision caption`, optional OCR sidecars, and a contact sheet
 - `mere-transcript-tools`: `mere.run speech transcribe` plus optional PII redaction
 - `mere-image-compose`: `mere.run image generate` with ref image and LoRA flags recorded

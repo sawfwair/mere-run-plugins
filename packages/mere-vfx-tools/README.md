@@ -52,7 +52,9 @@ The initial commands are:
   checkpoint provenance, and carries those identities into delivery. It does
   not claim a mesh, metric scale, or Gaussian parameters.
 - `image-to-3d`: run native single-image TripoSR and verify its run manifest,
-  mesh manifest, and hashed OBJ/PLY/GLB assets. The prior supplied-depth 2.5D
+  mesh manifest, and hashed OBJ/PLY/GLB assets. Choose `native-idol` to hand
+  off a verified Gaussian-splat PLY with its camera and prepared reference
+  image. The prior supplied-depth 2.5D
   projection is retained only as the explicit `supplied-depth-2.5d` fallback.
 - `multiview-image-to-3d`: send exactly four or six explicitly ordered,
   user-supplied views to native reconstruction-only InstantMesh and verify its

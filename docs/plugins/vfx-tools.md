@@ -115,6 +115,8 @@ loading and inference remain in core `mere.run`.
   albedo/roughness/metallic fields.
   Request example:
   `{"inputs":{"image":"./object.png"},"options":{"reconstructionMode":"native-trellis2","seed":42}}`
+- `options.reconstructionMode: "native-idol"` exports a single image as
+  Gaussian splats. See [Export a Gaussian splat from one image](#export-a-gaussian-splat-from-one-image).
 - `multiview-image-to-3d` is the reconstruction-only InstantMesh path. It
   requires an explicitly ordered array of exactly four or six user-supplied
   object views and calls `mere.run image reconstruct-3d-multiview`; it never
@@ -227,3 +229,41 @@ Explicit legacy supplied-depth fallback:
   "options": {"reconstructionMode": "supplied-depth-2.5d", "stride": 8}
 }
 ```
+
+## Export a Gaussian splat from one image
+
+Install the VFX Tools plugin and use a native `mere.run` runtime that provides
+`vision image-to-3d-idol`. Provide local IDOL, DINOv3 ViT-H+/16, and FLUX.2-dev
+VAE checkpoint directories after obtaining the publisher access needed for
+those weights. See the [IDOL runtime setup](https://github.com/sawfwair/mere-run/blob/v0.73.1/docs/runtime/vision.md#idol-object-splats)
+for checkpoint layout and framing options.
+
+Save the following as `idol-request.json` and substitute your local paths.
+
+```json
+{
+  "inputs": {"image": "/absolute/path/to/object.png"},
+  "options": {
+    "reconstructionMode": "native-idol",
+    "model": "/absolute/path/to/idol",
+    "dino": "/absolute/path/to/dinov3",
+    "vae": "/absolute/path/to/FLUX.2-dev/vae",
+    "inputMode": "synthetic",
+    "numGaussians": 262144,
+    "seed": 42
+  }
+}
+```
+
+```bash
+mere.run plugin install mere-vfx-tools --yes
+mere-vfx-tools image-to-3d --request-json ./idol-request.json --output-dir ./idol-out
+```
+
+The plugin verifies the binary splat PLY, prepared image, and camera against
+the native manifest. Open `idol-out/native-idol/object.ply` in a Gaussian splat
+viewer. The splat is y-up and uses normalized object-space units. The camera
+retains the original z-up convention, with yaw and pitch in radians and field
+of view in degrees. The `image-to-3d.json` handoff records both conventions,
+checkpoint identities, sampling settings, and SHA-256 hashes for the outputs.
+Use a new output directory for each run.

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media redaction review</title>
+<style>
+  :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+  body { margin: auto; max-width: 1000px; padding: 1rem 1.5rem; }
+  h1 { margin-bottom: 0.25rem; }
+  p { margin: 0.5rem 0 1rem; }
+  .controls, .rectangle { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.75rem 0; }
+  button, select, input { font: inherit; padding: 0.2rem 0.4rem; }
+  select { max-width: min(100%, 30rem); }
+  input[type="number"] { width: 5rem; }
+  .preview { overflow: auto; max-height: 70vh; }
+  .actual-size canvas { max-width: none; }
+  canvas { display: block; max-width: 100%; height: auto; touch-action: none; cursor: crosshair; background: #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Media redaction review</h1>
+  <p>Drag over sensitive areas to cover them with black rectangles. Inspect each image at full size when checking fine detail, then approve it.</p>
+  <div class="controls">
+    <button id="previous" type="button">Previous</button>
+    <label for="frames">Image</label>
+    <select id="frames"></select>
+    <button id="next" type="button">Next</button>
+    <label><input id="full-size" type="checkbox"> Actual size</label>
+  </div>
+  <div id="preview" class="preview">
+    <canvas id="image" aria-label="Image with redactions"></canvas>
+  </div>
+  <form id="coordinates" class="rectangle" aria-label="Add rectangle by pixel coordinates">
+    <label>Left <input name="left" type="number" min="0" required></label>
+    <label>Top <input name="top" type="number" min="0" required></label>
+    <label>Right <input name="right" type="number" min="1" required></label>
+    <label>Bottom <input name="bottom" type="number" min="1" required></label>
+    <button>Add rectangle</button>
+  </form>
+  <div class="controls">
+    <button id="undo" type="button">Undo rectangle</button>
+    <button id="approve" type="button">Approve image</button>
+    <button id="download" type="button" disabled>Download approved review</button>
+  </div>
+  <p id="status" role="status"></p>
+</main>
+<script type="application/json" id="review-data">__REVIEW_DATA__</script>
+<script>
+"use strict";
+const {schema, frames} = JSON.parse(document.querySelector("#review-data").textContent);
+const element = (id) => document.getElementById(id);
+const selector = element("frames");
+const canvas = element("image");
+const context = canvas.getContext("2d");
+const fields = element("coordinates");
+const state = frames.map(() => ({approved: false, rectangles: []}));
+let current = 0;
+let picture = null;
+let drag = null;
+
+for (const frame of frames) {
+  const option = document.createElement("option");
+  option.textContent = frame.name;
+  selector.append(option);
+}
+
+function render() {
+  if (!picture) return;
+  context.drawImage(picture, 0, 0);
+  context.fillStyle = "#000";
+  const frame = frames[current];
+  const rectangles = [...state[current].rectangles];
+  if (drag) rectangles.push(drag.rectangle);
+  for (const [x0, y0, x1, y1] of rectangles) {
+    context.fillRect(x0 * canvas.width / frame.width, y0 * canvas.height / frame.height,
+      (x1 - x0) * canvas.width / frame.width, (y1 - y0) * canvas.height / frame.height);
+  }
+}
+
+function update() {
+  const approvedCount = state.filter((entry) => entry.approved).length;
+  const entry = state[current];
+  element("status").textContent = `${approvedCount} of ${frames.length} approved. ${entry.rectangles.length} rectangles on this image.`;
+  element("undo").disabled = !picture || !entry.rectangles.length;
+  element("approve").disabled = !picture || Boolean(drag);
+  element("approve").textContent = entry.approved ? "Reopen review" : "Approve image";
+  element("download").disabled = approvedCount !== frames.length || Boolean(drag);
+  fields.querySelector("button").disabled = !picture;
+  element("previous").disabled = current === 0;
+  element("next").disabled = current === frames.length - 1;
+  render();
+}
+
+function show(index) {
+  if (index < 0 || index >= frames.length) return;
+  current = index;
+  selector.selectedIndex = index;
+  drag = null;
+  picture = null;
+  element("preview").scrollTo(0, 0);
+  canvas.width = 1;
+  canvas.height = 1;
+  fields.reset();
+  const frame = frames[index];
+  for (const axis of ["left", "right"]) fields.elements[axis].max = frame.width;
+  for (const axis of ["top", "bottom"]) fields.elements[axis].max = frame.height;
+  const loading = new Image();
+  loading.onload = () => {
+    if (current !== index || selector.selectedIndex !== index) return;
+    picture = loading;
+    canvas.width = picture.naturalWidth;
+    canvas.height = picture.naturalHeight;
+    update();
+  };
+  loading.onerror = () => {
+    if (current === index) element("status").textContent = "Could not load this image preview.";
+  };
+  loading.src = frame.preview;
+  update();
+}
+
+function point(event) {
+  const bounds = canvas.getBoundingClientRect();
+  const frame = frames[current];
+  return [
+    Math.min(frame.width, Math.max(0, (event.clientX - bounds.x) * frame.width / bounds.width)),
+    Math.min(frame.height, Math.max(0, (event.clientY - bounds.y) * frame.height / bounds.height))
+  ];
+}
+
+function addRectangle([left, top, right, bottom]) {
+  if (right <= left || bottom <= top) {
+    update();
+    element("status").textContent += " Choose a rectangle with positive width and height.";
+    return;
+  }
+  state[current].rectangles.push([left, top, right, bottom]);
+  state[current].approved = false;
+  update();
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (!picture || drag || event.button !== 0) return;
+  const [x, y] = point(event);
+  drag = {pointer: event.pointerId, x, y, rectangle: [x, y, x, y]};
+  canvas.setPointerCapture(event.pointerId);
+  update();
+});
+canvas.addEventListener("pointermove", (event) => {
+  if (!drag || drag.pointer !== event.pointerId) return;
+  const [x, y] = point(event);
+  drag.rectangle = [
+    Math.floor(Math.min(x, drag.x)), Math.floor(Math.min(y, drag.y)),
+    Math.ceil(Math.max(x, drag.x)), Math.ceil(Math.max(y, drag.y))
+  ];
+  render();
+});
+canvas.addEventListener("pointerup", (event) => {
+  if (!drag || drag.pointer !== event.pointerId) return;
+  const [left, top, right, bottom] = drag.rectangle;
+  drag = null;
+  addRectangle([left, top, right, bottom]);
+});
+for (const eventName of ["pointercancel", "lostpointercapture"]) {
+  canvas.addEventListener(eventName, () => {
+    if (!drag) return;
+    drag = null;
+    update();
+  });
+}
+fields.onsubmit = (event) => {
+  event.preventDefault();
+  const names = ["left", "top", "right", "bottom"];
+  addRectangle(names.map((name) => fields.elements[name].valueAsNumber));
+};
+element("full-size").onchange = (event) => element("preview").classList.toggle("actual-size", event.target.checked);
+selector.onchange = () => show(selector.selectedIndex);
+element("previous").onclick = () => show(current - 1);
+element("next").onclick = () => show(current + 1);
+element("undo").onclick = () => {
+  state[current].rectangles.pop();
+  state[current].approved = false;
+  update();
+};
+element("approve").onclick = () => {
+  state[current].approved = !state[current].approved;
+  update();
+};
+element("download").onclick = () => {
+  const result = frames.map(({preview, ...frame}, index) => ({...frame, ...state[index]}));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({schema, frames: result}, null, 2)], {type: "application/json"}));
+  const link = document.createElement("a");
+  link.download = "approved-redactions.json";
+  link.href = url;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+show(0);
+</script>
+</body>
+</html>
