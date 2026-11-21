@@ -392,11 +392,10 @@ def validate_plugin_manifests() -> None:
         ("mere_workflow_tools.batch_cli", "mere-batch-runner", "run-jobs"),
     ]
     for module, executable, one_shot in workflow_tools:
-        validate_plugin_manifest(
-            module,
-            executable,
-            {"manifest", "doctor", "plan", "run", "resume", "cleanup", one_shot},
-        )
+        commands = {"manifest", "doctor", "plan", "run", "resume", "cleanup", one_shot}
+        if executable == "mere-dataset-tools":
+            commands.add("text-lora")
+        validate_plugin_manifest(module, executable, commands)
 
 
 def validate_graph_provider() -> None:

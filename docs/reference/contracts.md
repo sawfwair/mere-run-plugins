@@ -35,6 +35,7 @@ plugins, recipes, and downstream automation.
 | [`film-delivery.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-delivery.v1.schema.json) | Checksum-backed master, captions, marketing stills, review package, and provenance handoff |
 | [`film-retake.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-retake.v1.schema.json) | Hash-bound native LTX retake candidate, source shot, and editable frame interval |
 | [`film-animatic-handoff.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/film-animatic-handoff.v1.schema.json) | Verified cast, locations, shot timing, deterministic seeds, and media for native Animatic import |
+| [`text-lora-workflow.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/text-lora-workflow.v1.schema.json) | File pins and receipts for dataset preparation, native training, and paired behavior evaluation |
 | [`workflow-graph.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/workflow-graph.v1.schema.json) | Portable executable graph |
 | [`graph-node-provider.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-provider.v1.schema.json) | Typed provider node catalog |
 | [`graph-node-invocation.v1.schema.json`](https://github.com/sawfwair/mere-run-plugins/blob/main/contracts/graph-node-invocation.v1.schema.json) | Confined graph-node request |

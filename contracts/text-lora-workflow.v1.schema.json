@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mere.run/contracts/text-lora-workflow.v1.schema.json",
+  "title": "Mere Run Text LoRA Workflow v1",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["contractVersion", "datasetSha256", "counts", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {"const": "mere.run/text-lora-dataset.v1"},
+        "datasetSha256": {"$ref": "#/$defs/hash"},
+        "counts": {
+          "type": "object",
+          "required": ["train", "heldOut", "behavior"],
+          "additionalProperties": false,
+          "properties": {
+            "train": {"$ref": "#/$defs/positive"},
+            "heldOut": {"$ref": "#/$defs/positive"},
+            "behavior": {"$ref": "#/$defs/positive"}
+          }
+        },
+        "files": {
+          "type": "object",
+          "required": ["train.jsonl", "held-out.jsonl", "evaluation/eval-pack.json", "evaluation/cases.jsonl"],
+          "additionalProperties": false,
+          "properties": {
+            "train.jsonl": {"$ref": "#/$defs/pin"},
+            "held-out.jsonl": {"$ref": "#/$defs/pin"},
+            "evaluation/eval-pack.json": {"$ref": "#/$defs/pin"},
+            "evaluation/cases.jsonl": {"$ref": "#/$defs/pin"}
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["contractVersion", "datasetSha256", "model", "settings", "baseModelDescriptionSha256", "status", "nativeDatasetFingerprint", "nativeManifest"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {"const": "mere.run/text-lora-training.v1"},
+        "datasetSha256": {"$ref": "#/$defs/hash"},
+        "model": {"type": "string", "minLength": 1},
+        "settings": {
+          "type": "object",
+          "required": ["steps", "rank", "batchSize", "learningRate", "maxSequenceLength", "seed"],
+          "additionalProperties": false,
+          "properties": {
+            "steps": {"$ref": "#/$defs/positive"},
+            "rank": {"$ref": "#/$defs/positive"},
+            "batchSize": {"$ref": "#/$defs/positive"},
+            "learningRate": {"type": "number", "exclusiveMinimum": 0},
+            "maxSequenceLength": {"$ref": "#/$defs/positive"},
+            "seed": {"type": "integer", "minimum": 0}
+          }
+        },
+        "baseModelDescriptionSha256": {"anyOf": [{"$ref": "#/$defs/hash"}, {"type": "null"}]},
+        "status": {"enum": ["planned", "completed"]},
+        "nativeDatasetFingerprint": {"type": "string", "minLength": 1},
+        "nativeManifest": {"$ref": "#/$defs/pin"},
+        "resumeFrom": {"$ref": "#/$defs/pin"},
+        "adapter": {"$ref": "#/$defs/pin"},
+        "heldOutLoss": {
+          "type": "object",
+          "required": ["before", "after", "examples", "assistantTokens"],
+          "additionalProperties": false,
+          "properties": {
+            "before": {"type": "number"},
+            "after": {"type": "number"},
+            "examples": {"$ref": "#/$defs/positive"},
+            "assistantTokens": {"$ref": "#/$defs/positive"}
+          }
+        }
+      },
+      "if": {"properties": {"status": {"const": "completed"}}},
+      "then": {
+        "required": ["adapter", "heldOutLoss"],
+        "properties": {"baseModelDescriptionSha256": {"$ref": "#/$defs/hash"}}
+      }
+    },
+    {
+      "type": "object",
+      "required": ["contractVersion", "datasetSha256", "model", "baseModelDescriptionSha256", "adapter", "nativeManifest", "maxTokens", "nativePackSha256", "nativeReport", "comparison"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {"const": "mere.run/text-lora-evaluation.v1"},
+        "datasetSha256": {"$ref": "#/$defs/hash"},
+        "model": {"type": "string", "minLength": 1},
+        "baseModelDescriptionSha256": {"$ref": "#/$defs/hash"},
+        "adapter": {"$ref": "#/$defs/pin"},
+        "nativeManifest": {"$ref": "#/$defs/pin"},
+        "maxTokens": {"$ref": "#/$defs/positive"},
+        "nativePackSha256": {"$ref": "#/$defs/hash"},
+        "nativeReport": {"$ref": "#/$defs/pin"},
+        "comparison": {
+          "type": "object",
+          "required": ["cases", "basePassed", "candidatePassed", "basePassRate", "candidatePassRate", "deltaPassRate", "improvedCases", "regressedCases"],
+          "additionalProperties": false,
+          "properties": {
+            "cases": {"$ref": "#/$defs/positive"},
+            "basePassed": {"$ref": "#/$defs/nonnegative"},
+            "candidatePassed": {"$ref": "#/$defs/nonnegative"},
+            "basePassRate": {"$ref": "#/$defs/rate"},
+            "candidatePassRate": {"$ref": "#/$defs/rate"},
+            "deltaPassRate": {"type": "number", "minimum": -1, "maximum": 1},
+            "improvedCases": {"$ref": "#/$defs/nonnegative"},
+            "regressedCases": {"$ref": "#/$defs/nonnegative"}
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "positive": {"type": "integer", "minimum": 1},
+    "nonnegative": {"type": "integer", "minimum": 0},
+    "rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "pin": {
+      "type": "object",
+      "required": ["bytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {"$ref": "#/$defs/positive"},
+        "sha256": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}

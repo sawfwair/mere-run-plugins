@@ -1,0 +1,2 @@
+{"id": "train-0", "sources": ["synthetic:train:0"], "messages": [{"role": "system", "content": "Answer concisely about synthetic route markers."}, {"role": "user", "content": "Which color marks the Marigold route?"}, {"role": "assistant", "content": "The marker is blue."}]}
+{"id": "train-1", "sources": ["synthetic:train:1"], "messages": [{"role": "system", "content": "Answer concisely about synthetic route markers."}, {"role": "user", "content": "What color label marks the Willow route?"}, {"role": "assistant", "content": "The marker is green."}]}

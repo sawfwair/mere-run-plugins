@@ -1,0 +1,1 @@
+{"id": "held-out-0", "sources": ["synthetic:held-out:0"], "messages": [{"role": "system", "content": "Answer concisely about synthetic route markers."}, {"role": "user", "content": "What color should I use to label the Cypress route?"}, {"role": "assistant", "content": "The marker is red."}]}
