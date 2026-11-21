@@ -18,6 +18,13 @@ const pageNameForPlugin = (id) => {
   return `${id.replace(/^mere-/, "")}.md`;
 };
 
+const readinessGuide = await readFile(
+  new URL("docs/guide/check-readiness.md", repoRoot), "utf8",
+);
+const readinessLinks = new Set(
+  Array.from(readinessGuide.matchAll(/^\| \[[^\]]+\]\(\/plugins\/([^/\s)]+)\) \| (\S.*) \|$/gm),
+    ([, slug]) => `${slug}.md`),
+);
 const failures = [];
 for (const plugin of catalog.plugins) {
   const pageName = pageNameForPlugin(plugin.id);
@@ -28,6 +35,9 @@ for (const plugin of catalog.plugins) {
     failures.push(
       `${plugin.id}: docs/plugins/${pageName} does not name the catalog ID`,
     );
+  }
+  if (!readinessLinks.has(pageName)) {
+    failures.push(`${plugin.id}: missing prerequisites in docs/guide/check-readiness.md`);
   }
 }
 
