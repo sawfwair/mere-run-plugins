@@ -1,12 +1,13 @@
 # Workflow Tools package
 
-`mere-workflow-tools` is a shared package that installs six companion commands
+`mere-workflow-tools` is a shared package that installs companion commands
 and graph contract tooling:
 
 - `mere-doc-tools`
 - `mere-media-scrub`
 - `mere-dataset-tools`
 - `mere-transcript-tools`
+- [`mere-audio-post`](/plugins/audio-post)
 - `mere-image-compose`
 - `mere-batch-runner`
 - `mere-graph-conformance`

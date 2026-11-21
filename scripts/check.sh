@@ -480,6 +480,7 @@ for executable in [
     "mere-media-scrub",
     "mere-dataset-tools",
     "mere-transcript-tools",
+    "mere-audio-post",
     "mere-image-compose",
     "mere-batch-runner",
 ]:

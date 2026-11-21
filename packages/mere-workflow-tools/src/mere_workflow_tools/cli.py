@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw, ImageOps
 from . import (
     __version__,
     anydoc_backend,
+    audio_post,
     comfy_bridge,
     doc_graph_provider,
     graph_compiler,
@@ -96,6 +97,16 @@ TOOLS: dict[str, ToolSpec] = {
         one_shot="transcribe",
         recipe_id="audio-transcribe-redact",
         recipe_title="Audio transcription and PII redaction",
+    ),
+    "audio_post": ToolSpec(
+        kind="audio_post",
+        plugin_name="mere-audio-post",
+        executable="mere-audio-post",
+        description="Finish local audio and video clips with WAV delivery, loudness reports, and optional native models.",
+        capabilities=["audio", "denoise", "dereverb", "stem-separation", "midi", "foley", "loudness"],
+        one_shot="process",
+        recipe_id="audio-post",
+        recipe_title="Local audio finishing and delivery",
     ),
     "image_compose": ToolSpec(
         kind="image_compose",
@@ -347,10 +358,32 @@ def make_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
         "media": make_media_manifest,
         "dataset": make_dataset_manifest,
         "transcript": make_transcript_manifest,
+        "audio_post": make_audio_post_manifest,
         "image_compose": make_image_manifest,
         "batch": make_batch_manifest,
     }
     return builders[spec.kind](spec, args)
+
+
+def make_audio_post_manifest(spec: ToolSpec, args: argparse.Namespace) -> JsonMap:
+    job = audio_post.Job(args.input, args.task, args.stems, args.prompt)
+    job.validate()
+    destination = args.output_dir / "audio"
+    receipt = args.manifest or default_manifest_path(args.output_dir)
+    if receipt == job.source or receipt == destination or destination in receipt.parents:
+        raise PluginError("Write the run manifest outside the input file and the audio delivery directory.", 2)
+    if destination.exists() or destination.is_symlink() or receipt.exists() or receipt.is_symlink():
+        raise PluginError("Choose a fresh Audio Post output directory and run manifest.", 2)
+    manifest = base_manifest(spec, args, [job.source])
+    manifest["command"] = one_shot_command(spec, args)
+    manifest_tool(manifest).update({
+        "workflow": "audio-post", "task": job.task, "requiredModels": list(job.models()), "requiresFFmpeg": True,
+    })
+    manifest_steps(manifest).append({
+        "name": "finish-audio", "python": "audio-post", "source": str(job.source), "task": job.task,
+        "stems": job.stems, "prompt": job.prompt, "outputs": {"delivery": str(destination)},
+    })
+    return manifest
 
 
 def add_step(manifest: JsonMap, name: str, argv: list[str], outputs: dict[str, str], stdin_path: str | None = None) -> None:
@@ -734,6 +767,10 @@ def one_shot_command(spec: ToolSpec, args: argparse.Namespace) -> list[str]:
                 command.extend([f"--{flag.replace('_', '-')}", value])
         if args.diarize:
             command.append("--diarize")
+    if spec.kind == "audio_post":
+        command.extend(["--task", args.task, "--stems", args.stems])
+        if args.prompt is not None:
+            command.extend(["--prompt", args.prompt])
     return command
 
 
@@ -757,6 +794,8 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
                 run_caption_step(step)
             elif step.get("python") == "structured-document":
                 run_structured_document_step(manifest, step)
+            elif step.get("python") == "audio-post":
+                run_audio_post_step(manifest, step)
             else:
                 run_mere_step(manifest, step)
         files = collect_artifacts(manifest)
@@ -773,6 +812,17 @@ def execute_manifest(manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
         update_manifest(manifest_path, manifest, status="failed")
         raise
     return manifest
+
+
+def run_audio_post_step(manifest: JsonMap, step: JsonMap) -> None:
+    source = pathlib.Path(str(step["source"]))
+    if not source.is_file() or tree_sha256([source]) != as_map(manifest["dataset"], "dataset").get("sha256"):
+        raise PluginError("The Audio Post input changed after planning. Create a fresh plan.", 2)
+    prompt = step.get("prompt")
+    job = audio_post.Job(source, str(step["task"]), str(step["stems"]), prompt if isinstance(prompt, str) else None)
+    runtime = string_list(manifest_tool(manifest)["mereRunCommand"], "tool.mereRunCommand")
+    destination = pathlib.Path(str(as_map(step["outputs"], "step.outputs")["delivery"]))
+    audio_post.finish(job, runtime, destination)
 
 
 def run_anydoc_step(manifest: JsonMap, step: JsonMap) -> None:
@@ -881,6 +931,9 @@ def command_doctor(spec: ToolSpec, args: argparse.Namespace) -> int:
             checks.append({"name": "anydoc", "ok": False, "detail": str(exc)})
     if spec.kind != "doc" or args.extractor == "ocr" or args.redact:
         checks.append({"name": "mere.run", "ok": command_available(mere_run_command), "detail": shlex.join(mere_run_command)})
+    if spec.kind == "audio_post":
+        executable = audio_post.ffmpeg_executable()
+        checks.append({"name": "ffmpeg", "ok": executable is not None, "detail": executable or "Install FFmpeg."})
     ok = all(item["ok"] for item in checks)
     print_json({"ok": ok, "checks": checks})
     return 0 if ok else 3
@@ -888,30 +941,53 @@ def command_doctor(spec: ToolSpec, args: argparse.Namespace) -> int:
 
 def command_plan(spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = make_manifest(spec, args)
-    write_json(pathlib.Path(str(manifest_local(manifest)["runManifest"])), manifest)
+    save_plan(spec, pathlib.Path(str(manifest_local(manifest)["runManifest"])), manifest)
     print_json(manifest)
     return 0
 
 
-def command_run(_spec: ToolSpec, args: argparse.Namespace) -> int:
+def save_plan(spec: ToolSpec, manifest_path: pathlib.Path, manifest: JsonMap) -> None:
+    if spec.kind != "audio_post":
+        write_json(manifest_path, manifest)
+        return
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    with audio_post.run_lock(manifest_path):
+        if manifest_path.exists() or manifest_path.is_symlink():
+            raise PluginError(f"Run manifest already exists at {manifest_path}. Choose a fresh path.", 2)
+        write_json(manifest_path, manifest)
+
+
+def command_run(spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest_path = args.run_manifest
     manifest = load_json(manifest_path)
+    if spec.kind == "audio_post" and as_map(manifest["plugin"], "plugin").get("name") != spec.plugin_name:
+        raise PluginError("Choose a run manifest created by Audio Post.", 2)
     if args.dry_run:
         print_json(manifest)
         return 0
-    manifest = execute_manifest(manifest_path, manifest)
+    manifest = run_saved_manifest(spec, manifest_path, manifest)
     print_json(manifest)
     return 0
+
+
+def run_saved_manifest(spec: ToolSpec, manifest_path: pathlib.Path, manifest: JsonMap) -> JsonMap:
+    if spec.kind == "audio_post":
+        with audio_post.run_lock(manifest_path):
+            latest = load_json(manifest_path)
+            if latest.get("status") == "succeeded":
+                return latest
+            return execute_manifest(manifest_path, latest)
+    return execute_manifest(manifest_path, manifest)
 
 
 def command_one_shot(spec: ToolSpec, args: argparse.Namespace) -> int:
     manifest = make_manifest(spec, args)
     manifest_path = pathlib.Path(str(manifest_local(manifest)["runManifest"]))
-    write_json(manifest_path, manifest)
+    save_plan(spec, manifest_path, manifest)
     if args.dry_run:
         print_json(manifest)
         return 0
-    manifest = execute_manifest(manifest_path, manifest)
+    manifest = run_saved_manifest(spec, manifest_path, manifest)
     print_json(manifest)
     return 0
 
@@ -1057,6 +1133,8 @@ def add_common_plan_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> Non
 
 
 def add_kind_args(parser: argparse.ArgumentParser, spec: ToolSpec) -> None:
+    if spec.kind == "audio_post":
+        audio_post.add_args(parser)
     if spec.kind in {"doc", "media", "dataset", "transcript"}:
         parser.add_argument("--input", required=True, type=pathlib.Path)
     if spec.kind in {"doc", "media"}:
