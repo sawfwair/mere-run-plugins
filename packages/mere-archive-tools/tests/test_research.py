@@ -45,6 +45,9 @@ class ResearchTests(unittest.TestCase):
                         {"url": "https://example.net/missing", "title": "Fetch failure"},
                     ]}
                 self.assertEqual(name, research.SCRAPE_PLUGIN)
+                if command == ["manifest", "--json"]:
+                    return {"capabilities": ["full-markdown"]}
+                self.assertEqual(command[:3], ["scrape", "--full", "--"])
                 url = command[-1]
                 self.assertNotIn(url, {SAME_URL, "http://127.0.0.1/"})
                 if url.endswith("/missing"):
@@ -56,9 +59,9 @@ class ResearchTests(unittest.TestCase):
 
             with patch.object(research, "plugin_json", side_effect=plugin) as network:
                 result = research.collect("mere.run", root, "flood mapping", 5)
-                self.assertEqual(network.call_count, 4)
+                self.assertEqual(network.call_count, 5)
                 self.assertEqual(research.collect("mere.run", root, "flood mapping", 5), result)
-                self.assertEqual(network.call_count, 4)
+                self.assertEqual(network.call_count, 5)
             sources = research.as_list(result["sources"], "test sources")
             self.assertEqual(len(sources), 1)
             source = research.as_map(sources[0], "test source")
@@ -76,21 +79,53 @@ class ResearchTests(unittest.TestCase):
             with self.assertRaisesRegex(research.ResearchError, "source changed"):
                 research.collect("mere.run", root, "flood mapping", 5)
 
+    def test_collect_keeps_long_evidence_and_gmail_citation_alias(self) -> None:
+        canonical = "https://support.google.com/mail/answer/6584"
+        desktop = canonical + "?hl=en&co=GENIE.Platform%3DDesktop"
+        mobile = canonical + "?co=GENIE.Platform%3DAndroid"
+        text = "Earlier documentation.\n" * 900 + "The administrator sets attachment sending limits."
+
+        def plugin(_runtime: str, name: str, command: list[str]) -> research.JsonMap:
+            if name == research.SEARCH_PLUGIN:
+                return {"query": "Gmail attachment limits", "results": [
+                    {"url": desktop}, {"url": canonical}, {"url": mobile},
+                ]}
+            if command == ["manifest", "--json"]:
+                return {"capabilities": ["full-markdown"]}
+            self.assertEqual(command[:3], ["scrape", "--full", "--"])
+            url = command[-1]
+            self.assertIn(url, {desktop, mobile})
+            return {"url": url, "requestedUrl": url, "truncated": False,
+                    "markdown": text if url == desktop else "Mobile documentation."}
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(research, "plugin_json", side_effect=plugin):
+            root = pathlib.Path(directory)
+            collected = research.collect("mere.run", root, "Gmail attachment limits", 3)
+            first, second = research.as_list(collected["sources"], "test sources")
+            self.assertEqual(research.as_map(first, "desktop source")["alternateUrls"], [canonical])
+            self.assertFalse(research.as_map(first, "desktop source")["truncated"])
+            self.assertEqual(research.as_map(second, "mobile source")["url"], mobile)
+            self.assertEqual((root / "collection/sources/S01.md").read_text(), text + "\n")
+            self.assertNotEqual(research.comparison_url(canonical), research.comparison_url(canonical + "?version=2"))
+
     def test_resume_after_index_failure_uses_saved_collection(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary) / "research"
             receipt = root / "run.json"
 
-            def plugin(_runtime: str, name: str, _arguments: list[str]) -> research.JsonMap:
+            def plugin(_runtime: str, name: str, arguments: list[str]) -> research.JsonMap:
                 if name == research.SEARCH_PLUGIN:
                     return {"query": "flood mapping", "results": [{"url": FINAL}]}
+                if arguments == ["manifest", "--json"]:
+                    return {"capabilities": ["markdown"]}
+                self.assertEqual(arguments, ["scrape", "--", FINAL])
                 return {"url": FINAL, "requestedUrl": FINAL, "markdown": "Local snapshot."}
 
             with patch.object(research, "plugin_json", side_effect=plugin) as network, \
                     patch.object(cli, "index_research_collection", side_effect=research.ResearchError("missing model")), \
                     redirect_stdout(StringIO()), redirect_stderr(StringIO()):
                 self.assertEqual(cli.main(["research", "--query", "flood mapping", "--output-dir", str(root)]), 1)
-                self.assertEqual(network.call_count, 2)
+                self.assertEqual(network.call_count, 3)
             self.assertEqual(json.loads(receipt.read_bytes())["status"], "failed")
             with patch.object(research, "plugin_json") as network, \
                     patch.object(cli, "index_research_collection", return_value={"database": "archive.sqlite3"}), \

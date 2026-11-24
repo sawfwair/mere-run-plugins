@@ -65,6 +65,23 @@ class FirecrawlTests(unittest.TestCase):
             "markdown": markdown[:-1], "truncated": True,
         })
 
+    def test_full_scrape_preserves_evidence_past_preview_cutoff(self) -> None:
+        url = "https://example.com/retention"
+        markdown = "Earlier documentation.\n" * 900 + "Public repository limit: 90 days."
+        page = {"markdown": markdown, "metadata": {"url": url}}
+        with mock.patch.object(cli, "request_json", return_value={"success": True, "data": page}):
+            status, stdout, stderr = self.invoke("scrape", "--full", url)
+        self.assertEqual((status, stderr), (0, ""))
+        self.assertEqual(json.loads(stdout)["markdown"], markdown)
+        self.assertFalse(json.loads(stdout)["truncated"])
+
+    def test_scrape_does_not_cite_a_page_with_an_invalid_redirect(self) -> None:
+        page = {"markdown": "A document.", "metadata": {"url": "http://127.0.0.1/"}}
+        with mock.patch.object(cli, "request_json", return_value={"success": True, "data": page}):
+            status, stdout, stderr = self.invoke("scrape", "https://example.com")
+        self.assertEqual((status, stdout), (1, ""))
+        self.assertIn("nonpublic page URL", stderr)
+
     def test_rejects_unsafe_inputs_before_request(self) -> None:
         for url in ("file:///etc/hosts", "https://user@example.com/", "http://127.0.0.1/", "http://[::1]/",
                     "http://foo.localhost./", "http://10.1.2.3", "https://example.com:70000", "https://example.com/\n"):

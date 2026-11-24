@@ -20,4 +20,4 @@ mere-firecrawl-local = "mere_firecrawl_local.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mere_firecrawl_local = ["py.typed", "resources/pi/extensions/*.ts"]
+mere_firecrawl_local = ["py.typed", "resources/pi/extensions/*.ts", "resources/pi/lib/*.ts"]

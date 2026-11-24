@@ -113,7 +113,7 @@ def request_json(endpoint: str, path: str, body: dict[str, object] | None = None
     return cast(dict[str, object], payload)
 
 
-def scrape(endpoint: str, url: str) -> dict[str, object]:
+def scrape(endpoint: str, url: str, *, full: bool = False) -> dict[str, object]:
     url = public_page_url(url)
     payload = request_json(endpoint, "/v2/scrape", {"url": url, "formats": ["markdown"], "timeout": 15_000})
     data = payload.get("data")
@@ -130,13 +130,13 @@ def scrape(endpoint: str, url: str) -> dict[str, object]:
         try:
             final_url = public_page_url(final_url)
         except InputError:
-            final_url = None
+            raise FirecrawlError("Firecrawl returned a nonpublic page URL") from None
     return {
         "requestedUrl": url,
         "url": final_url if isinstance(final_url, str) else url,
         "title": title[:300] if isinstance(title, str) else None,
-        "markdown": markdown[:MAX_MARKDOWN_CHARS],
-        "truncated": len(markdown) > MAX_MARKDOWN_CHARS,
+        "markdown": markdown if full else markdown[:MAX_MARKDOWN_CHARS],
+        "truncated": not full and len(markdown) > MAX_MARKDOWN_CHARS,
     }
 
 
@@ -144,7 +144,7 @@ def manifest() -> dict[str, object]:
     return {
         "contractVersion": "mere.run/plugin.v1", "name": PLUGIN, "executable": PLUGIN,
         "version": __version__, "description": DESCRIPTION,
-        "capabilities": ["web-scrape", "markdown", "pi-tool"],
+        "capabilities": ["web-scrape", "markdown", "pi-tool", "full-markdown"],
         "commands": [
             {"name": name, "description": description, "stdout": stream}
             for name, description, stream in COMMANDS
@@ -166,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("setup").add_argument("--yes", action="store_true")
     scrape_command = commands.add_parser("scrape")
     scrape_command.add_argument("--endpoint")
+    scrape_command.add_argument("--full", action="store_true", help="Return the complete Markdown from Firecrawl.")
     scrape_command.add_argument("url")
     args = parser.parse_args(argv)
 
@@ -200,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise FirecrawlError("Firecrawl did not report a healthy service")
                 result = {"ready": True, "endpoint": endpoint, "version": health.get("version")}
             else:
-                result = scrape(endpoint, args.url)
+                result = scrape(endpoint, args.url, full=args.full)
     except (InputError, FirecrawlError, pi.PiError, standalone.SetupError, OSError) as error:
         sys.stderr.write(f"{PLUGIN}: {error}\n")
         if isinstance(error, InputError):

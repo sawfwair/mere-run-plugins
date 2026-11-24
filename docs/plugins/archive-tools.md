@@ -70,12 +70,16 @@ mere.run plugin run mere-archive-tools -- research \
 ```
 
 SearXNG sends the query to its configured search engines. Firecrawl fetches
-the selected public URLs. Archive Tools deduplicates URLs and identical page
-text, then saves the following files:
+the selected public URLs. Archive Tools deduplicates equivalent URLs and
+identical page text. With a Firecrawl adapter that supports `--full`, it
+preserves the complete Markdown returned by Firecrawl in each snapshot.
+An older adapter can return a truncated snapshot. The collection contains
+these files.
 
 - `collection/sources/` contains the Markdown snapshots.
-- `collection/sources.json` maps citation IDs to public URLs, snapshot paths,
-  content hashes, and skipped results. It also indicates truncated snapshots.
+- `collection/sources.json` maps citation IDs to requested URLs, final URLs,
+  known URL aliases, snapshot paths, and content hashes. It also records
+  truncated snapshots and skipped results.
 - `collection/citations.md` lists source links using the same citation IDs.
 - `index/archive.sqlite3` contains the local reduced-content search index.
 - `run.json` records the settings, status, and paths to the collection and index.
