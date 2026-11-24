@@ -9,6 +9,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:coverage": "node scripts/check-docs-coverage.mjs",
+    "test:firecrawl-pi": "node --experimental-strip-types --test packages/mere-firecrawl-local/tests/*.test.mjs",
     "test:archive-pi": "node --experimental-strip-types --test packages/mere-archive-tools/tests/*.test.mjs"
   },
   "devDependencies": {

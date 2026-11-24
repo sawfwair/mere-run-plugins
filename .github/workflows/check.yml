@@ -44,5 +44,6 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:archive-pi
+      - run: pnpm test:firecrawl-pi
       - run: pnpm docs:coverage
       - run: pnpm docs:build

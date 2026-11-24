@@ -20,7 +20,6 @@ from .runtime import InferenceError, JsonMap, as_list, as_map, split_command
 SEARCH_PLUGIN = "mere-searxng-search"
 SCRAPE_PLUGIN = "mere-firecrawl-local"
 MAX_RESULTS = 20
-MAX_MARKDOWN = 16_000
 INDEX_MODELS = ("text-anonymize-privacy-filter", "vision-embed-qwen3-vl-2b")
 TRACKING_PARAMETERS = {"gclid", "dclid", "fbclid", "msclkid"}
 
@@ -68,12 +67,26 @@ def public_url(raw: object) -> str | None:
 
 def comparison_url(url: str) -> str:
     parsed = urlsplit(url)
+    host = (parsed.hostname or "").rstrip(".")
+    google_article = host == "support.google.com" and re.fullmatch(
+        r"/(?:mail|a(?:/users)?)/answer/\d+/?", parsed.path,
+    )
     query = []
     for parameter in parsed.query.split("&") if parsed.query else ():
-        key = unquote_plus(parameter.split("=", 1)[0]).lower()
-        if key not in TRACKING_PARAMETERS and not key.startswith("utm_"):
-            query.append(parameter)
-    return urlunsplit((parsed.scheme, (parsed.hostname or "").rstrip("."), parsed.path or "/", "&".join(query), ""))
+        raw_key, _, raw_value = parameter.partition("=")
+        key, value = unquote_plus(raw_key), unquote_plus(raw_value)
+        if key.lower() in TRACKING_PARAMETERS or key.lower().startswith("utm_"):
+            continue
+        if host == "slack.com" and key == "nojsmode" and value == "1":
+            continue
+        if google_article and (
+            (key == "hl" and re.fullmatch(r"en(?:-[a-z]{2})?", value, re.IGNORECASE))
+            or (key == "co" and value == "GENIE.Platform=Desktop")
+        ):
+            continue
+        query.append(parameter)
+    authority = f"[{host}]" if ":" in host else host
+    return urlunsplit((parsed.scheme, authority, parsed.path or "/", "&".join(query), ""))
 
 
 def call_json(runtime: str, command: list[str], service: str) -> JsonMap:
@@ -211,6 +224,9 @@ def scrape_sources(runtime: str, staging: pathlib.Path, candidates: list[object]
     requested: dict[str, Source | None] = {}
     by_url: dict[str, Source] = {}
     by_content: dict[str, Source] = {}
+    manifest = plugin_json(runtime, SCRAPE_PLUGIN, ["manifest", "--json"])
+    capabilities = as_list(manifest.get("capabilities", []), "Firecrawl capabilities")
+    scrape_command = ["scrape", "--full"] if "full-markdown" in capabilities else ["scrape"]
     for rank, raw in enumerate(candidates, 1):
         row = as_map(raw, "research search result")
         url = public_url(row.get("url"))
@@ -225,7 +241,7 @@ def scrape_sources(runtime: str, staging: pathlib.Path, candidates: list[object]
             continue
         requested[key] = None
         try:
-            page = plugin_json(runtime, SCRAPE_PLUGIN, ["scrape", "--", url])
+            page = plugin_json(runtime, SCRAPE_PLUGIN, [*scrape_command, "--", url])
         except ResearchError as exc:
             skipped.append({"rank": rank, "url": url, "reason": "fetch-failed", "detail": str(exc)})
             continue
@@ -234,7 +250,7 @@ def scrape_sources(runtime: str, staging: pathlib.Path, candidates: list[object]
         if page.get("requestedUrl") != url or final_url is None or not isinstance(markdown, str) or not markdown.strip():
             skipped.append({"rank": rank, "url": url, "reason": "invalid-page"})
             continue
-        body = (markdown[:MAX_MARKDOWN].strip() + "\n").encode("utf-8", errors="replace")
+        body = (markdown.strip() + "\n").encode("utf-8", errors="replace")
         body_hash = digest(body)
         final_key = comparison_url(final_url)
         previous = by_url.get(final_key) or by_content.get(body_hash)
@@ -246,7 +262,7 @@ def scrape_sources(runtime: str, staging: pathlib.Path, candidates: list[object]
             continue
         source = Source(
             f"S{len(sources) + 1:02d}", final_url, url, clean_label(page.get("title"), clean_label(row.get("title"), final_url)),
-            clean_label(row.get("engine"), "") or None, body_hash, page.get("truncated") is True or len(markdown) > MAX_MARKDOWN,
+            clean_label(row.get("engine"), "") or None, body_hash, page.get("truncated") is True,
         )
         (staging / source.relative_path).write_bytes(body)
         sources.append(source)

@@ -31,7 +31,12 @@ configure a compatible endpoint before installing the adapter.
 - [SHA-256 checksums](https://mere.run/releases/firecrawl-local/0.1.1/SHA256SUMS)
 
 The scrape command returns JSON with the requested URL, final URL, page title,
-Markdown, and a flag that reports truncation at 16,000 characters.
+Markdown, and a truncation flag. By default it returns up to 16,000 characters
+of Markdown. To retrieve the complete Markdown from Firecrawl, pass `--full`.
+
+```sh
+mere.run plugin run mere-firecrawl-local -- scrape --full https://example.com
+```
 
 To use another compatible instance, set `MERE_FIRECRAWL_URL` before installing
 the adapter or starting the agent. You can also pass `--endpoint` to individual adapter commands. Endpoints outside loopback
@@ -53,6 +58,14 @@ install the signed bundle.
 Run `mere.run plugin run mere-firecrawl-local -- pi status` to check the
 extension or replace `status` with `disable` to remove it. If you use SearXNG in the same
 session, Pi can use `searxng_search` to find sources and `firecrawl_scrape` to
-read the selected pages. Treat page text as untrusted source material.
+read the selected pages. Each successful read returns a `sourceId` for citing
+that page. Long pages return a preview and headings. Use `firecrawl_find` with
+the source ID and a phrase to read matching passages with line numbers from
+the complete page. You can also look up a page with its requested URL or
+verified redirect URL. For Gmail help articles, the shorter article URL
+can identify a page read with desktop and English locale parameters.
+
+Pi keeps up to eight recently read pages available for lookup. To search
+within an older page, read it again. Treat page text as untrusted source material.
 
 For instance options, see the [Firecrawl Local documentation](https://github.com/firecrawl/firecrawl/blob/main/apps/local/README.md).
