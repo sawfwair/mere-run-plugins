@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
@@ -131,6 +131,12 @@ TOOLS: dict[str, ToolSpec] = {
         recipe_title="Batch mere.run execution",
     ),
 }
+
+
+TOOLS["image_prompt"] = replace(
+    TOOLS["image_compose"], plugin_name="mere-image", executable="mere-image",
+    description="Render an image from a prompt and blind-review it with local Nemotron and Inkling models.",
+)
 
 
 def now_iso() -> str:
@@ -321,7 +327,7 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             "cleanupDefault": "none",
         },
     }
-    if spec.kind in {"doc", "dataset", "image_compose"}:
+    if spec.plugin_name in {"mere-doc-tools", "mere-dataset-tools", "mere-image-compose"}:
         commands.append({"name": "graph", "description": "Expose portable graph nodes.", "stdout": "json"})
         capabilities.append("graph-node-provider-v1")
         manifest["graphProvider"] = {"contractVersion": graph_provider.CONTRACT_VERSION}
@@ -1153,7 +1159,7 @@ def command_redact_export(_spec: ToolSpec, args: argparse.Namespace) -> int:
 def command_generate_reviewed(_spec: ToolSpec, args: argparse.Namespace) -> int:
     from . import image_review
 
-    print_json(image_review.generate(args, split_command(args.mere_run_command)))
+    print_json(image_review.generate(args, image_review.configured_runtime(args)))
     return 0
 
 
@@ -1259,6 +1265,8 @@ def add_structured_doc_args(parser: argparse.ArgumentParser, *, required: bool) 
 
 def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=spec.executable)
+    if spec.plugin_name == "mere-image":
+        parser.epilog = 'To render and review an image, run mere-image "your prompt".'
     sub = parser.add_subparsers(dest="command", required=True)
 
     manifest = sub.add_parser("manifest", help="Print plugin manifest.")
@@ -1299,7 +1307,7 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
         image_review.add_arguments(reviewed)
         reviewed.set_defaults(func=command_generate_reviewed)
 
-    if spec.kind in {"doc", "dataset", "image_compose"}:
+    if spec.plugin_name in {"mere-doc-tools", "mere-dataset-tools", "mere-image-compose"}:
         graph = sub.add_parser("graph", help="Expose portable graph nodes.")
         graph_sub = graph.add_subparsers(dest="graph_command", required=True)
 

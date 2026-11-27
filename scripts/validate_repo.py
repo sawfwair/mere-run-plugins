@@ -389,6 +389,7 @@ def validate_plugin_manifests() -> None:
         ("mere_workflow_tools.dataset_cli", "mere-dataset-tools", "caption"),
         ("mere_workflow_tools.transcript_cli", "mere-transcript-tools", "transcribe"),
         ("mere_workflow_tools.audio_post_cli", "mere-audio-post", "process"),
+        ("mere_workflow_tools.image_prompt_cli", "mere-image", "generate-reviewed"),
         ("mere_workflow_tools.image_compose_cli", "mere-image-compose", "generate"),
         ("mere_workflow_tools.batch_cli", "mere-batch-runner", "run-jobs"),
     ]

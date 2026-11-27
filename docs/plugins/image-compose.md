@@ -20,15 +20,31 @@ mere-image-compose generate \
 
 ## Generate with blind review
 
-From this checkout, install the plugin with `python -m pip install ./packages/mere-workflow-tools`.
-Use a local `mere.run` with Nemotron image generation and Inkling image chat.
-The defaults are `image-nemotron-labs-30b-a3b` and `vision-chat-inkling-2-mini`.
-For a packed checkpoint, set its path once in your shell.
+On Apple Silicon, install the signed `mere-image` plugin with mere.run 0.79.0 or later.
+Review NVIDIA’s non-commercial research and evaluation terms before accepting the Q8 download.
 
 ```bash
-export MERE_NEMOTRON_MODEL=/path/to/nemotron-q8
-mere-image-compose generate-reviewed --prompt "A red enamel kettle on a blue camping stove"
+mere.run plugin install mere-image --yes
+mere.run model pull image-nemotron-labs-30b-a3b-q8 --accept-model-license
+mere.run model pull vision-chat-inkling-2-mini
+mere-image "A red enamel kettle on a blue camping stove"
 ```
+
+The plugin uses the installed native runtime and managed model IDs. It needs no Python setup.
+For a custom installation, save overrides in `~/.config/mere-image-compose/defaults.json`
+(or under `$XDG_CONFIG_HOME`).
+Each field is optional. The runtime field takes an executable path.
+
+```json
+{
+  "runtime": "/path/to/mere.run",
+  "model": "/path/to/nemotron-q8",
+  "reviewer": "vision-chat-inkling-2-mini"
+}
+```
+
+Use `mere-image-compose generate-reviewed --help` to see all options.
+Explicit flags and the existing environment overrides take precedence over the saved settings.
 
 Inkling sees the creative brief and the first render. If it accepts the image, generation ends.
 If it requests a repair, Nemotron draws one new image from Inkling's standalone prompt.

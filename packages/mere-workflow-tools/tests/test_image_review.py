@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import shlex
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from unittest.mock import patch
 
-from mere_workflow_tools import cli
+from mere_workflow_tools import cli, image_prompt_cli, image_review
 
 # A real subprocess boundary catches argument splitting and state leaks between judges.
 RUNTIME = """
@@ -16,6 +19,9 @@ import json, pathlib, sys
 from PIL import Image
 root = pathlib.Path(__file__).parent
 args = sys.argv[1:]
+if args == ["--version"]:
+    print("0.78.0" if (root / "old-runtime").exists() else "0.79.0")
+    sys.exit(0)
 value = lambda flag: args[args.index(flag) + 1]
 with (root / "calls").open("a") as log:
     log.write(json.dumps(args) + "\\n")
@@ -41,6 +47,13 @@ class ReviewedGenerationTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = pathlib.Path(tmp.name)
+        environment = patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.root / "config")})
+        environment.start()
+        self.addCleanup(environment.stop)
+        for key in ("MERE_NEMOTRON_MODEL", "MERE_RUN_EXECUTABLE", "MERE_WORKFLOW_TOOLS_MERE_RUN"):
+            os.environ.pop(key, None)
+        self.config = self.root / "config/mere-image-compose/defaults.json"
+        self.config.parent.mkdir(parents=True)
         self.runtime = self.root / "runtime.py"
         self.runtime.write_text(RUNTIME)
         self.out = self.root / "out"
@@ -58,6 +71,45 @@ class ReviewedGenerationTests(unittest.TestCase):
 
     def report(self) -> dict[str, object]:
         return json.loads((self.out / "result.json").read_text())
+
+    def test_prompt_shortcut_uses_saved_settings_from_another_directory(self) -> None:
+        wrapper = self.root / "local runtime"
+        wrapper.write_text("#!/bin/sh\nexec " + shlex.join([sys.executable, str(self.runtime)]) + ' "$@"\n')
+        wrapper.chmod(0o700)
+        self.config.write_text(json.dumps({"runtime": str(wrapper), "model": "test-q8", "reviewer": "test-vlm"}))
+        self.reply("original", {"decision": "keep"})
+        self.addCleanup(os.chdir, pathlib.Path.cwd())
+        os.chdir(self.root)
+        output = StringIO()
+        with patch.object(sys, "argv", ["mere-image", self.brief]), redirect_stdout(output), redirect_stderr(StringIO()):
+            self.assertEqual(image_prompt_cli.main(), 0)
+        report = json.loads(output.getvalue())
+        self.assertEqual((report["generator"], report["reviewer"], report["prompt"]),
+                         ("test-q8", "test-vlm", self.brief))
+        self.assertTrue(pathlib.Path(report["output"]).is_file())
+
+    def test_environment_and_flags_override_saved_defaults(self) -> None:
+        self.config.write_text(json.dumps({"runtime": "saved", "model": "saved-model"}))
+        base = ["generate-reviewed", "--prompt", self.brief]
+        with patch.dict(os.environ, {"MERE_NEMOTRON_MODEL": "env-model", "MERE_RUN_EXECUTABLE": "env runtime"}):
+            parser = cli.build_parser(cli.TOOLS["image_compose"])
+            args = parser.parse_args(base)
+            self.assertEqual(image_review.configured_runtime(args), ["env runtime"])
+            self.assertEqual(args.model, "env-model")
+            args = parser.parse_args([*base, "--mere-run-command", "'flag runtime'", "--model", "flag-model"])
+            self.assertEqual(image_review.configured_runtime(args), ["flag runtime"])
+            self.assertEqual(args.model, "flag-model")
+
+    def test_old_runtime_fails_before_generation(self) -> None:
+        (self.root / "old-runtime").touch()
+        self.assertNotEqual(self.invoke(), 0)
+        self.assertFalse(self.out.exists())
+        self.assertFalse((self.root / "calls").exists())
+
+    def test_invalid_settings_fail_before_rendering(self) -> None:
+        self.config.write_text('{"runtime": []}')
+        self.assertNotEqual(self.invoke(), 0)
+        self.assertFalse(self.out.exists())
 
     def test_keep_only_renders_once_and_preserves_prior_run(self) -> None:
         self.reply("original", {"decision": "keep"})

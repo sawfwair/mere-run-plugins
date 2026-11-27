@@ -11,6 +11,7 @@ MODULES = {
     "mere_workflow_tools.transcript_cli",
     "mere_workflow_tools.audio_post_cli",
     "mere_workflow_tools.image_compose_cli",
+    "mere_workflow_tools.image_prompt_cli",
     "mere_workflow_tools.batch_cli",
     "mere_workflow_tools.identity_cli",
 }

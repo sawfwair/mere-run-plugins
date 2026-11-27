@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -13,7 +14,8 @@ from typing import cast
 
 from PIL import Image, ImageDraw, ImageOps
 
-from .cli import JsonMap, PluginError, eprint, write_json
+from .cli import JsonMap, PluginError, eprint, split_command, write_json
+from .native_runtime import runtime_command
 
 AUDIT = (
     "Review this image against the creative brief below, including its intended style. "
@@ -33,14 +35,39 @@ MAX_SEED = (1 << 64) - 1
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--prompt", required=True, help="Creative brief for generation and review.")
-    parser.add_argument("--model", default=os.environ.get("MERE_NEMOTRON_MODEL") or "image-nemotron-labs-30b-a3b",
+    parser.add_argument("--model", default=os.environ.get("MERE_NEMOTRON_MODEL"),
                         help="Installed Nemotron image model ID or checkpoint path (env: MERE_NEMOTRON_MODEL).")
-    parser.add_argument("--reviewer", default="vision-chat-inkling-2-mini", help="Installed Inkling model ID or path.")
+    parser.add_argument("--reviewer", help="Installed Inkling model ID or path.")
     parser.add_argument("--output-dir", type=pathlib.Path, help="New run directory (default: unique directory in runs/).")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--width", type=int, default=1024)
     parser.add_argument("--height", type=int, default=1024)
-    parser.add_argument("--mere-run-command", default="", help="Native mere.run command.")
+    parser.add_argument("--mere-run-command", dest="review_runtime", help="Native mere.run command.")
+
+
+def configured_runtime(args: argparse.Namespace) -> list[str]:
+    """Resolve command-line and environment overrides before saved user defaults."""
+    config_root = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home() / ".config")
+    path = config_root / "mere-image-compose" / "defaults.json"
+    defaults: dict[str, str] = {}
+    if path.exists():
+        try:
+            data: object = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise PluginError(f"Cannot read {path}: {exc}") from exc
+        if not isinstance(data, dict) or not all(
+            key in {"runtime", "model", "reviewer"} and isinstance(value, str) and value.strip()
+            for key, value in data.items()
+        ):
+            raise PluginError(f"Expected optional nonempty runtime, model, and reviewer strings in {path}.")
+        defaults = cast(dict[str, str], data)
+    args.model = args.model or defaults.get("model") or "image-nemotron-labs-30b-a3b-q8"
+    args.reviewer = args.reviewer or defaults.get("reviewer") or "vision-chat-inkling-2-mini"
+    if args.review_runtime:
+        return split_command(args.review_runtime)
+    if os.environ.get("MERE_WORKFLOW_TOOLS_MERE_RUN") or os.environ.get("MERE_RUN_EXECUTABLE"):
+        return runtime_command()
+    return [os.path.expanduser(defaults["runtime"])] if "runtime" in defaults else runtime_command()
 
 
 def render(native: list[str], folder: pathlib.Path, name: str, prompt: str, args: argparse.Namespace,
@@ -123,6 +150,10 @@ def prefer_redraw(native: list[str], folder: pathlib.Path, original: pathlib.Pat
 def generate(args: argparse.Namespace, native: list[str]) -> JsonMap:
     if not args.prompt.strip() or not 0 <= args.seed <= MAX_SEED or min(args.width, args.height) <= 0:
         raise PluginError("Supply a nonempty prompt, positive dimensions, and an unsigned 64-bit seed.")
+    version = subprocess.run([*native, "--version"], capture_output=True, text=True)
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version.stdout.strip())
+    if version.returncode or not match or tuple(map(int, match.groups())) < (0, 79, 0):
+        raise PluginError("Reviewed image generation requires mere.run 0.79.0 or later. Update the native runtime.")
     if args.output_dir is None:
         parent = pathlib.Path("runs").resolve()
         parent.mkdir(exist_ok=True)
