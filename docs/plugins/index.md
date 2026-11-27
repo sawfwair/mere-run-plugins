@@ -25,7 +25,7 @@ The live catalog contains 24 official companion executables.
 | [Dataset Tools](/plugins/dataset-tools) | `mere-dataset-tools` | LoRA captions, OCR, and contact sheets | Local |
 | [Transcript Tools](/plugins/transcript-tools) | `mere-transcript-tools` | Speech transcription and redaction | Local |
 | [Audio Post](/plugins/audio-post) | `mere-audio-post` | Audio restoration, stems, MIDI, Foley, and loudness | Local |
-| [Reviewed Image](/plugins/image) | `mere-image` | Generate, blind-review, and compare one redraw | mere.run 0.79.0+, Nemotron Q8 and Inkling 2 Mini |
+| [Reviewed Image](/plugins/image) | `mere-image` | Generate, blind-review, and compare one redraw | mere.run 0.79.0+, Nemotron Q6 and Inkling 2 Mini |
 | [Image Compose](/plugins/image-compose) | `mere-image-compose` | Repeatable image generation compositions | Local |
 | [Batch Runner](/plugins/batch-runner) | `mere-batch-runner` | Resumable JSONL core-command batches | Local |
 

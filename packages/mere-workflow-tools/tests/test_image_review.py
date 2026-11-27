@@ -88,6 +88,12 @@ class ReviewedGenerationTests(unittest.TestCase):
                          ("test-q8", "test-vlm", self.brief))
         self.assertTrue(pathlib.Path(report["output"]).is_file())
 
+    def test_default_generator_uses_mixed_six_bit_checkpoint(self) -> None:
+        parser = cli.build_parser(cli.TOOLS["image_compose"])
+        args = parser.parse_args(["generate-reviewed", "--prompt", self.brief])
+        image_review.configured_runtime(args)
+        self.assertEqual(args.model, "image-nemotron-labs-30b-a3b-q6")
+
     def test_environment_and_flags_override_saved_defaults(self) -> None:
         self.config.write_text(json.dumps({"runtime": "saved", "model": "saved-model"}))
         base = ["generate-reviewed", "--prompt", self.brief]

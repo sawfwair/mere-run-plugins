@@ -645,7 +645,7 @@
     {
       "id": "mere-image",
       "name": "Reviewed Image",
-      "description": "Generate images with Nemotron Q8 and blind-review them with Inkling on mere.run 0.79.0 or later.",
+      "description": "Generate images with Nemotron Q6 and blind-review them with Inkling on mere.run 0.79.0 or later.",
       "repo": "https://github.com/sawfwair/mere-run-plugins",
       "package": "mere-workflow-tools",
       "subdirectory": "packages/mere-workflow-tools",

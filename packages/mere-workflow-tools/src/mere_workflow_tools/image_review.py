@@ -61,7 +61,7 @@ def configured_runtime(args: argparse.Namespace) -> list[str]:
         ):
             raise PluginError(f"Expected optional nonempty runtime, model, and reviewer strings in {path}.")
         defaults = cast(dict[str, str], data)
-    args.model = args.model or defaults.get("model") or "image-nemotron-labs-30b-a3b-q8"
+    args.model = args.model or defaults.get("model") or "image-nemotron-labs-30b-a3b-q6"
     args.reviewer = args.reviewer or defaults.get("reviewer") or "vision-chat-inkling-2-mini"
     if args.review_runtime:
         return split_command(args.review_runtime)
