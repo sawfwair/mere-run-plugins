@@ -66,6 +66,7 @@ mere.run graph preflight ./workflow.graph.json --inputs-json ./inputs.json --jso
 | [Dataset Tools](/plugins/dataset-tools) | Captioning models and optional OCR models for dataset prep, or a compatible base model for the selected training workflow |
 | [Transcript Tools](/plugins/transcript-tools) | A compatible ASR model, plus diarization and redaction models when those features are enabled |
 | [Audio Post](/plugins/audio-post) | FFmpeg, plus the task-specific model for denoise, dereverb, stem separation, MIDI transcription, or Foley |
+| [Reviewed Image](/plugins/image) | mere.run 0.79.0 or later, the managed Nemotron Image Q8 checkpoint with accepted NVIDIA terms, and Inkling 2 Mini. |
 | [Image Compose](/plugins/image-compose) | The selected image generation model and any referenced LoRA files. Local inpainting has a model-free path. |
 | [Batch Runner](/plugins/batch-runner) | Core and the models or runtimes required by the individual commands in the batch |
 
