@@ -18,6 +18,32 @@ mere-image-compose generate \
   --output-dir ./image-out
 ```
 
+## Generate with blind review
+
+From this checkout, install the plugin with `python -m pip install ./packages/mere-workflow-tools`.
+Use a local `mere.run` with Nemotron image generation and Inkling image chat.
+The defaults are `image-nemotron-labs-30b-a3b` and `vision-chat-inkling-2-mini`.
+For a packed checkpoint, set its path once in your shell.
+
+```bash
+export MERE_NEMOTRON_MODEL=/path/to/nemotron-q8
+mere-image-compose generate-reviewed --prompt "A red enamel kettle on a blue camping stove"
+```
+
+Inkling sees the creative brief and the first render. If it accepts the image, generation ends.
+If it requests a repair, Nemotron draws one new image from Inkling's standalone prompt.
+Two fresh Inkling sessions compare the images in opposite orders. Each sees the original
+brief and labeled images. Both must prefer the redraw with self-reported confidence of
+at least 0.75 to replace the original. Ties, split votes, and lower confidence keep the original.
+
+The command prints JSON with the path to `selected.png` and the run directory under `runs/`.
+The directory contains the renders, prompts, replies, comparison sheets, and `result.json`.
+Set `--output-dir` to choose a new directory, `--seed` for the first render, or
+`--model` and `--reviewer` to override model IDs or paths. Use `MERE_RUN_EXECUTABLE`
+to select a native binary outside your PATH. An incomplete image block gets up to two more
+attempts with successive seeds. Other inference errors and invalid reviews exit with a
+failed record. A successfully rendered original remains available.
+
 ## Add references or a LoRA
 
 ```bash

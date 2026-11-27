@@ -71,7 +71,7 @@ The catalog contains 21 companion executables:
 | Prepare image-caption datasets | [Dataset Tools](https://plugins-docs.mere.run/plugins/dataset-tools) |
 | Transcribe and reduce sensitive text | [Transcript Tools](https://plugins-docs.mere.run/plugins/transcript-tools) |
 | Clean dialogue, separate stems, or measure audio loudness | [Audio Post](https://plugins-docs.mere.run/plugins/audio-post) |
-| Generate images with references or adapters | [Image Compose](https://plugins-docs.mere.run/plugins/image-compose) |
+| Generate images with blind review, references, or adapters | [Image Compose](https://plugins-docs.mere.run/plugins/image-compose) |
 | Run resumable local command batches | [Batch Runner](https://plugins-docs.mere.run/plugins/batch-runner) |
 
 For selection guidance, see
