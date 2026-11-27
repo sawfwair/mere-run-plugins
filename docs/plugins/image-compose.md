@@ -18,6 +18,8 @@ mere-image-compose generate \
   --output-dir ./image-out
 ```
 
+For Nemotron generation with Inkling review, see [Reviewed Image](/plugins/image).
+
 ## Add references or a LoRA
 
 ```bash

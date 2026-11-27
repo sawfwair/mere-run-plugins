@@ -106,6 +106,7 @@ export default defineConfig({
             { text: 'Dataset Tools', link: '/plugins/dataset-tools' },
             { text: 'Transcript Tools', link: '/plugins/transcript-tools' },
             { text: 'Audio Post', link: '/plugins/audio-post' },
+            { text: 'Reviewed Image', link: '/plugins/image' },
             { text: 'Image Compose', link: '/plugins/image-compose' },
             { text: 'Batch Runner', link: '/plugins/batch-runner' },
           ],

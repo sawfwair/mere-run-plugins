@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, cast
 
 from PIL import Image, ImageDraw, ImageOps
@@ -131,6 +131,12 @@ TOOLS: dict[str, ToolSpec] = {
         recipe_title="Batch mere.run execution",
     ),
 }
+
+
+TOOLS["image_prompt"] = replace(
+    TOOLS["image_compose"], plugin_name="mere-image", executable="mere-image",
+    description="Render an image from a prompt and blind-review it with local Nemotron and Inkling models.",
+)
 
 
 def now_iso() -> str:
@@ -297,6 +303,9 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
     if spec.kind == "dataset":
         commands.append({"name": "text-lora", "description": "Prepare data, train a text LoRA, and evaluate behavior.",
                          "stdout": "json"})
+    if spec.kind == "image_compose":
+        commands.append({"name": "generate-reviewed", "description": "Generate, review and select a local image.",
+                         "stdout": "json"})
     capabilities = list(spec.capabilities)
     manifest: JsonMap = {
         "contractVersion": "mere.run/plugin.v1",
@@ -318,7 +327,7 @@ def plugin_manifest(spec: ToolSpec) -> JsonMap:
             "cleanupDefault": "none",
         },
     }
-    if spec.kind in {"doc", "dataset", "image_compose"}:
+    if spec.plugin_name in {"mere-doc-tools", "mere-dataset-tools", "mere-image-compose"}:
         commands.append({"name": "graph", "description": "Expose portable graph nodes.", "stdout": "json"})
         capabilities.append("graph-node-provider-v1")
         manifest["graphProvider"] = {"contractVersion": graph_provider.CONTRACT_VERSION}
@@ -1147,6 +1156,13 @@ def command_redact_export(_spec: ToolSpec, args: argparse.Namespace) -> int:
     return 0
 
 
+def command_generate_reviewed(_spec: ToolSpec, args: argparse.Namespace) -> int:
+    from . import image_review
+
+    print_json(image_review.generate(args, image_review.configured_runtime(args)))
+    return 0
+
+
 def command_text_lora(_spec: ToolSpec, args: argparse.Namespace) -> int:
     native = shlex.split(getattr(args, "mere_run_command", ""))
     print_json(text_lora.run(args, native))
@@ -1249,6 +1265,8 @@ def add_structured_doc_args(parser: argparse.ArgumentParser, *, required: bool) 
 
 def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=spec.executable)
+    if spec.plugin_name == "mere-image":
+        parser.epilog = 'To render and review an image, run mere-image "your prompt".'
     sub = parser.add_subparsers(dest="command", required=True)
 
     manifest = sub.add_parser("manifest", help="Print plugin manifest.")
@@ -1282,7 +1300,14 @@ def build_parser(spec: ToolSpec) -> argparse.ArgumentParser:
     cleanup.add_argument("run_manifest", type=pathlib.Path)
     cleanup.set_defaults(func=command_cleanup)
 
-    if spec.kind in {"doc", "dataset", "image_compose"}:
+    if spec.kind == "image_compose":
+        from . import image_review
+
+        reviewed = sub.add_parser("generate-reviewed", help="Render, audit and select an image with local models.")
+        image_review.add_arguments(reviewed)
+        reviewed.set_defaults(func=command_generate_reviewed)
+
+    if spec.plugin_name in {"mere-doc-tools", "mere-dataset-tools", "mere-image-compose"}:
         graph = sub.add_parser("graph", help="Expose portable graph nodes.")
         graph_sub = graph.add_subparsers(dest="graph_command", required=True)
 

@@ -17,6 +17,7 @@ mere-media-scrub scrub --input ./frames --output-dir ./scrub-out
 mere-dataset-tools caption --input ./dataset --output-dir ./caption-out --trigger-token STYLE
 mere-transcript-tools transcribe --input ./meeting.wav --output-dir ./transcript-out
 mere-image-compose generate --prompt "a product render" --output-dir ./image-out
+mere-image-compose generate-reviewed --prompt "a watercolor of a harbor at dusk"
 mere-batch-runner run-jobs --jobs ./jobs.jsonl --output-dir ./batch-out
 ```
 
@@ -29,7 +30,7 @@ source-checkout binary.
 - `mere-media-scrub`: OCR and text redaction, plus offline visual review and PNG export for still images and frame folders
 - `mere-dataset-tools`: `mere.run vision caption`, optional OCR sidecars, and a contact sheet
 - `mere-transcript-tools`: `mere.run speech transcribe` plus optional PII redaction
-- `mere-image-compose`: `mere.run image generate` with ref image and LoRA flags recorded
+- `mere-image-compose`: local image generation with reference images, LoRAs, or blind review and redraw selection
   and portable graph nodes for cropping, masking, compositing, and small-area inpainting
 - `mere-batch-runner`: JSONL batch runner for explicit `mere.run` argv lists
 

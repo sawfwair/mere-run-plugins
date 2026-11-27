@@ -28,6 +28,15 @@ An installed bundle does not need uv, pipx, Homebrew, or a system Python.
 Do not put model weights, local artifacts, or signing keys in this directory.
 See [the bundle contract](../../docs/reference/plugin-bundles.md).
 
+## Reviewed Image release
+
+Version 0.9.0 adds the `mere-image` launcher. Build the workflow-tools bundle from the
+reviewed source revision, then sign, notarize and staple it using the existing release
+process. Publish and verify sequence 10 at `mere-workflow-tools/0.9.0-10/release.json`
+before promoting the catalog. The managed model IDs require mere.run 0.79.0 or later.
+On a relocated bundle, verify `mere-image manifest --json`, install both model IDs,
+and run a prompt through the native generator and reviewer.
+
 ## Refresh native dependency notices
 
 Use a clean checkout of the exact AnyDoc release source. Generate Cargo metadata
